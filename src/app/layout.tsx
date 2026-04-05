@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Health Dashboard",
+  title: "Health OS",
   description:
-    "A private dashboard that combines WHOOP and Hevy data into daily health and training guidance.",
+    "A private health command center that blends WHOOP and Hevy into daily decisions, trends, and delivery tools.",
 };
 
 export default function RootLayout({
