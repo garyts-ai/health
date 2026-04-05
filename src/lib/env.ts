@@ -1,12 +1,18 @@
 type RequiredEnvKey =
   | "WHOOP_CLIENT_ID"
   | "WHOOP_CLIENT_SECRET"
-  | "WHOOP_REDIRECT_URI";
+  | "WHOOP_REDIRECT_URI"
+  | "ADMIN_ACTION_SECRET";
 
 type OptionalEnvKey = "HEVY_API_KEY" | "DISCORD_WEBHOOK_URL";
 
-function getEnv(key: RequiredEnvKey) {
+function readEnv(key: RequiredEnvKey | OptionalEnvKey) {
   const value = process.env[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function getRequiredEnv(key: RequiredEnvKey) {
+  const value = readEnv(key);
 
   if (!value) {
     throw new Error(`Missing required environment variable: ${key}`);
@@ -15,14 +21,54 @@ function getEnv(key: RequiredEnvKey) {
   return value;
 }
 
-function getOptionalEnv(key: OptionalEnvKey) {
-  return process.env[key] ?? null;
+export function hasWhoopEnv() {
+  return Boolean(
+    readEnv("WHOOP_CLIENT_ID") &&
+      readEnv("WHOOP_CLIENT_SECRET") &&
+      readEnv("WHOOP_REDIRECT_URI"),
+  );
 }
 
-export const env = {
-  whoopClientId: getEnv("WHOOP_CLIENT_ID"),
-  whoopClientSecret: getEnv("WHOOP_CLIENT_SECRET"),
-  whoopRedirectUri: getEnv("WHOOP_REDIRECT_URI"),
-  hevyApiKey: getOptionalEnv("HEVY_API_KEY"),
-  discordWebhookUrl: getOptionalEnv("DISCORD_WEBHOOK_URL"),
-};
+export function getWhoopEnv() {
+  return {
+    clientId: getRequiredEnv("WHOOP_CLIENT_ID"),
+    clientSecret: getRequiredEnv("WHOOP_CLIENT_SECRET"),
+    redirectUri: getRequiredEnv("WHOOP_REDIRECT_URI"),
+  };
+}
+
+export function hasHevyApiKey() {
+  return Boolean(readEnv("HEVY_API_KEY"));
+}
+
+export function getHevyApiKey() {
+  const value = readEnv("HEVY_API_KEY");
+
+  if (!value) {
+    throw new Error("Missing required environment variable: HEVY_API_KEY");
+  }
+
+  return value;
+}
+
+export function hasDiscordWebhookUrl() {
+  return Boolean(readEnv("DISCORD_WEBHOOK_URL"));
+}
+
+export function getDiscordWebhookUrl() {
+  const value = readEnv("DISCORD_WEBHOOK_URL");
+
+  if (!value) {
+    throw new Error("Missing required environment variable: DISCORD_WEBHOOK_URL");
+  }
+
+  return value;
+}
+
+export function hasAdminActionSecret() {
+  return Boolean(readEnv("ADMIN_ACTION_SECRET"));
+}
+
+export function getAdminActionSecret() {
+  return getRequiredEnv("ADMIN_ACTION_SECRET");
+}

@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { env } from "@/lib/env";
+import { getHevyApiKey, hasHevyApiKey } from "@/lib/env";
 import { HEVY_API_BASE_URL, HEVY_PAGE_SIZE } from "@/lib/hevy/constants";
 import { getLatestHevyWorkouts, normalizeHevyWorkout } from "@/lib/hevy/normalize";
 import type { HevyConnectionStatus, HevyWorkoutSummary } from "@/lib/hevy/types";
@@ -25,11 +25,7 @@ function nowIso() {
 }
 
 function getApiKey() {
-  if (!env.hevyApiKey) {
-    throw new Error("Missing HEVY_API_KEY environment variable.");
-  }
-
-  return env.hevyApiKey;
+  return getHevyApiKey();
 }
 
 async function hevyFetch<T>(path: string) {
@@ -252,6 +248,7 @@ export async function syncHevyData() {
 
 export function getHevyConnectionStatus(): HevyConnectionStatus {
   const db = getDb();
+  const isConfigured = hasHevyApiKey();
   const row = db
     .prepare(`
       SELECT status, user_id, email, token_type, last_connected_at, last_sync_started_at,
@@ -280,9 +277,10 @@ export function getHevyConnectionStatus(): HevyConnectionStatus {
     Date.now() - new Date(lastSyncCompletedAt).getTime() > STALE_SYNC_MS;
 
   return {
-    connected: row?.status === "connected",
-    status: row?.status ?? "disconnected",
-    hasApiKey: Boolean(env.hevyApiKey),
+    connected: isConfigured && row?.status === "connected",
+    isConfigured,
+    status: isConfigured ? row?.status ?? "disconnected" : "not_configured",
+    hasApiKey: isConfigured,
     userId: row?.user_id ?? null,
     userName: row?.email ?? null,
     profileUrl: null,

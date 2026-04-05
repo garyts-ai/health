@@ -1,11 +1,11 @@
 import {
-  ConnectionsStatusCards,
   SummaryBanner,
   getSettingsBannerMessage,
 } from "@/components/dashboard-sections";
-import { DailyBriefExport } from "@/components/daily-brief-export";
+import { ProtectedSettingsActions } from "@/components/protected-settings-actions";
 import { ProductShell } from "@/components/product-shell";
 import { getDiscordDeliveryStatus } from "@/lib/discord-delivery";
+import { hasAdminActionSecret, hasDiscordWebhookUrl } from "@/lib/env";
 import { getHevyConnectionStatus } from "@/lib/hevy/provider";
 import { getDailySummary } from "@/lib/insights/engine";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
@@ -23,6 +23,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const whoopStatus = getWhoopConnectionStatus();
   const hevyStatus = getHevyConnectionStatus();
   const deliveryStatus = getDiscordDeliveryStatus();
+  const adminActionsConfigured = hasAdminActionSecret();
+  const discordConfigured = hasDiscordWebhookUrl();
   const bannerMessage = getSettingsBannerMessage(resolvedSearchParams);
 
   return (
@@ -96,9 +98,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </article>
       </section>
 
-      <ConnectionsStatusCards whoop={whoopStatus} hevy={hevyStatus} />
-
-      <DailyBriefExport summary={summary} deliveryStatus={deliveryStatus} />
+      <ProtectedSettingsActions
+        adminActionsConfigured={adminActionsConfigured}
+        deliveryStatus={deliveryStatus}
+        hevy={hevyStatus}
+        isDiscordConfigured={discordConfigured}
+        summary={summary}
+        whoop={whoopStatus}
+      />
     </ProductShell>
   );
 }

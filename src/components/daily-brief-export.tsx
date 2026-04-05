@@ -3,12 +3,16 @@
 import { toPng } from "html-to-image";
 import { useRef, useState, useTransition } from "react";
 
+import { ADMIN_ACTION_HEADER } from "@/lib/admin-action-shared";
 import { buildLlmHandoff } from "@/lib/daily-brief-shared";
 import type { DailySummary, DiscordDeliveryStatus } from "@/lib/insights/types";
 
 type DailyBriefExportProps = {
-  summary: DailySummary;
+  adminActionsConfigured: boolean;
+  adminSecret: string;
   deliveryStatus: DiscordDeliveryStatus;
+  isDiscordConfigured: boolean;
+  summary: DailySummary;
 };
 
 function formatTimestamp(value: string | null) {
@@ -22,7 +26,13 @@ function formatTimestamp(value: string | null) {
   }).format(new Date(value));
 }
 
-export function DailyBriefExport({ summary, deliveryStatus }: DailyBriefExportProps) {
+export function DailyBriefExport({
+  adminActionsConfigured,
+  adminSecret,
+  deliveryStatus,
+  isDiscordConfigured,
+  summary,
+}: DailyBriefExportProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const handoff = buildLlmHandoff(summary);
   const [copied, setCopied] = useState(false);
@@ -34,6 +44,9 @@ export function DailyBriefExport({ summary, deliveryStatus }: DailyBriefExportPr
     message: null,
   });
   const [isPending, startTransition] = useTransition();
+  const trimmedAdminSecret = adminSecret.trim();
+  const canSendToDiscord =
+    adminActionsConfigured && isDiscordConfigured && trimmedAdminSecret.length > 0;
 
   const handleDownload = () => {
     const target = cardRef.current;
@@ -61,12 +74,27 @@ export function DailyBriefExport({ summary, deliveryStatus }: DailyBriefExportPr
   };
 
   const handleSendToDiscord = () => {
+    if (!canSendToDiscord) {
+      setSendState({
+        kind: "error",
+        message: !adminActionsConfigured
+          ? "Add ADMIN_ACTION_SECRET to enable protected actions."
+          : !isDiscordConfigured
+            ? "Add DISCORD_WEBHOOK_URL to enable Discord sends."
+            : "Enter the admin secret to send the Discord brief.",
+      });
+      return;
+    }
+
     startTransition(async () => {
       setSendState({ kind: "idle", message: null });
 
       try {
         const response = await fetch("/api/discord/daily-brief", {
           method: "POST",
+          headers: {
+            [ADMIN_ACTION_HEADER]: trimmedAdminSecret,
+          },
         });
         const payload = (await response.json()) as {
           ok: boolean;
@@ -132,7 +160,7 @@ export function DailyBriefExport({ summary, deliveryStatus }: DailyBriefExportPr
           className="inline-flex h-11 items-center justify-center rounded-full border border-sky-300 bg-sky-50 px-5 text-sm font-semibold text-sky-900 transition hover:border-sky-500 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
           type="button"
           onClick={handleSendToDiscord}
-          disabled={isPending}
+          disabled={isPending || !canSendToDiscord}
         >
           {isPending ? "Sending..." : "Send to Discord"}
         </button>
@@ -197,45 +225,41 @@ export function DailyBriefExport({ summary, deliveryStatus }: DailyBriefExportPr
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lime-200">
                 Daily Health Brief
               </p>
-              <h3 className="mt-3 text-3xl font-semibold">
-                {handoff.headline}
-              </h3>
+              <h3 className="mt-3 text-3xl font-semibold">{handoff.headline}</h3>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-200">
                 {handoff.subheadline}
               </p>
             </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
-            {handoff.metricCards.map((card) => (
-              <div key={card.label} className="rounded-[1.25rem] bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                  {card.label}
-                </p>
-                <p className="mt-2 whitespace-pre-line text-3xl font-semibold">{card.value}</p>
-                <p className="mt-2 text-sm text-stone-600">{card.detail}</p>
-              </div>
-            ))}
-          </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              {handoff.metricCards.map((card) => (
+                <div key={card.label} className="rounded-[1.25rem] bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                    {card.label}
+                  </p>
+                  <p className="mt-2 whitespace-pre-line text-3xl font-semibold">{card.value}</p>
+                  <p className="mt-2 text-sm text-stone-600">{card.detail}</p>
+                </div>
+              ))}
+            </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-            {handoff.trainingContextCards.map((card) => (
-              <div key={card.label} className="rounded-[1.25rem] bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                  {card.label}
-                </p>
-                <p className="mt-2 whitespace-pre-line text-3xl font-semibold">{card.value}</p>
-                <p className="mt-2 text-sm text-stone-600">{card.detail}</p>
-              </div>
-            ))}
+              {handoff.trainingContextCards.map((card) => (
+                <div key={card.label} className="rounded-[1.25rem] bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                    {card.label}
+                  </p>
+                  <p className="mt-2 whitespace-pre-line text-3xl font-semibold">{card.value}</p>
+                  <p className="mt-2 text-sm text-stone-600">{card.detail}</p>
+                </div>
+              ))}
             </div>
 
             <div className="rounded-[1.5rem] bg-stone-950 p-5 text-stone-100">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-200">
                 Ask an LLM
               </p>
-              <p className="mt-3 text-sm leading-6">
-                {handoff.llmQuestion}
-              </p>
+              <p className="mt-3 text-sm leading-6">{handoff.llmQuestion}</p>
             </div>
           </div>
         </div>

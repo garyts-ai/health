@@ -13,11 +13,15 @@ const whoopMessages: Record<string, string> = {
   "oauth-denied": "WHOOP authorization was denied before the app could connect.",
   "invalid-state": "WHOOP callback could not be verified. Please try connecting again.",
   "missing-code": "WHOOP returned without an authorization code.",
+  unauthorized: "WHOOP sync was blocked because the admin secret was missing or invalid.",
+  "not-configured": "WHOOP credentials are missing. Add them to .env.local before connecting.",
   "sync-failed": "WHOOP connected, but the sync step failed. Try syncing again.",
   "sync-success": "WHOOP sync completed successfully.",
 };
 
 const hevyMessages: Record<string, string> = {
+  unauthorized: "Hevy sync was blocked because the admin secret was missing or invalid.",
+  "not-configured": "Hevy sync is disabled until HEVY_API_KEY is added to .env.local.",
   "sync-success": "Hevy sync completed successfully.",
   "sync-failed": "Hevy sync failed. Double-check the API key and try again.",
 };

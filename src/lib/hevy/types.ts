@@ -16,6 +16,7 @@ export type HevyWorkoutSummary = {
 
 export type HevyConnectionStatus = {
   connected: boolean;
+  isConfigured: boolean;
   status: string;
   hasApiKey: boolean;
   userId: string | null;

@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { applySchema, getDb } from "@/lib/db";
 import { buildDiscordSummaryText, createDailyBriefImage } from "@/lib/daily-brief";
-import { env } from "@/lib/env";
+import { getDiscordWebhookUrl } from "@/lib/env";
 import { getDailySummary } from "@/lib/insights/engine";
 import type {
   DiscordDeliveryStatus,
@@ -44,11 +44,7 @@ function getDeliveryDb(db?: DatabaseSync) {
 }
 
 function getWebhookUrl(webhookUrlOverride?: string) {
-  const webhookUrl = webhookUrlOverride ?? env.discordWebhookUrl;
-
-  if (!webhookUrl) {
-    throw new Error("Missing Discord webhook URL. Add DISCORD_WEBHOOK_URL to .env.local.");
-  }
+  const webhookUrl = webhookUrlOverride ?? getDiscordWebhookUrl();
 
   if (!/^https:\/\/(canary\.|ptb\.)?discord\.com\/api\/webhooks\//.test(webhookUrl)) {
     throw new Error("DISCORD_WEBHOOK_URL does not look like a valid Discord webhook URL.");

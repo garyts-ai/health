@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getDb } from "@/lib/db";
-import { env } from "@/lib/env";
+import { getWhoopEnv, hasWhoopEnv } from "@/lib/env";
 import {
   WHOOP_API_BASE_URL,
   WHOOP_AUTH_URL,
@@ -59,16 +59,18 @@ function createStateToken() {
 }
 
 function buildWhoopAuthUrl(state: string) {
+  const whoopEnv = getWhoopEnv();
   const url = new URL(WHOOP_AUTH_URL);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", env.whoopClientId);
-  url.searchParams.set("redirect_uri", env.whoopRedirectUri);
+  url.searchParams.set("client_id", whoopEnv.clientId);
+  url.searchParams.set("redirect_uri", whoopEnv.redirectUri);
   url.searchParams.set("scope", WHOOP_SCOPE_STRING);
   url.searchParams.set("state", state);
   return url.toString();
 }
 
 async function exchangeCodeForToken(code: string) {
+  const whoopEnv = getWhoopEnv();
   const response = await fetch(WHOOP_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -77,9 +79,9 @@ async function exchangeCodeForToken(code: string) {
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: env.whoopRedirectUri,
-      client_id: env.whoopClientId,
-      client_secret: env.whoopClientSecret,
+      redirect_uri: whoopEnv.redirectUri,
+      client_id: whoopEnv.clientId,
+      client_secret: whoopEnv.clientSecret,
     }),
     cache: "no-store",
   });
@@ -92,6 +94,7 @@ async function exchangeCodeForToken(code: string) {
 }
 
 async function refreshAccessToken(refreshToken: string) {
+  const whoopEnv = getWhoopEnv();
   const response = await fetch(WHOOP_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -100,8 +103,8 @@ async function refreshAccessToken(refreshToken: string) {
     body: new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: refreshToken,
-      client_id: env.whoopClientId,
-      client_secret: env.whoopClientSecret,
+      client_id: whoopEnv.clientId,
+      client_secret: whoopEnv.clientSecret,
     }),
     cache: "no-store",
   });
@@ -777,6 +780,7 @@ export async function syncWhoopData() {
 
 export function getWhoopConnectionStatus(): WhoopConnectionStatus {
   const db = getDb();
+  const isConfigured = hasWhoopEnv();
   const row = db
     .prepare(`
       SELECT provider, status, user_id, email, scopes, last_connected_at,
@@ -809,8 +813,9 @@ export function getWhoopConnectionStatus(): WhoopConnectionStatus {
     Date.now() - new Date(lastSyncCompletedAt).getTime() > STALE_SYNC_MS;
 
   return {
-    connected: row?.status === "connected",
-    status: row?.status ?? "disconnected",
+    connected: isConfigured && row?.status === "connected",
+    isConfigured,
+    status: isConfigured ? row?.status ?? "disconnected" : "not_configured",
     hasOfflineAccess: getScopesFromString(row?.scopes ?? null).includes("offline"),
     userId: row?.user_id ?? null,
     email: row?.email ?? null,

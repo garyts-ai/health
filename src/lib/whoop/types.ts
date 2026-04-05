@@ -76,6 +76,7 @@ export type WhoopWorkoutSummary = {
 
 export type WhoopConnectionStatus = {
   connected: boolean;
+  isConfigured: boolean;
   status: string;
   hasOfflineAccess: boolean;
   userId: number | null;

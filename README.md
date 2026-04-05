@@ -32,7 +32,16 @@ WHOOP_CLIENT_ID=
 WHOOP_CLIENT_SECRET=
 WHOOP_REDIRECT_URI=http://localhost:3000/api/auth/whoop/callback
 HEVY_API_KEY=
+ADMIN_ACTION_SECRET=
 ```
+
+Optional variables:
+
+```env
+DISCORD_WEBHOOK_URL=
+```
+
+`ADMIN_ACTION_SECRET` protects manual syncs and Discord delivery routes. Store it in `.env.local`, then enter the same value in the Settings page when you want to run protected actions from the browser.
 
 ## Current Direction
 
