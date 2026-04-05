@@ -13,6 +13,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+For a more stable local run that behaves like production:
+
+```bash
+npm run start:prod
+```
+
+This builds the app and starts the production server on [http://localhost:3000](http://localhost:3000).
+
 ## Environment
 
 Create a local `.env.local` file based on `.env.example`.
