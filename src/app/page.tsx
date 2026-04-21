@@ -6,9 +6,13 @@ import { getDailySummary } from "@/lib/insights/engine";
 import { getDiscordDeliveryStatus } from "@/lib/discord-delivery";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type HomePageProps = {
   searchParams?: Promise<{
     hevy?: string;
+    intake?: string;
     targets?: string;
     utilities?: string;
     whoop?: string;

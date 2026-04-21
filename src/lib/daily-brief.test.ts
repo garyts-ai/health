@@ -119,6 +119,31 @@ const summary: DailySummary = {
     smartReason: "Based on 162.0 lb, 4 lifts, 54 sets, and weight trend is controlled.",
     updatedAt: "2026-04-04T11:00:00.000Z",
   },
+  nutritionActuals: {
+    dateKey: "2026-04-04",
+    calories: 1780,
+    proteinG: 112,
+    carbsG: 185,
+    fatG: 58,
+    remainingCalories: 720,
+    remainingProteinG: 38,
+    calorieTarget: 2500,
+    proteinTargetG: 150,
+    hasLoggedIntake: true,
+    entries: [
+      {
+        id: 1,
+        mealType: "restaurant",
+        label: "Rice bowl",
+        calories: 780,
+        proteinG: 48,
+        carbsG: 92,
+        fatG: 22,
+        note: null,
+        loggedAt: "2026-04-04T18:00:00.000Z",
+      },
+    ],
+  },
   physiqueDecision: {
     trainingTarget: "Lower",
     trainingTargetReason: "Lower is due based on split recency: upper 1d, lower 2d.",
@@ -150,7 +175,7 @@ const summary: DailySummary = {
       { label: "Lifts", value: "4/4", detail: "54 sets Mon-Sun", status: "good" },
       { label: "Weight trend", value: "+0.2 lb", detail: "161.8 lb 7d avg", status: "good" },
       { label: "Strength", value: "+4.0 lb", detail: "Chest Press", status: "good" },
-      { label: "Nutrition", value: "150g", detail: "2500 cal target", status: "good" },
+      { label: "Nutrition", value: "112/150g", detail: "1780/2500 cal", status: "good" },
     ],
   },
   bodyCard: {
@@ -261,6 +286,7 @@ test("buildDiscordSummaryText stays metrics-led for fresh LLM judgment", () => {
   assert.match(text, /Recovery 71%/);
   assert.match(text, /Overnight read: Normal night/);
   assert.match(text, /Weekly muscle focus: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x/);
+  assert.match(text, /Nutrition: 1780\/2500 cal \| 112\/150g protein/);
   assert.match(text, /Body weight: 162\.0 lb \| stable versus last week/);
   assert.match(text, /Latest session:/);
   assert.match(text, /Prompt:/);
@@ -278,6 +304,7 @@ test("buildLlmHandoff prompt asks the model to infer priorities from metrics", (
   assert.match(handoff.promptText, /Infer fresh priorities from the data/);
   assert.match(handoff.promptText, /Overnight read: Normal night/);
   assert.match(handoff.promptText, /Weekly muscle groups hit: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x, Lats 1x/);
+  assert.match(handoff.promptText, /Intake logged today: 1780\/2500 cal, 112\/150g protein/);
   assert.match(handoff.promptText, /Body weight context: stable versus last week/);
   assert.match(handoff.promptText, /Latest workout muscle groups: Chest, Front delts, Biceps, Triceps/);
   assert.match(handoff.promptText, /Output/);

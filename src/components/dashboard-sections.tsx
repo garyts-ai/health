@@ -29,10 +29,17 @@ const targetMessages: Record<string, string> = {
   failed: "Nutrition targets could not be saved.",
 };
 
+const intakeMessages: Record<string, string> = {
+  saved: "Meal logged.",
+  deleted: "Meal removed.",
+  failed: "Meal entry could not be updated.",
+};
+
 export function getSettingsBannerMessage(searchParams: {
   whoop?: string;
   hevy?: string;
   targets?: string;
+  intake?: string;
 }) {
   return searchParams.whoop
     ? whoopMessages[searchParams.whoop]
@@ -40,6 +47,8 @@ export function getSettingsBannerMessage(searchParams: {
       ? hevyMessages[searchParams.hevy]
       : searchParams.targets
         ? targetMessages[searchParams.targets]
+        : searchParams.intake
+          ? intakeMessages[searchParams.intake]
       : null;
 }
 

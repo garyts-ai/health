@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { buildRequestRedirectUrl } from "@/lib/request-url";
 import { syncWhoopData } from "@/lib/whoop/provider";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const redirectUrl = new URL("/?utilities=open", request.url);
+  const redirectUrl = buildRequestRedirectUrl(request, "/?utilities=open");
 
   try {
     await syncWhoopData();

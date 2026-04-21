@@ -35,6 +35,10 @@ function formatPoundsValue(value: number | null) {
   return value === null ? "--" : `${value.toFixed(1)} lb`;
 }
 
+function formatMacroGrams(value: number) {
+  return `${Math.round(value)}g`;
+}
+
 function sanitizeTrend(values: Array<number | null>) {
   return values.slice(-3).map((value) => (typeof value === "number" ? value : null));
 }
@@ -202,6 +206,14 @@ export function buildTodayViewModel(
             ? summary.physiqueDecision.calorieTargetLabel
             : `${summary.physiqueDecision.calorieTargetLabel} / ${summary.physiqueDecision.calorieRecommendation}`,
         protein: summary.physiqueDecision.proteinTargetLabel,
+        intake:
+          summary.nutritionActuals.hasLoggedIntake
+            ? `${summary.nutritionActuals.calories}/${summary.nutritionActuals.calorieTarget ?? "--"} cal`
+            : "Log first meal",
+        remaining:
+          summary.nutritionActuals.hasLoggedIntake
+            ? `${summary.nutritionActuals.remainingCalories ?? "--"} cal / ${summary.nutritionActuals.remainingProteinG ?? "--"}g protein`
+            : "No meals logged",
         bottleneck: summary.physiqueDecision.mainBottleneck,
         targetReason: summary.physiqueDecision.trainingTargetReason,
         sessionAnchors: summary.physiqueDecision.sessionAnchors,
@@ -309,9 +321,13 @@ export function buildTodayViewModel(
           "Auto-detecting repeat lifts",
       },
       {
-        label: "Nutrition target",
-        value: summary.physiqueDecision.proteinTargetLabel,
-        detail: `${summary.physiqueDecision.calorieTargetLabel} calories`,
+        label: "Nutrition",
+        value: summary.nutritionActuals.hasLoggedIntake
+          ? `${summary.nutritionActuals.calories} cal`
+          : "No meals",
+        detail: summary.nutritionActuals.hasLoggedIntake
+          ? `${formatMacroGrams(summary.nutritionActuals.proteinG)} protein / ${summary.nutritionActuals.remainingCalories ?? "--"} cal left`
+          : `${summary.physiqueDecision.calorieTargetLabel} / ${summary.physiqueDecision.proteinTargetLabel} target`,
       },
     ],
     scorecard: summary.physiqueDecision.weeklyScorecard,

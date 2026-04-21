@@ -115,13 +115,21 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     },
     {
       label: "Calories",
-      value: summary.physiqueDecision.calorieTargetLabel,
-      detail: summary.physiqueDecision.calorieRecommendation,
+      value: summary.nutritionActuals.hasLoggedIntake
+        ? `${summary.nutritionActuals.calories}/${summary.nutritionActuals.calorieTarget ?? "--"}`
+        : summary.physiqueDecision.calorieTargetLabel,
+      detail: summary.nutritionActuals.hasLoggedIntake
+        ? `${summary.nutritionActuals.remainingCalories ?? "--"} remaining`
+        : summary.physiqueDecision.calorieRecommendation,
     },
     {
       label: "Protein",
-      value: summary.physiqueDecision.proteinTargetLabel,
-      detail: "Target only; intake not logged yet",
+      value: summary.nutritionActuals.hasLoggedIntake
+        ? `${summary.nutritionActuals.proteinG}/${summary.nutritionActuals.proteinTargetG ?? "--"}g`
+        : summary.physiqueDecision.proteinTargetLabel,
+      detail: summary.nutritionActuals.hasLoggedIntake
+        ? `${summary.nutritionActuals.remainingProteinG ?? "--"}g remaining`
+        : "Target only; intake not logged yet",
     },
     {
       label: "Body Weight",
@@ -206,6 +214,20 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Calorie target: ${summary.physiqueDecision.calorieTargetLabel}`,
     `- Calorie recommendation: ${summary.physiqueDecision.calorieRecommendation}`,
     `- Protein target: ${summary.physiqueDecision.proteinTargetLabel}`,
+    `- Intake logged today: ${
+      summary.nutritionActuals.hasLoggedIntake
+        ? `${summary.nutritionActuals.calories}/${summary.nutritionActuals.calorieTarget ?? "--"} cal, ${summary.nutritionActuals.proteinG}/${summary.nutritionActuals.proteinTargetG ?? "--"}g protein, ${summary.nutritionActuals.carbsG}g carbs, ${summary.nutritionActuals.fatG}g fat`
+        : "No meals logged yet"
+    }`,
+    `- Intake remaining: ${
+      summary.nutritionActuals.remainingCalories === null
+        ? "No calorie target"
+        : `${summary.nutritionActuals.remainingCalories} cal`
+    }, ${
+      summary.nutritionActuals.remainingProteinG === null
+        ? "no protein target"
+        : `${summary.nutritionActuals.remainingProteinG}g protein`
+    }`,
     `- Recovery score: ${handoffMetric(summary.readiness.recoveryScore, "%")}`,
     `- Recovery 3-day trend: ${handoffMetric(summary.readiness.recoveryTrend3d, "%")}`,
     `- Actual sleep: ${handoffMetric(summary.readiness.sleepHours, "h", 1)}`,

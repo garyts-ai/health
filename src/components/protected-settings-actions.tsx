@@ -38,6 +38,13 @@ function formatTimestamp(value: string | null) {
   }).format(new Date(value));
 }
 
+function formatMealTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function getTone(card: ActionCard) {
   if (!card.isConfigured) {
     return {
@@ -199,6 +206,173 @@ export function ProtectedSettingsActions({
             </article>
           );
         })}
+      </section>
+
+      <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">
+              Quick intake
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#645c7d]">
+              Log a meal from your phone. Targets stay separate from actual intake.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] bg-[rgba(77,67,119,0.12)] text-sm">
+            <div className="bg-white/72 px-4 py-3">
+              <div className="text-xs text-[#7b7492]">Calories</div>
+              <div className="mt-1 font-semibold text-[#312c49]">
+                {summary.nutritionActuals.calories}
+                {summary.nutritionActuals.calorieTarget
+                  ? ` / ${summary.nutritionActuals.calorieTarget}`
+                  : ""}
+              </div>
+            </div>
+            <div className="bg-white/72 px-4 py-3">
+              <div className="text-xs text-[#7b7492]">Protein</div>
+              <div className="mt-1 font-semibold text-[#312c49]">
+                {summary.nutritionActuals.proteinG}g
+                {summary.nutritionActuals.proteinTargetG
+                  ? ` / ${summary.nutritionActuals.proteinTargetG}g`
+                  : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form
+          action="/api/nutrition-intake"
+          method="post"
+          className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6"
+        >
+          <label className="block lg:col-span-2">
+            <span className="text-sm font-medium text-[#4d4764]">Meal</span>
+            <select
+              className="mt-2 h-12 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-base text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              name="mealType"
+              defaultValue="restaurant"
+            >
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Dinner</option>
+              <option value="snack">Snack</option>
+              <option value="restaurant">Restaurant</option>
+            </select>
+          </label>
+          <label className="block lg:col-span-4">
+            <span className="text-sm font-medium text-[#4d4764]">Label</span>
+            <input
+              className="mt-2 h-12 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-base text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              name="label"
+              placeholder="Chipotle bowl, sushi, burger..."
+              type="text"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#4d4764]">Calories</span>
+            <input
+              className="mt-2 h-12 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-base text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              inputMode="numeric"
+              min="0"
+              name="calories"
+              placeholder="650"
+              required
+              type="number"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#4d4764]">Protein</span>
+            <input
+              className="mt-2 h-12 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-base text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              inputMode="decimal"
+              min="0"
+              name="proteinG"
+              placeholder="45"
+              step="0.1"
+              type="number"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#4d4764]">Carbs</span>
+            <input
+              className="mt-2 h-12 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-base text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              inputMode="decimal"
+              min="0"
+              name="carbsG"
+              placeholder="70"
+              step="0.1"
+              type="number"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#4d4764]">Fat</span>
+            <input
+              className="mt-2 h-12 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-base text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              inputMode="decimal"
+              min="0"
+              name="fatG"
+              placeholder="20"
+              step="0.1"
+              type="number"
+            />
+          </label>
+          <label className="block lg:col-span-2">
+            <span className="text-sm font-medium text-[#4d4764]">Note</span>
+            <input
+              className="mt-2 h-12 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-base text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              name="note"
+              placeholder="optional"
+              type="text"
+            />
+          </label>
+          <div className="flex items-end">
+            <button
+              className="inline-flex h-12 w-full items-center justify-center rounded-[10px] bg-[#19162a] px-4 text-sm font-semibold text-white transition hover:bg-[#2b2443]"
+              type="submit"
+            >
+              Log meal
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-5">
+          {summary.nutritionActuals.entries.length > 0 ? (
+            <div className="divide-y divide-[rgba(121,110,159,0.12)] overflow-hidden rounded-[10px] border border-[rgba(77,67,119,0.12)] bg-white/62">
+              {summary.nutritionActuals.entries.slice(0, 6).map((entry) => (
+                <div
+                  key={entry.id}
+                  className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-semibold text-[#312c49]">{entry.label}</span>
+                      <span className="text-xs text-[#7b7492]">
+                        {entry.mealType} at {formatMealTime(entry.loggedAt)}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-[#645c7d]">
+                      {entry.calories} cal / {entry.proteinG}g protein / {entry.carbsG}g carbs / {entry.fatG}g fat
+                    </div>
+                  </div>
+                  <form action="/api/nutrition-intake/delete" method="post">
+                    <input name="id" type="hidden" value={entry.id} />
+                    <button
+                      className="inline-flex h-9 items-center justify-center rounded-[8px] border border-[#d8d1ec] bg-white px-3 text-xs font-semibold text-[#5f5874] transition hover:border-[#bdb2e0] hover:bg-[#faf8ff]"
+                      type="submit"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[10px] border border-dashed border-[rgba(77,67,119,0.18)] bg-white/46 px-4 py-4 text-sm leading-6 text-[#645c7d]">
+              No meals logged today. Targets are active, but intake is intentionally empty until you log something.
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">

@@ -8,6 +8,7 @@ import {
   summarizeWorkoutMuscleGroups,
 } from "@/lib/insights/body-map";
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
+import { getNutritionIntakeSummary } from "@/lib/nutrition-intake";
 import { getNutritionTargets } from "@/lib/nutrition-targets";
 import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
@@ -22,6 +23,7 @@ import type {
   DailySummary,
   DailyTrainingLoad,
   DailyNutritionTargets,
+  DailyNutritionActuals,
   DailyPhysiqueDecision,
   DailyStrengthProgression,
   DailyWeightTrend,
@@ -1183,11 +1185,47 @@ function buildNutritionTargets(
   };
 }
 
+function buildNutritionActuals(
+  dateKey: string,
+  nutritionTargets: DailyNutritionTargets,
+): DailyNutritionActuals {
+  const intake = getNutritionIntakeSummary(dateKey);
+  const calorieTarget = nutritionTargets.effectiveCalorieTarget;
+  const proteinTargetG = nutritionTargets.effectiveProteinTargetG;
+
+  return {
+    dateKey,
+    calories: intake.calories,
+    proteinG: intake.proteinG,
+    carbsG: intake.carbsG,
+    fatG: intake.fatG,
+    remainingCalories:
+      calorieTarget === null ? null : Math.max(0, calorieTarget - intake.calories),
+    remainingProteinG:
+      proteinTargetG === null ? null : Math.max(0, proteinTargetG - intake.proteinG),
+    calorieTarget,
+    proteinTargetG,
+    hasLoggedIntake: intake.hasLoggedIntake,
+    entries: intake.entries.map((entry) => ({
+      id: entry.id,
+      mealType: entry.mealType,
+      label: entry.label,
+      calories: entry.calories,
+      proteinG: entry.proteinG,
+      carbsG: entry.carbsG,
+      fatG: entry.fatG,
+      note: entry.note,
+      loggedAt: entry.loggedAt,
+    })),
+  };
+}
+
 function buildPhysiqueDecision(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
   stressFlags: DailyStressFlags,
   nutritionTargets: DailyNutritionTargets,
+  nutritionActuals: DailyNutritionActuals,
   strengthProgression: DailyStrengthProgression[],
 ): DailyPhysiqueDecision {
   const weightTrend = buildWeightTrend(readiness);
@@ -1199,6 +1237,14 @@ function buildPhysiqueDecision(
   const lowWeeklyFrequency = trainingLoad.hevyWorkoutCount7d < 3;
   const strengthDown = strengthProgression.some((item) => item.trend === "down");
   const strengthUp = strengthProgression.some((item) => item.trend === "up");
+  const proteinGap =
+    nutritionActuals.hasLoggedIntake &&
+    nutritionActuals.remainingProteinG !== null &&
+    nutritionActuals.remainingProteinG >= 45;
+  const calorieGap =
+    nutritionActuals.hasLoggedIntake &&
+    nutritionActuals.remainingCalories !== null &&
+    nutritionActuals.remainingCalories >= 900;
   const upperDays = trainingLoad.upperBodyDaysSince ?? 99;
   const lowerDays = trainingLoad.lowerBodyDaysSince ?? 99;
   const trainingTarget: DailyPhysiqueDecision["trainingTarget"] =
@@ -1252,6 +1298,10 @@ function buildPhysiqueDecision(
       ? "Body weight is missing, so nutrition targets still need a manual baseline."
       : poorSystemicReadiness
         ? "Systemic recovery is the limiter; keep training productive but not heroic."
+      : proteinGap
+        ? "Protein is behind today; close that gap before judging training progress."
+      : calorieGap
+        ? "Calories are still light today; keep the meal plan aligned with the session."
       : lowWeeklyFrequency
           ? `${trainingTarget} is the split target; recent training frequency is behind the physique goal.`
           : strengthDown
@@ -1303,11 +1353,15 @@ function buildPhysiqueDecision(
       value:
         nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
           ? "Set target"
-          : `${nutritionTargets.effectiveProteinTargetG}g`,
+          : nutritionActuals.hasLoggedIntake
+            ? `${nutritionActuals.proteinG}/${nutritionTargets.effectiveProteinTargetG}g`
+            : `${nutritionTargets.effectiveProteinTargetG}g`,
       detail:
         nutritionTargets.effectiveCalorieTarget === null
           ? "Calories not set"
-          : `${nutritionTargets.effectiveCalorieTarget} cal ${nutritionTargets.targetSource}`,
+          : nutritionActuals.hasLoggedIntake
+            ? `${nutritionActuals.calories}/${nutritionTargets.effectiveCalorieTarget} cal`
+            : `${nutritionTargets.effectiveCalorieTarget} cal ${nutritionTargets.targetSource}`,
       status:
         nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
           ? "missing"
@@ -1787,6 +1841,20 @@ function buildPromptText(summary: DailySummary) {
     }`,
     `- Calories: ${summary.physiqueDecision.calorieTargetLabel} (${summary.physiqueDecision.calorieRecommendation})`,
     `- Protein: ${summary.physiqueDecision.proteinTargetLabel}`,
+    `- Intake logged today: ${
+      summary.nutritionActuals.hasLoggedIntake
+        ? `${summary.nutritionActuals.calories}/${summary.nutritionActuals.calorieTarget ?? "--"} cal, ${summary.nutritionActuals.proteinG}/${summary.nutritionActuals.proteinTargetG ?? "--"}g protein, ${summary.nutritionActuals.carbsG}g carbs, ${summary.nutritionActuals.fatG}g fat`
+        : "No meals logged yet"
+    }`,
+    `- Intake remaining: ${
+      summary.nutritionActuals.remainingCalories === null
+        ? "No calorie target"
+        : `${summary.nutritionActuals.remainingCalories} cal`
+    }, ${
+      summary.nutritionActuals.remainingProteinG === null
+        ? "no protein target"
+        : `${summary.nutritionActuals.remainingProteinG}g protein`
+    }`,
     `- Bottleneck: ${summary.physiqueDecision.mainBottleneck}`,
     "",
     "Metrics",
@@ -1820,6 +1888,8 @@ function buildPromptText(summary: DailySummary) {
 }
 
 export function getDailySummary(): DailySummary {
+  const now = new Date();
+  const dateKey = getDateKey(now);
   const freshness = buildFreshness();
   const miniTrends = buildMiniTrends();
   const trendSeries = buildTrendSeries();
@@ -1827,12 +1897,14 @@ export function getDailySummary(): DailySummary {
   const trainingLoad = buildTrainingLoad();
   const stressFlags = buildStressFlags(readiness, trainingLoad);
   const nutritionTargets = buildNutritionTargets(getNutritionTargets(), readiness, trainingLoad);
+  const nutritionActuals = buildNutritionActuals(dateKey, nutritionTargets);
   const strengthProgression = buildStrengthProgression(getRecentHevyWorkouts(90));
   const physiqueDecision = buildPhysiqueDecision(
     readiness,
     trainingLoad,
     stressFlags,
     nutritionTargets,
+    nutritionActuals,
     strengthProgression,
   );
   const lateNightDisruption = deriveLateNightDisruption(readiness, stressFlags);
@@ -1854,7 +1926,7 @@ export function getDailySummary(): DailySummary {
   );
 
   const summary: DailySummary = {
-    date: new Date().toISOString(),
+    date: now.toISOString(),
     contextLine: "Goal: longevity and feeling good first; strength/body composition second.",
     miniTrends,
     trendSeries,
@@ -1865,6 +1937,7 @@ export function getDailySummary(): DailySummary {
     overnightRead,
     strainSummary,
     nutritionTargets,
+    nutritionActuals,
     physiqueDecision,
     bodyCard,
     recommendations,

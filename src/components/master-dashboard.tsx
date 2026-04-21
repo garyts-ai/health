@@ -565,6 +565,8 @@ export async function MasterDashboard({
                     ["Intensity", vm.hero.decision.intensityIntentLabel],
                     ["Calories", vm.hero.decision.calories],
                     ["Protein", vm.hero.decision.protein],
+                    ["Intake", vm.hero.decision.intake],
+                    ["Remaining", vm.hero.decision.remaining],
                     ["Anchors", vm.hero.decision.sessionAnchorsLabel],
                     ["Latest", `${vm.hero.workoutLabel} / ${vm.hero.latestSessionAgeLabel}`],
                   ].map(([label, value]) => (

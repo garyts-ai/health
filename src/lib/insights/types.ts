@@ -146,6 +146,32 @@ export type DailyNutritionTargets = {
   updatedAt: string | null;
 };
 
+export type DailyNutritionIntakeEntry = {
+  id: number;
+  mealType: string;
+  label: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  note: string | null;
+  loggedAt: string;
+};
+
+export type DailyNutritionActuals = {
+  dateKey: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  remainingCalories: number | null;
+  remainingProteinG: number | null;
+  calorieTarget: number | null;
+  proteinTargetG: number | null;
+  hasLoggedIntake: boolean;
+  entries: DailyNutritionIntakeEntry[];
+};
+
 export type DailyWeightTrend = {
   currentLb: number | null;
   average7dLb: number | null;
@@ -276,6 +302,7 @@ export type DailySummary = {
     supportingPoints: string[];
   };
   nutritionTargets: DailyNutritionTargets;
+  nutritionActuals: DailyNutritionActuals;
   physiqueDecision: DailyPhysiqueDecision;
   bodyCard: BodyCardSummary;
   recommendations: DailyRecommendation[];

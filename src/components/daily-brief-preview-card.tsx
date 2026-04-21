@@ -123,7 +123,7 @@ export async function DailyBriefPreviewCard({
                     <p className="text-[12px] text-white/68">Weekly muscle volume</p>
                     <p className="mt-1 text-[11px] text-white/46">Mon-Sun</p>
                   </div>
-                  <p className="text-[11px] text-white/56">{summary.trainingLoad.hevyWorkoutCount7d} lifts</p>
+                  <p className="text-[11px] text-white/56">{summary.trainingLoad.hevyWorkoutCountThisWeek} lifts</p>
                 </div>
 
                 {dashboard.hero.weeklyFocus.length > 0 ? (

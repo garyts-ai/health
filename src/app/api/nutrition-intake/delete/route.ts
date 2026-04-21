@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { nutritionTargetsFromFormData, saveNutritionTargets } from "@/lib/nutrition-targets";
+import { deleteNutritionIntakeEntry } from "@/lib/nutrition-intake";
 import { buildRequestRedirectUrl } from "@/lib/request-url";
 
 export const runtime = "nodejs";
@@ -10,10 +10,16 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData();
-    saveNutritionTargets(nutritionTargetsFromFormData(formData));
-    redirectUrl.searchParams.set("targets", "saved");
+    const id = Number.parseInt(String(formData.get("id") ?? ""), 10);
+
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new Error("Missing nutrition intake id.");
+    }
+
+    deleteNutritionIntakeEntry(id);
+    redirectUrl.searchParams.set("intake", "deleted");
   } catch {
-    redirectUrl.searchParams.set("targets", "failed");
+    redirectUrl.searchParams.set("intake", "failed");
   }
 
   return NextResponse.redirect(redirectUrl, { status: 303 });

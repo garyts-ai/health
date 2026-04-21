@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { hasWhoopEnv } from "@/lib/env";
+import { buildRequestRedirectUrl } from "@/lib/request-url";
 import { connectWhoop } from "@/lib/whoop/provider";
 
 export const runtime = "nodejs";
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   if (!hasWhoopEnv()) {
     return NextResponse.redirect(
-      new URL("/?utilities=open&whoop=not-configured", request.url),
+      buildRequestRedirectUrl(request, "/?utilities=open&whoop=not-configured"),
     );
   }
 
