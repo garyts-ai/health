@@ -7,7 +7,9 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   if (!hasWhoopEnv()) {
-    return NextResponse.redirect(new URL("/settings?whoop=not-configured", request.url));
+    return NextResponse.redirect(
+      new URL("/?utilities=open&whoop=not-configured", request.url),
+    );
   }
 
   return connectWhoop();

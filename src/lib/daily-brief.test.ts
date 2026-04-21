@@ -29,6 +29,7 @@ const summary: DailySummary = {
     sleepEfficiency: 90,
     awakeHours: 0.8,
     latestSleepStart: "2026-04-04T03:00:00.000Z",
+    latestSleepEnd: "2026-04-04T10:30:00.000Z",
     restingHeartRate: 49,
     restingHeartRateVs7d: 1.2,
     hrvRmssd: 78,
@@ -44,6 +45,8 @@ const summary: DailySummary = {
     hevyVolume28dAvg: 13000,
     hevySetCount7d: 54,
     hevyWorkoutCount7d: 4,
+    hevySetCountThisWeek: 54,
+    hevyWorkoutCountThisWeek: 4,
     hevyConsecutiveDays: 2,
     hevyLastWorkoutTitle: "UPPER B: Chest/Arms",
     hevyLastWorkoutAt: "2026-04-03T10:00:00.000Z",
@@ -55,14 +58,23 @@ const summary: DailySummary = {
     pushDaysSince: 1,
     pullDaysSince: 1,
     muscleFocus: ["chest", "biceps", "triceps"],
+    upperSessionAnchors: ["Chest Press", "Seated Row", "Triceps Pushdown"],
+    lowerSessionAnchors: ["Single Leg Press", "Seated Leg Curl", "Leg Extension"],
     weeklyMuscleFocus: [
       { label: "Chest", hits: 2 },
-      { label: "Shoulders", hits: 2 },
+      { label: "Front delts", hits: 2 },
       { label: "Biceps", hits: 2 },
       { label: "Triceps", hits: 2 },
-      { label: "Back", hits: 1 },
+      { label: "Lats", hits: 1 },
     ],
-    latestWorkoutFocus: ["Chest", "Shoulders", "Biceps", "Triceps"],
+    weeklyMuscleVolume: [
+      { label: "Chest", effectiveSets: 10, hits: 2 },
+      { label: "Front delts", effectiveSets: 8, hits: 2 },
+      { label: "Biceps", effectiveSets: 6, hits: 2 },
+      { label: "Triceps", effectiveSets: 6, hits: 2 },
+      { label: "Lats", effectiveSets: 5, hits: 1 },
+    ],
+    latestWorkoutFocus: ["Chest", "Front delts", "Biceps", "Triceps"],
   },
   stressFlags: {
     illnessRisk: false,
@@ -96,12 +108,59 @@ const summary: DailySummary = {
     blurb: "Most of today's logged strain appears to come from walking.",
     supportingPoints: ["Walking is the biggest logged WHOOP activity so far at strain 7.7."],
   },
+  nutritionTargets: {
+    calorieTarget: 2500,
+    proteinTargetG: 150,
+    effectiveCalorieTarget: 2500,
+    effectiveProteinTargetG: 150,
+    smartCalorieTarget: 2450,
+    smartProteinTargetG: 160,
+    targetSource: "manual",
+    smartReason: "Based on 162.0 lb, 4 lifts, 54 sets, and weight trend is controlled.",
+    updatedAt: "2026-04-04T11:00:00.000Z",
+  },
+  physiqueDecision: {
+    trainingTarget: "Lower",
+    trainingTargetReason: "Lower is due based on split recency: upper 1d, lower 2d.",
+    trainingIntent: "Maintain",
+    intensityLabel: "Keep normal volume, no forced PRs",
+    sessionAnchors: ["Single Leg Press", "Seated Leg Curl", "Leg Extension"],
+    calorieRecommendation: "maintain",
+    calorieTargetLabel: "2500 cal",
+    proteinTargetLabel: "150g",
+    mainBottleneck: "Consistency is the main lever: hit volume, protein, and a stable calorie target.",
+    weightTrend: {
+      currentLb: 162,
+      average7dLb: 161.8,
+      weeklyDeltaLb: 0.2,
+    },
+    strengthProgression: [
+      {
+        exercise: "Chest Press",
+        latestValue: 112,
+        previousValue: 108,
+        delta: 4,
+        latestLabel: "112 est",
+        previousLabel: "108 prev",
+        deltaLabel: "+4.0 lb",
+        trend: "up",
+      },
+    ],
+    weeklyScorecard: [
+      { label: "Lifts", value: "4/4", detail: "54 sets Mon-Sun", status: "good" },
+      { label: "Weight trend", value: "+0.2 lb", detail: "161.8 lb 7d avg", status: "good" },
+      { label: "Strength", value: "+4.0 lb", detail: "Chest Press", status: "good" },
+      { label: "Nutrition", value: "150g", detail: "2500 cal target", status: "good" },
+    ],
+  },
   bodyCard: {
     recoveryScore: 71,
     sleepHours: 7.5,
     weightLb: 162,
     latestWorkoutName: "UPPER B: Chest/Arms",
     highlightedRegions: [],
+    weeklyHighlightedRegions: [],
+    latestWorkoutOverlayRegions: [],
     displayRegions: [],
   },
   recommendations: [
@@ -201,10 +260,10 @@ test("buildDiscordSummaryText stays metrics-led for fresh LLM judgment", () => {
   assert.match(text, /Daily Health Brief/);
   assert.match(text, /Recovery 71%/);
   assert.match(text, /Overnight read: Normal night/);
-  assert.match(text, /Weekly muscle focus: Chest 2x, Shoulders 2x, Biceps 2x, Triceps 2x/);
-  assert.match(text, /Weight 162\.0 lb \| stable versus last week/);
-  assert.match(text, /Latest lift:/);
-  assert.match(text, /\*\*Ask the LLM:\*\*/);
+  assert.match(text, /Weekly muscle focus: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x/);
+  assert.match(text, /Body weight: 162\.0 lb \| stable versus last week/);
+  assert.match(text, /Latest session:/);
+  assert.match(text, /Prompt:/);
   assert.doesNotMatch(text, /\*\*Train:\*\*/);
   assert.doesNotMatch(text, /\*\*Eat:\*\*/);
   assert.doesNotMatch(text, /\*\*Recover:\*\*/);
@@ -214,13 +273,15 @@ test("buildDiscordSummaryText stays metrics-led for fresh LLM judgment", () => {
 test("buildLlmHandoff prompt asks the model to infer priorities from metrics", () => {
   const handoff = buildLlmHandoff(summary);
 
-  assert.match(handoff.promptText, /Use the metrics below to infer today's priorities/);
+  assert.match(handoff.promptText, /Rules/);
   assert.match(handoff.promptText, /Do not mirror any app-generated action cards/);
+  assert.match(handoff.promptText, /Infer fresh priorities from the data/);
   assert.match(handoff.promptText, /Overnight read: Normal night/);
-  assert.match(handoff.promptText, /Weekly muscle groups hit: Chest 2x, Shoulders 2x, Biceps 2x, Triceps 2x, Back 1x/);
+  assert.match(handoff.promptText, /Weekly muscle groups hit: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x, Lats 1x/);
   assert.match(handoff.promptText, /Body weight context: stable versus last week/);
-  assert.match(handoff.promptText, /Latest workout muscle groups: Chest, Shoulders, Biceps, Triceps/);
-  assert.match(handoff.promptText, /What do you think today's priorities should be for:/);
+  assert.match(handoff.promptText, /Latest workout muscle groups: Chest, Front delts, Biceps, Triceps/);
+  assert.match(handoff.promptText, /Output/);
+  assert.match(handoff.promptText, /For each section, give:/);
   assert.doesNotMatch(handoff.promptText, /Keep intensity moderate/);
   assert.doesNotMatch(handoff.promptText, /Protect tonight's sleep/);
 });

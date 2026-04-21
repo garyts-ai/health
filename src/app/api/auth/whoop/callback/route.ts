@@ -9,31 +9,32 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
-  const settingsUrl = new URL("/settings", url);
+  const dashboardUrl = new URL("/", url);
+  dashboardUrl.searchParams.set("utilities", "open");
 
   if (error) {
-    settingsUrl.searchParams.set("whoop", "oauth-denied");
-    return NextResponse.redirect(settingsUrl);
+    dashboardUrl.searchParams.set("whoop", "oauth-denied");
+    return NextResponse.redirect(dashboardUrl);
   }
 
   const stateIsValid = await validateWhoopOAuthState(state);
 
   if (!stateIsValid) {
-    settingsUrl.searchParams.set("whoop", "invalid-state");
-    return NextResponse.redirect(settingsUrl);
+    dashboardUrl.searchParams.set("whoop", "invalid-state");
+    return NextResponse.redirect(dashboardUrl);
   }
 
   if (!code) {
-    settingsUrl.searchParams.set("whoop", "missing-code");
-    return NextResponse.redirect(settingsUrl);
+    dashboardUrl.searchParams.set("whoop", "missing-code");
+    return NextResponse.redirect(dashboardUrl);
   }
 
   try {
     await handleWhoopCallback(code);
-    settingsUrl.searchParams.set("whoop", "connected");
-    return NextResponse.redirect(settingsUrl);
+    dashboardUrl.searchParams.set("whoop", "connected");
+    return NextResponse.redirect(dashboardUrl);
   } catch {
-    settingsUrl.searchParams.set("whoop", "sync-failed");
-    return NextResponse.redirect(settingsUrl);
+    dashboardUrl.searchParams.set("whoop", "sync-failed");
+    return NextResponse.redirect(dashboardUrl);
   }
 }

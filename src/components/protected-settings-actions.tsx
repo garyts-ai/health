@@ -1,22 +1,18 @@
 "use client";
 
-import { useState } from "react";
-
 import { DailyBriefExport } from "@/components/daily-brief-export";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
 import type { DailySummary, DiscordDeliveryStatus } from "@/lib/insights/types";
 import type { WhoopConnectionStatus } from "@/lib/whoop/types";
 
 type ProtectedSettingsActionsProps = {
-  adminActionsConfigured: boolean;
   deliveryStatus: DiscordDeliveryStatus;
   hevy: HevyConnectionStatus;
   isDiscordConfigured: boolean;
+  preview: React.ReactNode;
   summary: DailySummary;
   whoop: WhoopConnectionStatus;
 };
-
-const SESSION_STORAGE_KEY = "healthmaxer.adminActionSecret";
 
 type ActionCard = {
   name: "WHOOP" | "Hevy";
@@ -46,68 +42,55 @@ function getTone(card: ActionCard) {
   if (!card.isConfigured) {
     return {
       label: "Not configured",
-      badgeClass: "bg-stone-700",
-      cardClass: "border-stone-200 bg-stone-50/80",
+      badgeClass: "bg-[#756f8f] text-white",
+      cardClass:
+        "bg-[linear-gradient(180deg,_rgba(248,245,255,0.92)_0%,_rgba(255,255,255,0.84)_100%)] ring-[rgba(77,67,119,0.12)]",
     };
   }
 
   if (!card.connected) {
     return {
       label: "Needs attention",
-      badgeClass: "bg-amber-500",
-      cardClass: "border-amber-200 bg-amber-50/80",
+      badgeClass: "bg-[#f4b38e] text-[#43251d]",
+      cardClass:
+        "bg-[linear-gradient(180deg,_rgba(255,244,240,0.94)_0%,_rgba(255,252,250,0.86)_100%)] ring-[rgba(194,118,83,0.14)]",
     };
   }
 
   if (card.lastSyncStatus === "failed") {
     return {
       label: "Sync failed",
-      badgeClass: "bg-rose-600",
-      cardClass: "border-rose-200 bg-rose-50/80",
+      badgeClass: "bg-[#c85f6e] text-white",
+      cardClass:
+        "bg-[linear-gradient(180deg,_rgba(255,243,246,0.94)_0%,_rgba(255,252,253,0.88)_100%)] ring-[rgba(191,92,115,0.16)]",
     };
   }
 
   if (card.isStale) {
     return {
       label: "Connected, stale",
-      badgeClass: "bg-stone-700",
-      cardClass: "border-stone-200 bg-stone-50/80",
+      badgeClass: "bg-[#5e5a74] text-white",
+      cardClass:
+        "bg-[linear-gradient(180deg,_rgba(245,242,252,0.94)_0%,_rgba(255,255,255,0.84)_100%)] ring-[rgba(112,104,151,0.14)]",
     };
   }
 
   return {
     label: "Connected",
-    badgeClass: "bg-lime-600",
-    cardClass: "border-lime-200 bg-lime-50/80",
+    badgeClass: "bg-[#5f58a7] text-white",
+    cardClass:
+      "bg-[linear-gradient(180deg,_rgba(242,239,252,0.94)_0%,_rgba(255,255,255,0.84)_100%)] ring-[rgba(95,88,167,0.14)]",
   };
 }
 
 export function ProtectedSettingsActions({
-  adminActionsConfigured,
   deliveryStatus,
   hevy,
   isDiscordConfigured,
+  preview,
   summary,
   whoop,
 }: ProtectedSettingsActionsProps) {
-  const [adminSecret, setAdminSecret] = useState(() =>
-    typeof window === "undefined" ? "" : window.sessionStorage.getItem(SESSION_STORAGE_KEY) ?? "",
-  );
-
-  const updateAdminSecret = (value: string) => {
-    setAdminSecret(value);
-
-    if (value.trim()) {
-      window.sessionStorage.setItem(SESSION_STORAGE_KEY, value);
-      return;
-    }
-
-    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
-  };
-
-  const trimmedAdminSecret = adminSecret.trim();
-  const actionsReady = adminActionsConfigured && trimmedAdminSecret.length > 0;
-
   const cards: ActionCard[] = [
     {
       name: "WHOOP",
@@ -141,77 +124,62 @@ export function ProtectedSettingsActions({
 
   return (
     <>
-      <section className="rounded-[1.6rem] border border-white/70 bg-white/85 p-6 shadow-[0_18px_55px_rgba(78,88,61,0.1)]">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-              Protected actions
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-stone-950">
-              Admin secret
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-              Manual syncs and Discord delivery are gated behind a shared admin secret. The
-              value only stays in this browser session and is never written into the app data.
+            <h2 className="text-2xl font-semibold tracking-tight text-[#19162a]">Manual controls</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#645c7d]">
+              This install is running as a single-user local workspace, so manual sync and
+              Discord delivery are available without an extra browser-only key step.
             </p>
           </div>
-          <div className="min-w-0 max-w-xl flex-1">
-            <label className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-              Current session secret
-            </label>
-            <input
-              className="mt-2 h-12 w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 text-sm text-stone-900 outline-none transition focus:border-stone-950 focus:bg-white"
-              type="password"
-              value={adminSecret}
-              onChange={(event) => updateAdminSecret(event.target.value)}
-              placeholder="Enter ADMIN_ACTION_SECRET"
-              autoComplete="off"
-              spellCheck={false}
-            />
+
+          <div className="min-w-0 rounded-[10px] border border-[rgba(77,67,119,0.12)] bg-white/70 p-4">
+            <p className="text-sm font-medium text-[#4d4764]">Action state</p>
+            <p className="mt-2 text-sm leading-6 text-[#645c7d]">
+              Protected actions are live in this browser. Provider credentials still determine
+              whether each sync or delivery endpoint is actually ready.
+            </p>
           </div>
         </div>
-        <p className="mt-4 text-sm text-stone-600">
-          {!adminActionsConfigured
-            ? "Add ADMIN_ACTION_SECRET to .env.local before using protected actions."
-            : trimmedAdminSecret
-              ? "Protected actions are armed for this browser session."
-              : "Enter the admin secret to unlock manual sync and Discord send actions."}
+
+        <p className="mt-4 text-sm text-[#645c7d]">
+          Sync buttons depend on provider configuration, and Discord send depends on the webhook
+          being configured.
         </p>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         {cards.map((card) => {
           const tone = getTone(card);
-          const canSync = actionsReady && card.isConfigured;
+          const canSync = card.isConfigured;
 
           return (
             <article
               key={card.name}
-              className={`rounded-[1.6rem] border p-5 shadow-[0_18px_55px_rgba(78,88,61,0.08)] ${tone.cardClass}`}
+              className={`rounded-[12px] p-5 shadow-[0_10px_28px_rgba(22,20,35,0.08)] ring-1 ${tone.cardClass}`}
             >
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-2xl font-semibold text-stone-950">{card.name}</h2>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white ${tone.badgeClass}`}
-                >
+                <h2 className="text-2xl font-semibold text-[#19162a]">{card.name}</h2>
+                <span className={`rounded-[8px] px-3 py-1 text-xs font-semibold ${tone.badgeClass}`}>
                   {tone.label}
                 </span>
               </div>
-              <p className="mt-3 text-sm text-stone-700">
+              <p className="mt-3 text-sm text-[#413b56]">
                 Last sync: {formatTimestamp(card.lastSyncCompletedAt)}
               </p>
-              <p className="mt-2 text-sm leading-6 text-stone-600">{card.statusNote}</p>
+              <p className="mt-2 text-sm leading-6 text-[#645c7d]">{card.statusNote}</p>
               <div className="mt-5 flex flex-wrap gap-3">
                 {card.primaryHref ? (
                   <a
-                    className="inline-flex h-11 items-center justify-center rounded-full bg-stone-950 px-5 text-sm font-semibold text-white transition hover:bg-stone-800"
+                    className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#19162a] px-4 text-sm font-semibold text-white transition hover:bg-[#2b2443]"
                     href={card.primaryHref}
                   >
                     {card.primaryLabel}
                   </a>
                 ) : (
                   <button
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-stone-300 px-5 text-sm font-semibold text-stone-500"
+                    className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[rgba(77,67,119,0.12)] bg-white/58 px-4 text-sm font-semibold text-[#8a84a4]"
                     type="button"
                     disabled
                   >
@@ -219,9 +187,8 @@ export function ProtectedSettingsActions({
                   </button>
                 )}
                 <form action={card.syncFormAction} method="post">
-                  <input type="hidden" name="adminSecret" value={adminSecret} />
                   <button
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-stone-300 px-5 text-sm font-semibold text-stone-800 transition hover:border-stone-950 hover:bg-white disabled:cursor-not-allowed disabled:text-stone-500 disabled:hover:border-stone-300 disabled:hover:bg-transparent"
+                    className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[rgba(77,67,119,0.14)] bg-white/76 px-4 text-sm font-semibold text-[#312c49] transition hover:border-[#8f84c7] hover:bg-white disabled:cursor-not-allowed disabled:text-[#8a84a4] disabled:hover:border-[rgba(77,67,119,0.14)] disabled:hover:bg-white/76"
                     type="submit"
                     disabled={!canSync}
                   >
@@ -234,11 +201,116 @@ export function ProtectedSettingsActions({
         })}
       </section>
 
+      <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">
+              Nutrition targets
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#645c7d]">
+              Smart targets come from body weight, weekly lifting, set volume, and short-term
+              weight trend. You can save them as your manual baseline or override them.
+            </p>
+          </div>
+
+          <div className="rounded-[10px] border border-[rgba(77,67,119,0.12)] bg-white/70 p-4 text-sm text-[#4d4764]">
+            <div className="font-medium text-[#312c49]">Active target</div>
+            <div className="mt-2">
+              Calories:{" "}
+              <span className="font-semibold">
+                {summary.nutritionTargets.effectiveCalorieTarget ?? "not set"}
+              </span>
+            </div>
+            <div className="mt-1">
+              Protein:{" "}
+              <span className="font-semibold">
+                {summary.nutritionTargets.effectiveProteinTargetG
+                  ? `${summary.nutritionTargets.effectiveProteinTargetG}g`
+                  : "not set"}
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-[#7b7492]">
+              Source: {summary.nutritionTargets.targetSource}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-[10px] border border-[rgba(77,67,119,0.12)] bg-white/58 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-medium text-[#312c49]">Smart suggestion</div>
+              <div className="mt-1 text-sm text-[#645c7d]">
+                {summary.nutritionTargets.smartCalorieTarget
+                  ? `${summary.nutritionTargets.smartCalorieTarget} calories / ${summary.nutritionTargets.smartProteinTargetG}g protein`
+                  : "Not available yet"}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-[#7b7492]">
+                {summary.nutritionTargets.smartReason}
+              </div>
+            </div>
+            <form action="/api/nutrition-targets" method="post">
+              <input
+                name="calorieTarget"
+                type="hidden"
+                value={summary.nutritionTargets.smartCalorieTarget ?? ""}
+              />
+              <input
+                name="proteinTargetG"
+                type="hidden"
+                value={summary.nutritionTargets.smartProteinTargetG ?? ""}
+              />
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d8d1ec] bg-white px-4 text-sm font-semibold text-[#312c49] transition hover:border-[#8f84c7] hover:bg-[#faf8ff] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  summary.nutritionTargets.smartCalorieTarget === null ||
+                  summary.nutritionTargets.smartProteinTargetG === null
+                }
+                type="submit"
+              >
+                Use smart targets
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <form action="/api/nutrition-targets" method="post" className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <label className="block">
+            <span className="text-sm font-medium text-[#4d4764]">Calories</span>
+            <input
+              className="mt-2 h-11 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-sm text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              defaultValue={summary.nutritionTargets.calorieTarget ?? ""}
+              inputMode="numeric"
+              min="1"
+              name="calorieTarget"
+              placeholder={summary.nutritionTargets.smartCalorieTarget?.toString() ?? "2500"}
+              type="number"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#4d4764]">Protein grams</span>
+            <input
+              className="mt-2 h-11 w-full rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-sm text-[#19162a] outline-none transition focus:border-[#8f84c7]"
+              defaultValue={summary.nutritionTargets.proteinTargetG ?? ""}
+              inputMode="numeric"
+              min="1"
+              name="proteinTargetG"
+              placeholder={summary.nutritionTargets.smartProteinTargetG?.toString() ?? "150"}
+              type="number"
+            />
+          </label>
+          <button
+            className="inline-flex h-11 items-center justify-center rounded-[10px] bg-[#19162a] px-4 text-sm font-semibold text-white transition hover:bg-[#2b2443]"
+            type="submit"
+          >
+            Save targets
+          </button>
+        </form>
+      </section>
+
       <DailyBriefExport
-        adminActionsConfigured={adminActionsConfigured}
-        adminSecret={adminSecret}
         deliveryStatus={deliveryStatus}
         isDiscordConfigured={isDiscordConfigured}
+        preview={preview}
         summary={summary}
       />
     </>

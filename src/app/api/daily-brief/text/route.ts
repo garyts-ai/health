@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { buildLlmHandoff } from "@/lib/daily-brief";
+import { buildLlmHandoff } from "@/lib/daily-brief-shared";
 import { getDailySummary } from "@/lib/insights/engine";
 
 export const runtime = "nodejs";

@@ -162,6 +162,13 @@ export function applySchema(db: DatabaseSync) {
       error_message TEXT,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS nutrition_targets (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      calorie_target INTEGER,
+      protein_target_g INTEGER,
+      updated_at TEXT NOT NULL
+    );
   `);
 }
 

@@ -1,8 +1,7 @@
 type RequiredEnvKey =
   | "WHOOP_CLIENT_ID"
   | "WHOOP_CLIENT_SECRET"
-  | "WHOOP_REDIRECT_URI"
-  | "ADMIN_ACTION_SECRET";
+  | "WHOOP_REDIRECT_URI";
 
 type OptionalEnvKey = "HEVY_API_KEY" | "DISCORD_WEBHOOK_URL";
 
@@ -63,12 +62,4 @@ export function getDiscordWebhookUrl() {
   }
 
   return value;
-}
-
-export function hasAdminActionSecret() {
-  return Boolean(readEnv("ADMIN_ACTION_SECRET"));
-}
-
-export function getAdminActionSecret() {
-  return getRequiredEnv("ADMIN_ACTION_SECRET");
 }

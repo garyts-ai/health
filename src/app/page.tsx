@@ -1,26 +1,35 @@
-import {
-  ActiveSignalsStrip,
-  TodayHeroMetrics,
-  TopActionsSection,
-  WhatChangedCard,
-} from "@/components/dashboard-sections";
-import { ProductShell } from "@/components/product-shell";
+import { MasterDashboard } from "@/components/master-dashboard";
+import { getSettingsBannerMessage } from "@/components/dashboard-sections";
+import { hasDiscordWebhookUrl } from "@/lib/env";
+import { getHevyConnectionStatus } from "@/lib/hevy/provider";
 import { getDailySummary } from "@/lib/insights/engine";
+import { getDiscordDeliveryStatus } from "@/lib/discord-delivery";
+import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
 
-export default function Home() {
+type HomePageProps = {
+  searchParams?: Promise<{
+    hevy?: string;
+    targets?: string;
+    utilities?: string;
+    whoop?: string;
+  }>;
+};
+
+export default async function Home({ searchParams }: HomePageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
   const summary = getDailySummary();
+  const whoopStatus = getWhoopConnectionStatus();
+  const hevyStatus = getHevyConnectionStatus();
+  const deliveryStatus = getDiscordDeliveryStatus();
 
   return (
-    <ProductShell
-      current="today"
-      eyebrow="Health OS"
-      title="Today"
-      description="Open the app, trust the read, and decide your day quickly. This view stays focused on readiness, action, and the handful of signals that actually changed."
-    >
-      <TodayHeroMetrics summary={summary} />
-      <TopActionsSection summary={summary} />
-      <WhatChangedCard summary={summary} />
-      <ActiveSignalsStrip summary={summary} />
-    </ProductShell>
+    <MasterDashboard
+      deliveryStatus={deliveryStatus}
+      hevy={hevyStatus}
+      isDiscordConfigured={hasDiscordWebhookUrl()}
+      summary={summary}
+      utilityBannerMessage={getSettingsBannerMessage(resolvedSearchParams)}
+      whoop={whoopStatus}
+    />
   );
 }

@@ -71,6 +71,7 @@ export type DailyReadiness = {
   sleepEfficiency: number | null;
   awakeHours: number | null;
   latestSleepStart: string | null;
+  latestSleepEnd: string | null;
   restingHeartRate: number | null;
   restingHeartRateVs7d: number | null;
   hrvRmssd: number | null;
@@ -106,6 +107,8 @@ export type DailyTrainingLoad = {
   hevyVolume28dAvg: number;
   hevySetCount7d: number;
   hevyWorkoutCount7d: number;
+  hevySetCountThisWeek: number;
+  hevyWorkoutCountThisWeek: number;
   hevyConsecutiveDays: number;
   hevyLastWorkoutTitle: string | null;
   hevyLastWorkoutAt: string | null;
@@ -117,11 +120,67 @@ export type DailyTrainingLoad = {
   pushDaysSince: number | null;
   pullDaysSince: number | null;
   muscleFocus: string[];
+  upperSessionAnchors: string[];
+  lowerSessionAnchors: string[];
   weeklyMuscleFocus: Array<{
     label: string;
     hits: number;
   }>;
+  weeklyMuscleVolume: Array<{
+    label: string;
+    effectiveSets: number;
+    hits: number;
+  }>;
   latestWorkoutFocus: string[];
+};
+
+export type DailyNutritionTargets = {
+  calorieTarget: number | null;
+  proteinTargetG: number | null;
+  effectiveCalorieTarget: number | null;
+  effectiveProteinTargetG: number | null;
+  smartCalorieTarget: number | null;
+  smartProteinTargetG: number | null;
+  targetSource: "manual" | "smart" | "missing";
+  smartReason: string;
+  updatedAt: string | null;
+};
+
+export type DailyWeightTrend = {
+  currentLb: number | null;
+  average7dLb: number | null;
+  weeklyDeltaLb: number | null;
+};
+
+export type DailyStrengthProgression = {
+  exercise: string;
+  latestValue: number | null;
+  previousValue: number | null;
+  delta: number | null;
+  latestLabel: string;
+  previousLabel: string;
+  deltaLabel: string;
+  trend: "up" | "down" | "flat" | "unknown";
+};
+
+export type DailyPhysiqueDecision = {
+  trainingTarget: "Upper" | "Lower" | "Either";
+  trainingTargetReason: string;
+  trainingIntent: "Push" | "Maintain" | "Back off";
+  intensityLabel: string;
+  sessionAnchors: string[];
+  calorieRecommendation: "maintain" | "+150 cal" | "-150 cal" | "set target";
+  calorieTargetLabel: string;
+  proteinTargetLabel: string;
+  mainBottleneck: string;
+  weightTrend: DailyWeightTrend;
+  strengthProgression: DailyStrengthProgression[];
+  weeklyScorecard: Array<{
+    label: string;
+    value: string;
+    detail: string;
+    status: "good" | "watch" | "missing";
+  }>;
 };
 
 export type DailyStressFlags = {
@@ -160,7 +219,7 @@ export type BodyRegionId =
   | "hamstrings"
   | "calves";
 
-export type BodyHighlightIntensity = "high" | "medium";
+export type BodyHighlightIntensity = "low" | "medium" | "high";
 
 export type BodyHighlight = {
   regionId: BodyRegionId;
@@ -174,6 +233,8 @@ export type BodyCardSummary = {
   weightLb: number | null;
   latestWorkoutName: string | null;
   highlightedRegions: BodyHighlight[];
+  weeklyHighlightedRegions: BodyHighlight[];
+  latestWorkoutOverlayRegions: BodyHighlight[];
   displayRegions: Array<{
     regionId: BodyRegionId;
     label: string;
@@ -214,6 +275,8 @@ export type DailySummary = {
     blurb: string;
     supportingPoints: string[];
   };
+  nutritionTargets: DailyNutritionTargets;
+  physiqueDecision: DailyPhysiqueDecision;
   bodyCard: BodyCardSummary;
   recommendations: DailyRecommendation[];
   freshness: DailyFreshness;

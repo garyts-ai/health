@@ -13,27 +13,33 @@ const whoopMessages: Record<string, string> = {
   "oauth-denied": "WHOOP authorization was denied before the app could connect.",
   "invalid-state": "WHOOP callback could not be verified. Please try connecting again.",
   "missing-code": "WHOOP returned without an authorization code.",
-  unauthorized: "WHOOP sync was blocked because the admin secret was missing or invalid.",
   "not-configured": "WHOOP credentials are missing. Add them to .env.local before connecting.",
   "sync-failed": "WHOOP connected, but the sync step failed. Try syncing again.",
   "sync-success": "WHOOP sync completed successfully.",
 };
 
 const hevyMessages: Record<string, string> = {
-  unauthorized: "Hevy sync was blocked because the admin secret was missing or invalid.",
   "not-configured": "Hevy sync is disabled until HEVY_API_KEY is added to .env.local.",
   "sync-success": "Hevy sync completed successfully.",
   "sync-failed": "Hevy sync failed. Double-check the API key and try again.",
 };
 
+const targetMessages: Record<string, string> = {
+  saved: "Nutrition targets saved.",
+  failed: "Nutrition targets could not be saved.",
+};
+
 export function getSettingsBannerMessage(searchParams: {
   whoop?: string;
   hevy?: string;
+  targets?: string;
 }) {
   return searchParams.whoop
     ? whoopMessages[searchParams.whoop]
     : searchParams.hevy
       ? hevyMessages[searchParams.hevy]
+      : searchParams.targets
+        ? targetMessages[searchParams.targets]
       : null;
 }
 
@@ -597,7 +603,7 @@ function shouldShowXAxisLabel(length: number, index: number) {
 
 export function SummaryBanner({ message }: { message: string }) {
   return (
-    <section className="rounded-[1.4rem] border border-lime-200 bg-lime-50/85 px-5 py-4 text-sm text-lime-900 shadow-[0_12px_40px_rgba(78,88,61,0.08)]">
+    <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] px-5 py-4 text-sm text-[#312c49] shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
       {message}
     </section>
   );
@@ -933,15 +939,17 @@ function TrendStat({
 }) {
   const avg = average(points.map((point) => point.value));
   return (
-    <article className="rounded-[1.7rem] border border-stone-200/80 bg-white/88 p-6 shadow-[0_18px_55px_rgba(78,88,61,0.1)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{title}</p>
-      <div className="mt-3 flex items-end justify-between gap-4">
-        <p className="text-3xl font-semibold tracking-tight text-stone-950">{value}</p>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-          {avg === null ? "No baseline" : `avg ${avg.toFixed(title === "Lifting Load" ? 1 : 0)}`}
+    <article className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.9)_0%,_rgba(255,255,255,0.8)_100%)] p-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-[#6d6785]">{title}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#171329]">{value}</p>
+        </div>
+        <p className="rounded-[8px] bg-[rgba(104,96,153,0.08)] px-2.5 py-1 text-[11px] font-medium text-[#6c6488]">
+          {avg === null ? "No baseline" : `Avg ${avg.toFixed(title === "Lifting Load" ? 1 : 0)}`}
         </p>
       </div>
-      <p className="mt-3 text-sm leading-6 text-stone-600">{note}</p>
+      <p className="mt-3 text-sm leading-6 text-[#645c7d]">{note}</p>
       <TrendChart points={points} lineClass={lineClass} gradientId={gradientId} />
     </article>
   );

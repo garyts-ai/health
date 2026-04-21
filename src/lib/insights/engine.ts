@@ -2,10 +2,13 @@ import { getDb } from "@/lib/db";
 import { getHevyConnectionStatus } from "@/lib/hevy/provider";
 import {
   buildBodyHighlightsFromWorkout,
+  buildWeeklyBodyHighlights,
   summarizeWeeklyMuscleHits,
+  summarizeWeeklyMuscleVolume,
   summarizeWorkoutMuscleGroups,
 } from "@/lib/insights/body-map";
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
+import { getNutritionTargets } from "@/lib/nutrition-targets";
 import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
 import type {
@@ -18,6 +21,10 @@ import type {
   DailyStressFlags,
   DailySummary,
   DailyTrainingLoad,
+  DailyNutritionTargets,
+  DailyPhysiqueDecision,
+  DailyStrengthProgression,
+  DailyWeightTrend,
   TrendPoint,
   DailyWhyChanged,
   RecommendationConfidence,
@@ -26,6 +33,7 @@ import type {
 
 type WhoopSleepRow = {
   start: string;
+  end: string;
   sleep_performance_percentage: number | null;
   sleep_consistency_percentage: number | null;
   sleep_efficiency_percentage: number | null;
@@ -84,6 +92,17 @@ type HevyWorkoutRow = {
   volume_kg: number | null;
   duration_seconds: number | null;
   raw_json: string;
+};
+
+type HevySetEntry = {
+  type?: string | null;
+  weight_kg?: number | null;
+  reps?: number | null;
+};
+
+type HevyExerciseEntry = {
+  title?: string | null;
+  sets?: HevySetEntry[];
 };
 
 type MuscleBucket = "upper" | "lower" | "push" | "pull";
@@ -173,6 +192,10 @@ function getStartOfWeekIso() {
   return start.toISOString();
 }
 
+function isMonday(date: Date) {
+  return date.getDay() === 1;
+}
+
 function getDateKey(date: string | Date) {
   return NEW_YORK_DAY.format(typeof date === "string" ? new Date(date) : date);
 }
@@ -232,6 +255,194 @@ function getExerciseTitles(rawJson: string) {
   } catch {
     return [];
   }
+}
+
+function getWorkoutExerciseLabels(rawJson: string) {
+  return getHevyExercises(rawJson)
+    .map((exercise) => exercise.title?.trim() ?? "")
+    .filter(Boolean);
+}
+
+function getHevyExercises(rawJson: string) {
+  try {
+    const parsed = JSON.parse(rawJson) as { exercises?: HevyExerciseEntry[] };
+    return Array.isArray(parsed.exercises) ? parsed.exercises : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeExerciseTitle(title: string) {
+  return title
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\b(machine|dumbbell|barbell|cable|standing|seated|single)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatExerciseTitle(title: string) {
+  return title
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getExerciseFamily(title: string) {
+  if (/(bench|chest press|incline press|incline bench)/.test(title)) {
+    return "push";
+  }
+
+  if (/(row|pull|pulldown|chin)/.test(title)) {
+    return "pull";
+  }
+
+  if (/(squat|leg press|lunge|split squat|leg extension)/.test(title)) {
+    return "legs";
+  }
+
+  if (/(deadlift|rdl|romanian|hip thrust|leg curl|hamstring)/.test(title)) {
+    return "hinge";
+  }
+
+  if (/(shoulder press|overhead press|lateral raise|rear delt)/.test(title)) {
+    return "shoulders";
+  }
+
+  return "accessory";
+}
+
+function estimateTopSetValue(sets: HevySetEntry[] | undefined) {
+  if (!Array.isArray(sets)) {
+    return null;
+  }
+
+  const estimates = sets
+    .filter((set) => set?.type !== "warmup")
+    .map((set) => {
+      if (typeof set.weight_kg !== "number" || typeof set.reps !== "number" || set.reps <= 0) {
+        return null;
+      }
+
+      return set.weight_kg * (1 + set.reps / 30);
+    })
+    .filter((value): value is number => typeof value === "number");
+
+  return estimates.length ? Math.max(...estimates) : null;
+}
+
+function buildStrengthProgression(workouts: HevyWorkoutRow[]): DailyStrengthProgression[] {
+  const byExercise = new Map<
+    string,
+    Array<{
+      title: string;
+      family: string;
+      value: number;
+      workoutAt: string;
+    }>
+  >();
+
+  for (const workout of [...workouts].reverse()) {
+    for (const exercise of getHevyExercises(workout.raw_json)) {
+      const title = exercise.title ?? "";
+      const normalized = normalizeExerciseTitle(title);
+      if (!normalized) {
+        continue;
+      }
+
+      const value = estimateTopSetValue(exercise.sets);
+      if (value === null || value <= 0) {
+        continue;
+      }
+
+      const current = byExercise.get(normalized) ?? [];
+      current.push({
+        title: formatExerciseTitle(normalized),
+        family: getExerciseFamily(normalized),
+        value,
+        workoutAt: workout.start_time,
+      });
+      byExercise.set(normalized, current);
+    }
+  }
+
+  const candidates = [...byExercise.values()]
+    .filter((entries) => entries.length >= 2)
+    .map((entries) => {
+      const latest = entries[entries.length - 1];
+      const previous = entries[entries.length - 2];
+      const delta = latest.value - previous.value;
+      return {
+        exercise: latest.title,
+        latestValue: round(kilogramsToPounds(latest.value), 1),
+        previousValue: round(kilogramsToPounds(previous.value), 1),
+        delta: round(kilogramsToPounds(delta), 1),
+        latestLabel: `${round(kilogramsToPounds(latest.value), 0) ?? "--"} est`,
+        previousLabel: `${round(kilogramsToPounds(previous.value), 0) ?? "--"} prev`,
+        deltaLabel:
+          delta > 0
+            ? `+${round(kilogramsToPounds(delta), 1)} lb`
+            : delta < 0
+              ? `${round(kilogramsToPounds(delta), 1)} lb`
+              : "flat",
+        trend: (Math.abs(delta) < 0.5
+          ? "flat"
+          : delta > 0
+            ? "up"
+            : "down") satisfies DailyStrengthProgression["trend"],
+        family: latest.family,
+        recency: new Date(latest.workoutAt).getTime(),
+      };
+    })
+    .sort((left, right) => {
+      const familyOrder = ["push", "pull", "legs", "hinge", "shoulders", "accessory"];
+      const leftFamily = familyOrder.indexOf(left.family);
+      const rightFamily = familyOrder.indexOf(right.family);
+      if (leftFamily !== rightFamily) {
+        return leftFamily - rightFamily;
+      }
+
+      return right.recency - left.recency;
+    });
+
+  const selected: typeof candidates = [];
+  const usedFamilies = new Set<string>();
+
+  for (const candidate of candidates) {
+    if (selected.length >= 5) {
+      break;
+    }
+
+    if (candidate.family !== "accessory" && usedFamilies.has(candidate.family)) {
+      continue;
+    }
+
+    selected.push(candidate);
+    usedFamilies.add(candidate.family);
+  }
+
+  for (const candidate of candidates) {
+    if (selected.length >= 5) {
+      break;
+    }
+
+    if (!selected.includes(candidate)) {
+      selected.push(candidate);
+    }
+  }
+
+  return selected.slice(0, 5).map((item) => ({
+    exercise: item.exercise,
+    latestValue: item.latestValue,
+    previousValue: item.previousValue,
+    delta: item.delta,
+    latestLabel: item.latestLabel,
+    previousLabel: item.previousLabel,
+    deltaLabel: item.deltaLabel,
+    trend: item.trend as DailyStrengthProgression["trend"],
+  }));
 }
 
 function inferBuckets(exerciseTitles: string[]) {
@@ -315,7 +526,7 @@ function buildReadiness(): DailyReadiness {
   const db = getDb();
   const sleepRows = db
     .prepare(`
-      SELECT start, sleep_performance_percentage, sleep_consistency_percentage,
+      SELECT start, "end", sleep_performance_percentage, sleep_consistency_percentage,
              sleep_efficiency_percentage, total_in_bed_time_milli, total_awake_time_milli, sleep_needed_baseline_milli,
              sleep_needed_debt_milli, sleep_needed_strain_milli, sleep_needed_nap_milli
       FROM whoop_sleep_summaries
@@ -405,6 +616,7 @@ function buildReadiness(): DailyReadiness {
     sleepEfficiency: latestSleep?.sleep_efficiency_percentage ?? null,
     awakeHours: round(hoursFromMillis(latestSleep?.total_awake_time_milli ?? null)),
     latestSleepStart: latestSleep?.start ?? null,
+    latestSleepEnd: latestSleep?.end ?? null,
     restingHeartRate: latestRecovery?.resting_heart_rate ?? null,
     restingHeartRateVs7d:
       latestRecovery?.resting_heart_rate !== null && restingHr7d !== null
@@ -451,12 +663,14 @@ function buildMiniTrends() {
   const sleepRows = db
     .prepare(`
       SELECT start, total_in_bed_time_milli, total_awake_time_milli
+             , "end"
       FROM whoop_sleep_summaries
       WHERE start >= ?
       ORDER BY start DESC
     `)
     .all(getStartDate(7)) as Array<{
       start: string;
+      end: string;
       total_in_bed_time_milli: number | null;
       total_awake_time_milli: number | null;
     }>;
@@ -491,6 +705,7 @@ function buildMiniTrends() {
           round(
             getActualSleepHours({
               start: row.start,
+              end: row.end,
               sleep_performance_percentage: null,
               sleep_consistency_percentage: null,
               sleep_efficiency_percentage: null,
@@ -532,12 +747,14 @@ function buildTrendSeries() {
   const sleepRows = db
     .prepare(`
       SELECT start, total_in_bed_time_milli, total_awake_time_milli
+             , "end"
       FROM whoop_sleep_summaries
       WHERE start >= ?
       ORDER BY start DESC
     `)
     .all(getStartDate(14)) as Array<{
       start: string;
+      end: string;
       total_in_bed_time_milli: number | null;
       total_awake_time_milli: number | null;
     }>;
@@ -587,6 +804,7 @@ function buildTrendSeries() {
         round(
           getActualSleepHours({
             start: row.start,
+            end: row.end,
             sleep_performance_percentage: null,
             sleep_consistency_percentage: null,
             sleep_efficiency_percentage: null,
@@ -638,25 +856,60 @@ function buildTrendSeries() {
 }
 
 function buildBodyCard(readiness: DailyReadiness): BodyCardSummary {
-  const latestWorkout = getDb()
+  const db = getDb();
+  const startOfWeekIso = getStartOfWeekIso();
+  const startOfWeek = new Date(startOfWeekIso);
+  const latestWorkout = db
     .prepare(`
-      SELECT title, raw_json
+      SELECT title, start_time, raw_json
       FROM hevy_workouts
       ORDER BY start_time DESC
       LIMIT 1
     `)
-    .get() as { title: string | null; raw_json: string } | undefined;
-  const highlightedRegions = latestWorkout
-    ? buildBodyHighlightsFromWorkout(latestWorkout.raw_json)
-    : [];
+    .get() as { title: string | null; start_time: string; raw_json: string } | undefined;
+  const weekWorkouts = db
+    .prepare(`
+      SELECT raw_json
+      FROM hevy_workouts
+      WHERE start_time >= ?
+      ORDER BY start_time DESC
+    `)
+    .all(getStartOfWeekIso()) as Array<{ raw_json: string }>;
+  const weeklyHighlightedRegions = buildWeeklyBodyHighlights(
+    weekWorkouts.map((workout) => workout.raw_json),
+  );
+  const shouldShowLatestOverlay = (() => {
+    if (!latestWorkout) {
+      return false;
+    }
+
+    const latestWorkoutAt = new Date(latestWorkout.start_time);
+    if (latestWorkoutAt >= startOfWeek) {
+      return true;
+    }
+
+    if (!isMonday(new Date())) {
+      return false;
+    }
+
+    const saturdayStart = new Date(startOfWeek);
+    saturdayStart.setDate(startOfWeek.getDate() - 2);
+    return latestWorkoutAt >= saturdayStart && latestWorkoutAt < startOfWeek;
+  })();
+  const latestWorkoutOverlayRegions =
+    latestWorkout && shouldShowLatestOverlay
+      ? buildBodyHighlightsFromWorkout(latestWorkout.raw_json)
+      : [];
 
   return {
     recoveryScore: readiness.recoveryScore,
     sleepHours: readiness.sleepHours,
     weightLb: kilogramsToPounds(readiness.bodyWeightKg),
     latestWorkoutName: latestWorkout?.title ?? null,
-    highlightedRegions,
-    displayRegions: highlightedRegions.slice(0, 5).map((highlight) => ({
+    highlightedRegions: weeklyHighlightedRegions,
+    weeklyHighlightedRegions,
+    latestWorkoutOverlayRegions,
+    displayRegions: weeklyHighlightedRegions.slice(0, 6).map((highlight) => ({
       regionId: highlight.regionId,
       label: highlight.regionId.replace(/([A-Z])/g, " $1").trim(),
       intensity: highlight.intensity,
@@ -754,6 +1007,7 @@ function buildTrainingLoad(): DailyTrainingLoad {
     `)
     .all(getStartDate(28)) as HevyWorkoutRow[];
   const workouts7d = workouts.filter((workout) => workout.start_time >= getStartDate(7));
+  const workoutsThisWeek = workouts.filter((workout) => workout.start_time >= getStartOfWeekIso());
   const latestWorkout = workouts[0] ?? null;
   const weeklyAverages = [0, 1, 2, 3].map((weekIndex) => {
     const end = Date.now() - weekIndex * 7 * DAY_MS;
@@ -780,12 +1034,22 @@ function buildTrainingLoad(): DailyTrainingLoad {
   }
 
   const bucketDates = new Map<MuscleBucket, string>();
-  for (const workout of workouts7d) {
+  let upperSessionAnchors: string[] = [];
+  let lowerSessionAnchors: string[] = [];
+  for (const workout of workouts) {
     const buckets = inferBuckets(getExerciseTitles(workout.raw_json));
     for (const bucket of buckets) {
       if (!bucketDates.has(bucket)) {
         bucketDates.set(bucket, workout.start_time);
       }
+    }
+
+    if (upperSessionAnchors.length === 0 && buckets.includes("upper")) {
+      upperSessionAnchors = getWorkoutExerciseLabels(workout.raw_json).slice(0, 5);
+    }
+
+    if (lowerSessionAnchors.length === 0 && buckets.includes("lower")) {
+      lowerSessionAnchors = getWorkoutExerciseLabels(workout.raw_json).slice(0, 5);
     }
   }
 
@@ -794,6 +1058,8 @@ function buildTrainingLoad(): DailyTrainingLoad {
     hevyVolume28dAvg: round(average(weeklyAverages)) ?? 0,
     hevySetCount7d: sum(workouts7d.map((workout) => workout.set_count)),
     hevyWorkoutCount7d: workouts7d.length,
+    hevySetCountThisWeek: sum(workoutsThisWeek.map((workout) => workout.set_count)),
+    hevyWorkoutCountThisWeek: workoutsThisWeek.length,
     hevyConsecutiveDays: consecutiveDays,
     hevyLastWorkoutTitle: latestWorkout?.title ?? null,
     hevyLastWorkoutAt: latestWorkout?.start_time ?? null,
@@ -808,10 +1074,266 @@ function buildTrainingLoad(): DailyTrainingLoad {
     pushDaysSince: daysSince(bucketDates.get("push") ?? null),
     pullDaysSince: daysSince(bucketDates.get("pull") ?? null),
     muscleFocus: latestWorkout ? getExerciseTitles(latestWorkout.raw_json).slice(0, 4) : [],
+    upperSessionAnchors,
+    lowerSessionAnchors,
     weeklyMuscleFocus: summarizeWeeklyMuscleHits(
-      workouts7d.map((workout) => workout.raw_json),
+      workoutsThisWeek.map((workout) => workout.raw_json),
+    ),
+    weeklyMuscleVolume: summarizeWeeklyMuscleVolume(
+      workoutsThisWeek.map((workout) => workout.raw_json),
     ),
     latestWorkoutFocus: latestWorkout ? summarizeWorkoutMuscleGroups(latestWorkout.raw_json) : [],
+  };
+}
+
+function getRecentHevyWorkouts(days: number) {
+  return getDb()
+    .prepare(`
+      SELECT id, title, start_time, exercise_count, set_count, volume_kg,
+             duration_seconds, raw_json
+      FROM hevy_workouts
+      WHERE start_time >= ?
+      ORDER BY start_time DESC
+    `)
+    .all(getStartDate(days)) as HevyWorkoutRow[];
+}
+
+function buildWeightTrend(readiness: DailyReadiness): DailyWeightTrend {
+  const currentLb = round(kilogramsToPounds(readiness.bodyWeightKg), 1);
+  const deltaLb = round(kilogramsToPounds(readiness.bodyWeightDelta7dKg), 1);
+  const average7dLb =
+    currentLb !== null && deltaLb !== null ? round(currentLb - deltaLb, 1) : null;
+
+  return {
+    currentLb,
+    average7dLb,
+    weeklyDeltaLb: deltaLb,
+  };
+}
+
+function formatSignedPounds(value: number | null) {
+  if (value === null) {
+    return "--";
+  }
+
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)} lb`;
+}
+
+function roundToNearest(value: number, step: number) {
+  return Math.round(value / step) * step;
+}
+
+function buildNutritionTargets(
+  manualTargets: Pick<DailyNutritionTargets, "calorieTarget" | "proteinTargetG" | "updatedAt">,
+  readiness: DailyReadiness,
+  trainingLoad: DailyTrainingLoad,
+): DailyNutritionTargets {
+  const weightLb = kilogramsToPounds(readiness.bodyWeightKg);
+  const weightDeltaLb = kilogramsToPounds(readiness.bodyWeightDelta7dKg);
+
+  if (weightLb === null) {
+    return {
+      ...manualTargets,
+      effectiveCalorieTarget: manualTargets.calorieTarget,
+      effectiveProteinTargetG: manualTargets.proteinTargetG,
+      smartCalorieTarget: null,
+      smartProteinTargetG: null,
+      targetSource:
+        manualTargets.calorieTarget !== null && manualTargets.proteinTargetG !== null
+          ? "manual"
+          : "missing",
+      smartReason: "Smart targets need a recent body-weight reading.",
+    };
+  }
+
+  const activityMultiplier =
+    trainingLoad.hevyWorkoutCount7d >= 4
+      ? 15.7
+      : trainingLoad.hevyWorkoutCount7d >= 2
+        ? 15.1
+        : 14.5;
+  const setAdjustment = trainingLoad.hevySetCount7d >= 55 ? 100 : 0;
+  const trendAdjustment =
+    (weightDeltaLb ?? 0) <= -0.8 && trainingLoad.hevyWorkoutCount7d >= 3
+      ? 150
+      : (weightDeltaLb ?? 0) >= 1.2
+        ? -150
+        : 0;
+  const smartCalorieTarget = roundToNearest(weightLb * activityMultiplier + setAdjustment + trendAdjustment, 50);
+  const smartProteinTargetG = Math.max(130, Math.min(210, roundToNearest(weightLb, 5)));
+  const targetSource =
+    manualTargets.calorieTarget !== null && manualTargets.proteinTargetG !== null
+      ? "manual"
+      : "smart";
+  const trendPhrase =
+    trendAdjustment > 0
+      ? "weight is slipping while training demand is present"
+      : trendAdjustment < 0
+        ? "weight is rising faster than the lean-gain lane"
+        : "weight trend is controlled";
+
+  return {
+    ...manualTargets,
+    effectiveCalorieTarget: manualTargets.calorieTarget ?? smartCalorieTarget,
+    effectiveProteinTargetG: manualTargets.proteinTargetG ?? smartProteinTargetG,
+    smartCalorieTarget,
+    smartProteinTargetG,
+    targetSource,
+    smartReason: `Based on ${weightLb.toFixed(1)} lb, ${trainingLoad.hevyWorkoutCount7d} lifts, ${trainingLoad.hevySetCount7d} sets, and ${trendPhrase}.`,
+  };
+}
+
+function buildPhysiqueDecision(
+  readiness: DailyReadiness,
+  trainingLoad: DailyTrainingLoad,
+  stressFlags: DailyStressFlags,
+  nutritionTargets: DailyNutritionTargets,
+  strengthProgression: DailyStrengthProgression[],
+): DailyPhysiqueDecision {
+  const weightTrend = buildWeightTrend(readiness);
+  const poorSystemicReadiness =
+    stressFlags.illnessRisk ||
+    stressFlags.lowRecovery ||
+    ((readiness.sleepVsNeedHours ?? 0) <= -1.25 && (readiness.recoveryScore ?? 100) < 55);
+  const trainedRecently = trainingLoad.upperBodyDaysSince === 0 || trainingLoad.lowerBodyDaysSince === 0;
+  const lowWeeklyFrequency = trainingLoad.hevyWorkoutCount7d < 3;
+  const strengthDown = strengthProgression.some((item) => item.trend === "down");
+  const strengthUp = strengthProgression.some((item) => item.trend === "up");
+  const upperDays = trainingLoad.upperBodyDaysSince ?? 99;
+  const lowerDays = trainingLoad.lowerBodyDaysSince ?? 99;
+  const trainingTarget: DailyPhysiqueDecision["trainingTarget"] =
+    upperDays === 99 && lowerDays === 99
+      ? "Either"
+      : lowerDays > upperDays
+        ? "Lower"
+        : upperDays > lowerDays
+          ? "Upper"
+          : trainingLoad.hevyLastWorkoutTitle?.toLowerCase().includes("upper")
+            ? "Lower"
+            : "Upper";
+  const sessionAnchors =
+    trainingTarget === "Lower"
+      ? trainingLoad.lowerSessionAnchors
+      : trainingTarget === "Upper"
+        ? trainingLoad.upperSessionAnchors
+        : [];
+  const trainingTargetReason =
+    trainingTarget === "Either"
+      ? "No clear upper/lower recency exists yet, so use warm-up feel and the planned split."
+      : `${trainingTarget} is due based on split recency: upper ${
+          trainingLoad.upperBodyDaysSince === null ? "not recent" : `${trainingLoad.upperBodyDaysSince}d`
+        }, lower ${
+          trainingLoad.lowerBodyDaysSince === null ? "not recent" : `${trainingLoad.lowerBodyDaysSince}d`
+        }.`;
+
+  const trainingIntent: DailyPhysiqueDecision["trainingIntent"] = poorSystemicReadiness
+    ? "Back off"
+    : lowWeeklyFrequency && !trainedRecently
+      ? "Push"
+      : "Maintain";
+  const intensityLabel =
+    trainingIntent === "Push"
+      ? "Add load or reps if warm-up is normal"
+      : trainingIntent === "Back off"
+        ? "Cap hard sets; preserve the week"
+        : "Keep normal volume, no forced PRs";
+
+  const calorieRecommendation: DailyPhysiqueDecision["calorieRecommendation"] =
+    nutritionTargets.effectiveCalorieTarget === null
+      ? "set target"
+      : (weightTrend.weeklyDeltaLb ?? 0) <= -0.8 && trainingLoad.hevyWorkoutCount7d >= 3
+        ? "+150 cal"
+        : (weightTrend.weeklyDeltaLb ?? 0) >= 1.2 && trainingLoad.hevyWorkoutCount7d < 4
+          ? "-150 cal"
+          : "maintain";
+
+  const mainBottleneck =
+    nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
+      ? "Body weight is missing, so nutrition targets still need a manual baseline."
+      : poorSystemicReadiness
+        ? "Systemic recovery is the limiter; keep training productive but not heroic."
+      : lowWeeklyFrequency
+          ? `${trainingTarget} is the split target; recent training frequency is behind the physique goal.`
+          : strengthDown
+            ? "Progression is soft on at least one key lift; check food, sleep, and exercise selection."
+            : strengthUp
+              ? "Progression signal is positive; keep food and volume consistent."
+              : "Consistency is the main lever: hit volume, protein, and a stable calorie target.";
+
+  const weeklyScorecard: DailyPhysiqueDecision["weeklyScorecard"] = [
+    {
+      label: "Lifts",
+      value: `${trainingLoad.hevyWorkoutCountThisWeek}/4`,
+      detail: `${trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
+      status: trainingLoad.hevyWorkoutCountThisWeek >= 3 ? "good" : "watch",
+    },
+    {
+      label: "Weight trend",
+      value: formatSignedPounds(weightTrend.weeklyDeltaLb),
+      detail:
+        weightTrend.average7dLb === null
+          ? "7-day average unavailable"
+          : `${weightTrend.average7dLb.toFixed(1)} lb 7d avg`,
+      status:
+        weightTrend.weeklyDeltaLb === null
+          ? "missing"
+          : Math.abs(weightTrend.weeklyDeltaLb) <= 0.8
+            ? "good"
+            : "watch",
+    },
+    {
+      label: "Strength",
+      value:
+        strengthProgression.length === 0
+          ? "--"
+          : strengthProgression[0].deltaLabel,
+      detail:
+        strengthProgression.length === 0
+          ? "Need repeat lift history"
+          : strengthProgression[0].exercise,
+      status:
+        strengthProgression.length === 0
+          ? "missing"
+          : strengthProgression[0].trend === "down"
+            ? "watch"
+            : "good",
+    },
+    {
+      label: "Nutrition",
+      value:
+        nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
+          ? "Set target"
+          : `${nutritionTargets.effectiveProteinTargetG}g`,
+      detail:
+        nutritionTargets.effectiveCalorieTarget === null
+          ? "Calories not set"
+          : `${nutritionTargets.effectiveCalorieTarget} cal ${nutritionTargets.targetSource}`,
+      status:
+        nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
+          ? "missing"
+          : "good",
+    },
+  ];
+
+  return {
+    trainingTarget,
+    trainingTargetReason,
+    trainingIntent,
+    intensityLabel,
+    sessionAnchors,
+    calorieRecommendation,
+    calorieTargetLabel:
+      nutritionTargets.effectiveCalorieTarget === null
+        ? "Set target"
+        : `${nutritionTargets.effectiveCalorieTarget} cal`,
+    proteinTargetLabel:
+      nutritionTargets.effectiveProteinTargetG === null
+        ? "Set target"
+        : `${nutritionTargets.effectiveProteinTargetG}g`,
+    mainBottleneck,
+    weightTrend,
+    strengthProgression,
+    weeklyScorecard,
   };
 }
 
@@ -1244,22 +1766,56 @@ function buildWhyChangedToday(
 }
 
 function buildPromptText(summary: DailySummary) {
+  const intensityDisplay =
+    summary.physiqueDecision.trainingIntent === "Push"
+      ? "Progress"
+      : summary.physiqueDecision.trainingIntent;
+
   return [
-    "Goal: longevity and feeling good first; strength/body composition second.",
-    "Use this WHOOP + Hevy brief to recommend today's training intensity, eating focus, recovery priorities, and conservative supplement guidance.",
-    `Recovery score: ${summary.readiness.recoveryScore ?? "--"}.`,
-    `WHOOP day strain: ${summary.strainSummary.score ?? "--"}. ${summary.strainSummary.blurb}`,
-    `Body weight: ${poundsText(summary.readiness.bodyWeightKg, 1)}, 7-day delta: ${signedPoundsText(summary.readiness.bodyWeightDelta7dKg)}.`,
-    `Actual sleep: ${summary.readiness.sleepHours ?? "--"}h, sleep vs need: ${summary.readiness.sleepVsNeedHours ?? "--"}h.`,
-    `Overnight read: ${summary.overnightRead.label}. ${summary.overnightRead.detail}`,
-    `Late-night disruption signal: ${summary.lateNightDisruption.active ? `${summary.lateNightDisruption.likelyLane} (${summary.lateNightDisruption.confidence})` : "inactive"}.`,
-    `Recent load: ${summary.trainingLoad.hevyWorkoutCount7d} workouts and ${poundsText(summary.trainingLoad.hevyVolume7d, 0)} over 7 days.`,
-    `Why today changed: ${summary.whyChangedToday.deltas.join(" ")}`,
-    `Top actions: ${summary.recommendations
-      .slice(0, 3)
-      .map((item) => `${item.title}: ${item.action}`)
-      .join(" ")}`,
-    "Given this, what should I do today for training, eating, recovery, and supplements?",
+    "Goal",
+    "- Physique progression without ignoring recovery.",
+    "",
+    "Decision layer",
+    `- Training target: ${summary.physiqueDecision.trainingTarget}`,
+    `- Training target reason: ${summary.physiqueDecision.trainingTargetReason}`,
+    `- Intensity intent: ${intensityDisplay}`,
+    `- Intensity cue: ${summary.physiqueDecision.intensityLabel}`,
+    `- Session anchors: ${
+      summary.physiqueDecision.sessionAnchors.length > 0
+        ? summary.physiqueDecision.sessionAnchors.join(", ")
+        : "Use planned main lifts"
+    }`,
+    `- Calories: ${summary.physiqueDecision.calorieTargetLabel} (${summary.physiqueDecision.calorieRecommendation})`,
+    `- Protein: ${summary.physiqueDecision.proteinTargetLabel}`,
+    `- Bottleneck: ${summary.physiqueDecision.mainBottleneck}`,
+    "",
+    "Metrics",
+    `- Recovery: ${summary.readiness.recoveryScore ?? "--"}%`,
+    `- Sleep: ${summary.readiness.sleepHours ?? "--"}h (${summary.readiness.sleepVsNeedHours ?? "--"}h vs need)`,
+    `- Strain: ${summary.strainSummary.score ?? "--"}`,
+    `- Overnight: ${summary.overnightRead.label}. ${summary.overnightRead.detail}`,
+    `- Weight: ${summary.physiqueDecision.weightTrend.currentLb ?? "--"} lb (${formatSignedPounds(summary.physiqueDecision.weightTrend.weeklyDeltaLb)} vs 7d avg)`,
+    `- Training this week: ${summary.trainingLoad.hevyWorkoutCountThisWeek} workouts, ${summary.trainingLoad.hevySetCountThisWeek} sets`,
+    `- Rolling 7-day training: ${summary.trainingLoad.hevyWorkoutCount7d} workouts, ${summary.trainingLoad.hevySetCount7d} sets`,
+    `- Weekly effective sets: ${
+      summary.trainingLoad.weeklyMuscleVolume.length
+        ? summary.trainingLoad.weeklyMuscleVolume
+            .slice(0, 8)
+            .map((item) => `${item.label} ${item.effectiveSets}`)
+            .join(", ")
+        : "none logged"
+    }`,
+    `- Strength progression: ${
+      summary.physiqueDecision.strengthProgression.length
+        ? summary.physiqueDecision.strengthProgression
+            .slice(0, 5)
+            .map((item) => `${item.exercise} ${item.deltaLabel}`)
+            .join(", ")
+        : "not enough repeat lift history"
+    }`,
+    "",
+    "Ask",
+    "- Make a fresh call for training, eating, recovery, supplements, and cautions.",
   ].join("\n");
 }
 
@@ -1270,6 +1826,15 @@ export function getDailySummary(): DailySummary {
   const readiness = buildReadiness();
   const trainingLoad = buildTrainingLoad();
   const stressFlags = buildStressFlags(readiness, trainingLoad);
+  const nutritionTargets = buildNutritionTargets(getNutritionTargets(), readiness, trainingLoad);
+  const strengthProgression = buildStrengthProgression(getRecentHevyWorkouts(90));
+  const physiqueDecision = buildPhysiqueDecision(
+    readiness,
+    trainingLoad,
+    stressFlags,
+    nutritionTargets,
+    strengthProgression,
+  );
   const lateNightDisruption = deriveLateNightDisruption(readiness, stressFlags);
   const overnightRead = buildOvernightRead(lateNightDisruption, readiness);
   const strainSummary = buildStrainSummary(readiness, trainingLoad);
@@ -1299,6 +1864,8 @@ export function getDailySummary(): DailySummary {
     lateNightDisruption,
     overnightRead,
     strainSummary,
+    nutritionTargets,
+    physiqueDecision,
     bodyCard,
     recommendations,
     freshness,
