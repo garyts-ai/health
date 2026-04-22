@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
 import { DailyBriefExport } from "@/components/daily-brief-export";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
 import type { DailySummary, DiscordDeliveryStatus } from "@/lib/insights/types";
@@ -22,6 +24,7 @@ type ActionCard = {
   lastSyncCompletedAt: string | null;
   lastSyncStatus: string | null;
   primaryHref: string | null;
+  primaryDisabledLabel: string;
   primaryLabel: string | null;
   statusNote: string;
   syncFormAction: string;
@@ -43,6 +46,22 @@ function formatMealTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function isLocalOAuthHost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function subscribeToBrowserHost() {
+  return () => {};
+}
+
+function getBrowserOAuthSnapshot() {
+  return typeof window !== "undefined" && isLocalOAuthHost(window.location.hostname);
+}
+
+function getServerOAuthSnapshot() {
+  return false;
 }
 
 function getTone(card: ActionCard) {
@@ -98,6 +117,12 @@ export function ProtectedSettingsActions({
   summary,
   whoop,
 }: ProtectedSettingsActionsProps) {
+  const canUseWhoopOAuth = useSyncExternalStore(
+    subscribeToBrowserHost,
+    getBrowserOAuthSnapshot,
+    getServerOAuthSnapshot,
+  );
+
   const cards: ActionCard[] = [
     {
       name: "WHOOP",
@@ -106,10 +131,13 @@ export function ProtectedSettingsActions({
       isStale: whoop.isStale,
       lastSyncCompletedAt: whoop.lastSyncCompletedAt,
       lastSyncStatus: whoop.lastSyncStatus,
-      primaryHref: whoop.isConfigured ? "/api/auth/whoop" : null,
+      primaryHref: whoop.isConfigured && canUseWhoopOAuth ? "/api/auth/whoop" : null,
+      primaryDisabledLabel: whoop.isConfigured ? "Reconnect on desktop" : "Configure WHOOP",
       primaryLabel: whoop.connected ? "Reconnect WHOOP" : "Connect WHOOP",
       statusNote: whoop.isConfigured
-        ? "OAuth and sync stay available once WHOOP credentials are present."
+        ? canUseWhoopOAuth
+          ? "OAuth reconnect is available from the local desktop URL. Mobile sync uses the stored token."
+          : "Mobile sync uses the stored WHOOP token. Reconnect from localhost on the PC if OAuth needs renewal."
         : "Add WHOOP credentials to enable connect and sync actions.",
       syncFormAction: "/api/whoop/sync",
     },
@@ -121,6 +149,7 @@ export function ProtectedSettingsActions({
       lastSyncCompletedAt: hevy.lastSyncCompletedAt,
       lastSyncStatus: hevy.lastSyncStatus,
       primaryHref: null,
+      primaryDisabledLabel: "Configure Hevy",
       primaryLabel: null,
       statusNote: hevy.isConfigured
         ? "Sync uses the configured Hevy API key and writes fresh workouts locally."
@@ -190,7 +219,7 @@ export function ProtectedSettingsActions({
                     type="button"
                     disabled
                   >
-                    Configure {card.name}
+                    {card.primaryDisabledLabel}
                   </button>
                 )}
                 <form action={card.syncFormAction} method="post">
