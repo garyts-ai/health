@@ -242,6 +242,7 @@ export type BodyRegionId =
   | "obliques"
   | "glutes"
   | "quads"
+  | "adductors"
   | "hamstrings"
   | "calves";
 

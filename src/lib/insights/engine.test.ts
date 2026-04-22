@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { deriveLateNightDisruption } from "@/lib/insights/overnight-read";
+import { inferBuckets } from "@/lib/insights/engine";
 import type { DailyReadiness, DailyStressFlags, DailyTrainingLoad } from "@/lib/insights/types";
 
 function makeReadiness(overrides: Partial<DailyReadiness> = {}): DailyReadiness {
@@ -108,6 +109,17 @@ test("load spike fixture exposes heavy recent training", () => {
   assert.equal(training.recentLoadSpike, true);
   assert.equal(training.hevyConsecutiveDays >= 3, true);
   assert.equal(training.lowerBodyDaysSince, 0);
+});
+
+test("squat press is classified as lower body, not upper push", () => {
+  const buckets = inferBuckets([
+    "squat press",
+    "seated leg curl",
+    "hip adduction",
+    "leg extension (machine)",
+  ]);
+
+  assert.deepEqual(buckets, ["lower"]);
 });
 
 test("late-night disruption infers a hangover-like lane from a rough night without illness markers", () => {

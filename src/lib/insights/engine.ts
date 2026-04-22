@@ -447,24 +447,32 @@ function buildStrengthProgression(workouts: HevyWorkoutRow[]): DailyStrengthProg
   }));
 }
 
-function inferBuckets(exerciseTitles: string[]) {
+export function inferBuckets(exerciseTitles: string[]) {
   const buckets = new Set<MuscleBucket>();
 
   for (const title of exerciseTitles) {
-    if (
-      /(squat|deadlift|lunge|leg|calf|hamstring|glute|quad|rdl|hip thrust|split squat)/.test(
+    const isLowerBody =
+      /(squat|deadlift|lunge|leg|calf|hamstring|glute|quad|rdl|hip thrust|split squat|adductor|adduction)/.test(
         title,
-      )
-    ) {
+      );
+    const isLowerBodyPress = /(squat press|leg press)/.test(title);
+    const isLowerBodyCurl = /(leg curl|hamstring curl|nordic)/.test(title);
+
+    if (isLowerBody) {
       buckets.add("lower");
     }
 
-    if (/(bench|press|dip|push|incline|tricep|fly|pec)/.test(title)) {
+    if (/(bench|press|dip|push|incline|tricep|fly|pec)/.test(title) && !isLowerBodyPress) {
       buckets.add("push");
       buckets.add("upper");
     }
 
-    if (/(row|pull|lat|chin|curl|rear delt|face pull|pullup|pulldown)/.test(title)) {
+    if (
+      /(\brow\b|\bpull[- ]?up\b|\bchin[- ]?up\b|\blat\b|pulldown|\bcurl\b|rear delt|face pull)/.test(
+        title,
+      ) &&
+      !isLowerBodyCurl
+    ) {
       buckets.add("pull");
       buckets.add("upper");
     }
