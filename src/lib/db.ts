@@ -162,6 +162,30 @@ export function applySchema(db: DatabaseSync) {
       error_message TEXT,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS nutrition_targets (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      calorie_target INTEGER,
+      protein_target_g INTEGER,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS nutrition_intake_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date_key TEXT NOT NULL,
+      meal_type TEXT NOT NULL,
+      label TEXT NOT NULL,
+      calories INTEGER NOT NULL,
+      protein_g REAL NOT NULL,
+      carbs_g REAL NOT NULL,
+      fat_g REAL NOT NULL,
+      note TEXT,
+      logged_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_nutrition_intake_date
+      ON nutrition_intake_entries (date_key, logged_at);
   `);
 }
 

@@ -5,5 +5,5 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const summary = getDailySummary();
-  return createDailyBriefImage(summary);
+  return await createDailyBriefImage(summary);
 }

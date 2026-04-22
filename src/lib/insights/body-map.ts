@@ -6,7 +6,11 @@ import type {
 
 type ExerciseRecord = {
   title?: string | null;
-  sets?: unknown[];
+  sets?: Array<{
+    type?: string | null;
+    weight_kg?: number | null;
+    reps?: number | null;
+  }>;
 };
 
 type HevyWorkoutShape = {
@@ -25,14 +29,17 @@ type RegionScore = {
 
 export type WeeklyMuscleGroup =
   | "Chest"
-  | "Shoulders"
-  | "Back"
+  | "Front delts"
+  | "Side delts"
+  | "Rear delts"
+  | "Lats"
+  | "Upper back / traps"
   | "Biceps"
   | "Triceps"
   | "Quads"
-  | "Hamstrings/Glutes"
+  | "Hamstrings / glutes"
   | "Calves"
-  | "Core";
+  | "Abs / obliques";
 
 const REGION_VIEW: Record<BodyRegionId, "front" | "back"> = {
   chest: "front",
@@ -54,6 +61,13 @@ const REGION_VIEW: Record<BodyRegionId, "front" | "back"> = {
 };
 
 const EXERCISE_REGION_RULES: Array<{ pattern: RegExp; match: RegionMatch }> = [
+  {
+    pattern: /(leg curl|hamstring curl|nordic)/,
+    match: {
+      primary: ["hamstrings"],
+      secondary: ["glutes"],
+    },
+  },
   {
     pattern: /(bench|chest press|machine press|push[- ]?up|pec deck|fly|cable fly|dip)/,
     match: {
@@ -153,13 +167,6 @@ const EXERCISE_REGION_RULES: Array<{ pattern: RegExp; match: RegionMatch }> = [
     },
   },
   {
-    pattern: /(leg curl|hamstring curl|nordic)/,
-    match: {
-      primary: ["hamstrings"],
-      secondary: ["glutes"],
-    },
-  },
-  {
     pattern: /(leg extension)/,
     match: {
       primary: ["quads"],
@@ -191,20 +198,35 @@ const EXERCISE_REGION_RULES: Array<{ pattern: RegExp; match: RegionMatch }> = [
 
 const REGION_GROUP_MAP: Partial<Record<BodyRegionId, WeeklyMuscleGroup>> = {
   chest: "Chest",
-  frontDelts: "Shoulders",
-  sideDelts: "Shoulders",
-  rearDelts: "Shoulders",
-  lats: "Back",
-  upperBack: "Back",
-  traps: "Back",
+  frontDelts: "Front delts",
+  sideDelts: "Side delts",
+  rearDelts: "Rear delts",
+  lats: "Lats",
+  upperBack: "Upper back / traps",
+  traps: "Upper back / traps",
   biceps: "Biceps",
   triceps: "Triceps",
   quads: "Quads",
-  hamstrings: "Hamstrings/Glutes",
-  glutes: "Hamstrings/Glutes",
+  hamstrings: "Hamstrings / glutes",
+  glutes: "Hamstrings / glutes",
   calves: "Calves",
-  abs: "Core",
-  obliques: "Core",
+  abs: "Abs / obliques",
+  obliques: "Abs / obliques",
+};
+
+const WEEKLY_GROUP_REGIONS: Record<WeeklyMuscleGroup, BodyRegionId[]> = {
+  Chest: ["chest"],
+  "Front delts": ["frontDelts"],
+  "Side delts": ["sideDelts"],
+  "Rear delts": ["rearDelts"],
+  Lats: ["lats"],
+  "Upper back / traps": ["upperBack", "traps"],
+  Biceps: ["biceps"],
+  Triceps: ["triceps"],
+  Quads: ["quads"],
+  "Hamstrings / glutes": ["hamstrings", "glutes"],
+  Calves: ["calves"],
+  "Abs / obliques": ["abs", "obliques"],
 };
 
 function getExerciseEntries(rawJson: string) {
@@ -214,6 +236,9 @@ function getExerciseEntries(rawJson: string) {
     return exercises.map((exercise) => ({
       title: exercise.title?.toLowerCase() ?? "",
       setCount: Array.isArray(exercise.sets) ? exercise.sets.length : 0,
+      workingSetCount: Array.isArray(exercise.sets)
+        ? exercise.sets.filter((set) => set?.type !== "warmup").length
+        : 0,
     }));
   } catch {
     return [];
@@ -288,6 +313,22 @@ function classifyIntensity(score: number, maxScore: number): BodyHighlightIntens
   return "medium";
 }
 
+function getWeeklyIntensity(hits: number): BodyHighlightIntensity | null {
+  if (hits >= 3) {
+    return "high";
+  }
+
+  if (hits === 2) {
+    return "medium";
+  }
+
+  if (hits === 1) {
+    return "low";
+  }
+
+  return null;
+}
+
 export function buildBodyHighlightsFromWorkout(rawJson: string): BodyHighlight[] {
   const scores = new Map<BodyRegionId, RegionScore>();
 
@@ -337,7 +378,7 @@ export function buildBodyHighlightsFromWorkout(rawJson: string): BodyHighlight[]
     })
     .filter((entry): entry is BodyHighlight => entry !== null)
     .sort((left, right) => {
-      const intensityWeight = { high: 2, medium: 1 };
+      const intensityWeight = { high: 3, medium: 2, low: 1 };
       return intensityWeight[right.intensity] - intensityWeight[left.intensity];
     });
 }
@@ -364,4 +405,103 @@ export function summarizeWeeklyMuscleHits(rawJsonWorkouts: string[]) {
 
       return left.label.localeCompare(right.label);
     });
+}
+
+export function summarizeWeeklyMuscleVolume(rawJsonWorkouts: string[]) {
+  const counts = new Map<WeeklyMuscleGroup, { effectiveSets: number; hits: number }>();
+
+  for (const rawJson of rawJsonWorkouts) {
+    const workoutGroups = new Set<WeeklyMuscleGroup>();
+
+    for (const exercise of getExerciseEntries(rawJson)) {
+      if (!exercise.title) {
+        continue;
+      }
+
+      const match = inferRegionMatch(exercise.title);
+      if (!match) {
+        continue;
+      }
+
+      const workingSets = Math.max(1, exercise.workingSetCount || exercise.setCount || 1);
+
+      for (const region of match.primary) {
+        const group = REGION_GROUP_MAP[region];
+        if (!group) {
+          continue;
+        }
+
+        const current = counts.get(group) ?? { effectiveSets: 0, hits: 0 };
+        counts.set(group, {
+          effectiveSets: current.effectiveSets + workingSets,
+          hits: current.hits,
+        });
+        workoutGroups.add(group);
+      }
+
+      for (const region of match.secondary) {
+        const group = REGION_GROUP_MAP[region];
+        if (!group) {
+          continue;
+        }
+
+        const current = counts.get(group) ?? { effectiveSets: 0, hits: 0 };
+        counts.set(group, {
+          effectiveSets: current.effectiveSets + workingSets * 0.5,
+          hits: current.hits,
+        });
+        workoutGroups.add(group);
+      }
+    }
+
+    for (const group of workoutGroups) {
+      const current = counts.get(group);
+      if (current) {
+        counts.set(group, { ...current, hits: current.hits + 1 });
+      }
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([label, value]) => ({
+      label,
+      effectiveSets: Math.round(value.effectiveSets * 2) / 2,
+      hits: value.hits,
+    }))
+    .sort((left, right) => {
+      if (right.effectiveSets !== left.effectiveSets) {
+        return right.effectiveSets - left.effectiveSets;
+      }
+
+      if (right.hits !== left.hits) {
+        return right.hits - left.hits;
+      }
+
+      return left.label.localeCompare(right.label);
+    });
+}
+
+export function buildWeeklyBodyHighlights(rawJsonWorkouts: string[]) {
+  const weeklyGroups = summarizeWeeklyMuscleHits(rawJsonWorkouts);
+  const highlights: BodyHighlight[] = [];
+
+  for (const group of weeklyGroups) {
+    const intensity = getWeeklyIntensity(group.hits);
+    if (!intensity) {
+      continue;
+    }
+
+    for (const regionId of WEEKLY_GROUP_REGIONS[group.label]) {
+      highlights.push({
+        regionId,
+        intensity,
+        view: REGION_VIEW[regionId],
+      });
+    }
+  }
+
+  return highlights.sort((left, right) => {
+    const intensityWeight = { high: 3, medium: 2, low: 1 };
+    return intensityWeight[right.intensity] - intensityWeight[left.intensity];
+  });
 }

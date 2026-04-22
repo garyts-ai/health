@@ -1,25 +1,28 @@
 import { NextResponse } from "next/server";
 
-import { authorizeAdminAction } from "@/lib/admin-action";
 import { sendDailyBriefToDiscord } from "@/lib/discord-delivery";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const auth = await authorizeAdminAction(request);
+  const contentType = request.headers.get("content-type") ?? "";
+  let imageBuffer: Buffer | undefined;
+  let imageFilename: string | undefined;
 
-  if (!auth.ok) {
-    return NextResponse.json(
-      {
-        ok: false,
-        status: "failed",
-        error: auth.message,
-      },
-      { status: auth.status },
-    );
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    const image = formData.get("image");
+
+    if (image instanceof File) {
+      imageBuffer = Buffer.from(await image.arrayBuffer());
+      imageFilename = image.name || undefined;
+    }
   }
 
-  const result = await sendDailyBriefToDiscord("manual");
+  const result = await sendDailyBriefToDiscord("manual", {
+    imageBuffer,
+    imageFilename,
+  });
 
   if (result.ok) {
     return NextResponse.json({

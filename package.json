@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:mobile": "next build",
+    "mobile": "npm run build:mobile && next start -H 0.0.0.0 -p 8000",
     "start": "next start",
+    "start:mobile": "next start -H 0.0.0.0 -p 8000",
     "start:prod": "npm run build && next start",
     "discord:send-scheduled": "node --import tsx src/scripts/send-scheduled-discord-brief.ts",
     "lint": "eslint",

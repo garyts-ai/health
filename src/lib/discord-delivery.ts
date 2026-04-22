@@ -24,6 +24,9 @@ type DeliveryRow = {
 type SendDailyBriefOptions = {
   db?: DatabaseSync;
   webhookUrl?: string;
+  contentOverride?: string;
+  imageBuffer?: Buffer;
+  imageFilename?: string;
 };
 
 const NEW_YORK_DATE = new Intl.DateTimeFormat("en-CA", {
@@ -194,22 +197,23 @@ export async function sendDailyBriefToDiscord(
 
   try {
     const webhookUrl = getWebhookUrl(options.webhookUrl);
-    const imageResponse = createDailyBriefImage(summary);
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const imageBuffer =
+      options.imageBuffer ??
+      Buffer.from(await (await createDailyBriefImage(summary)).arrayBuffer());
     const formData = new FormData();
 
     formData.append(
       "payload_json",
       JSON.stringify({
-        content: buildDiscordSummaryText(summary),
+        content: options.contentOverride ?? buildDiscordSummaryText(summary),
         username: "Health Dashboard",
         allowed_mentions: { parse: [] },
       }),
     );
     formData.append(
       "files[0]",
-      new Blob([imageBuffer], { type: "image/png" }),
-      `daily-health-brief-${dateKey}.png`,
+      new Blob([new Uint8Array(imageBuffer)], { type: "image/png" }),
+      options.imageFilename ?? `daily-health-brief-${dateKey}.png`,
     );
 
     const response = await fetch(webhookUrl, {

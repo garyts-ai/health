@@ -1,0 +1,18 @@
+{
+  "name": "Health OS",
+  "short_name": "Health OS",
+  "description": "Private WHOOP, Hevy, and nutrition dashboard.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f2fb",
+  "theme_color": "#5d54a3",
+  "icons": [
+    {
+      "src": "/health-os-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

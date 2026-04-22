@@ -21,6 +21,16 @@ npm run start:prod
 
 This builds the app and starts the production server on [http://localhost:3000](http://localhost:3000).
 
+## Private mobile access
+
+The recommended phone setup is Tailscale. Install Tailscale on this Windows PC and on your iPhone, sign into the same account, then run:
+
+```bash
+npm run mobile
+```
+
+Open the app from the phone at `http://<your-pc-tailscale-name>:8000` or `http://<your-pc-tailscale-ip>:8000`. In Safari, use Share -> Add to Home Screen to install it like a private app. The PC must stay awake and the mobile server must keep running.
+
 ## Environment
 
 Create a local `.env.local` file based on `.env.example`.
@@ -32,7 +42,6 @@ WHOOP_CLIENT_ID=
 WHOOP_CLIENT_SECRET=
 WHOOP_REDIRECT_URI=http://localhost:3000/api/auth/whoop/callback
 HEVY_API_KEY=
-ADMIN_ACTION_SECRET=
 ```
 
 Optional variables:
@@ -40,8 +49,6 @@ Optional variables:
 ```env
 DISCORD_WEBHOOK_URL=
 ```
-
-`ADMIN_ACTION_SECRET` protects manual syncs and Discord delivery routes. Store it in `.env.local`, then enter the same value in the Settings page when you want to run protected actions from the browser.
 
 ## Current Direction
 
