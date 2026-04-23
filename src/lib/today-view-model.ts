@@ -7,6 +7,7 @@ import type {
 type ProviderStatus = {
   connected: boolean;
   isStale: boolean;
+  lastSyncCompletedAt?: string | null;
 };
 
 const ACTIVE_SIGNAL_LABELS: Array<{
@@ -67,6 +68,40 @@ function formatClockTime(value: string | null) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatSyncTime(value: string | null) {
+  if (!value) {
+    return "never";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function buildFreshnessNotice(summary: DailySummary) {
+  const staleSources = [
+    !summary.freshness.whoop.connected
+      ? `WHOOP disconnected, last sync ${formatSyncTime(summary.freshness.whoop.lastSyncCompletedAt)}`
+      : summary.freshness.whoop.isStale
+        ? `WHOOP last sync ${formatSyncTime(summary.freshness.whoop.lastSyncCompletedAt)}`
+        : null,
+    !summary.freshness.hevy.connected
+      ? `Hevy disconnected, last sync ${formatSyncTime(summary.freshness.hevy.lastSyncCompletedAt)}`
+      : summary.freshness.hevy.isStale
+        ? `Hevy last sync ${formatSyncTime(summary.freshness.hevy.lastSyncCompletedAt)}`
+      : null,
+  ].filter((item): item is string => item !== null);
+
+  if (staleSources.length === 0) {
+    return null;
+  }
+
+  return `Source check: ${staleSources.join(" / ")}`;
 }
 
 function buildRecentDateLabels(summaryDate: string) {
@@ -191,6 +226,7 @@ export function buildTodayViewModel(
       productName: "Health OS",
       dateLabel: formatDate(summary.date),
       utilityLabel: getUtilityStatusLabel(whoop, hevy, delivery),
+      freshnessNotice: buildFreshnessNotice(summary),
     },
     hero: {
       decision: {
@@ -317,14 +353,15 @@ export function buildTodayViewModel(
           summary.physiqueDecision.strengthProgression[0]?.deltaLabel ??
           "Needs repeats",
         detail:
-          summary.physiqueDecision.strengthProgression[0]?.exercise ??
-          "Auto-detecting repeat lifts",
+          summary.physiqueDecision.strengthProgression[0]
+            ? `${summary.physiqueDecision.strengthProgression[0].exercise} / ${summary.physiqueDecision.strengthProgression[0].confidenceLabel}`
+            : "Auto-detecting repeat lifts",
       },
       {
         label: "Nutrition",
         value: summary.nutritionActuals.hasLoggedIntake
           ? `${summary.nutritionActuals.calories} cal`
-          : "No meals",
+          : "Log meals",
         detail: summary.nutritionActuals.hasLoggedIntake
           ? `${formatMacroGrams(summary.nutritionActuals.proteinG)} protein / ${summary.nutritionActuals.remainingCalories ?? "--"} cal left`
           : `${summary.physiqueDecision.calorieTargetLabel} / ${summary.physiqueDecision.proteinTargetLabel} target`,

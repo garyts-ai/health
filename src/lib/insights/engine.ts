@@ -376,24 +376,39 @@ function buildStrengthProgression(workouts: HevyWorkoutRow[]): DailyStrengthProg
       const latest = entries[entries.length - 1];
       const previous = entries[entries.length - 2];
       const delta = latest.value - previous.value;
+      const deltaLb = round(kilogramsToPounds(delta), 1);
+      const confidence =
+        deltaLb !== null && Math.abs(deltaLb) >= 25
+          ? "low"
+          : entries.length >= 3
+            ? "high"
+            : "medium";
+      const confidenceLabel =
+        confidence === "high"
+          ? "repeat trend"
+          : confidence === "medium"
+            ? "estimated"
+            : "check context";
       return {
         exercise: latest.title,
         latestValue: round(kilogramsToPounds(latest.value), 1),
         previousValue: round(kilogramsToPounds(previous.value), 1),
-        delta: round(kilogramsToPounds(delta), 1),
+        delta: deltaLb,
         latestLabel: `${round(kilogramsToPounds(latest.value), 0) ?? "--"} est`,
         previousLabel: `${round(kilogramsToPounds(previous.value), 0) ?? "--"} prev`,
         deltaLabel:
           delta > 0
-            ? `+${round(kilogramsToPounds(delta), 1)} lb`
+            ? `+${deltaLb} lb`
             : delta < 0
-              ? `${round(kilogramsToPounds(delta), 1)} lb`
+              ? `${deltaLb} lb`
               : "flat",
         trend: (Math.abs(delta) < 0.5
           ? "flat"
           : delta > 0
             ? "up"
             : "down") satisfies DailyStrengthProgression["trend"],
+        confidence,
+        confidenceLabel,
         family: latest.family,
         recency: new Date(latest.workoutAt).getTime(),
       };
@@ -444,6 +459,8 @@ function buildStrengthProgression(workouts: HevyWorkoutRow[]): DailyStrengthProg
     previousLabel: item.previousLabel,
     deltaLabel: item.deltaLabel,
     trend: item.trend as DailyStrengthProgression["trend"],
+    confidence: item.confidence as DailyStrengthProgression["confidence"],
+    confidenceLabel: item.confidenceLabel,
   }));
 }
 
@@ -1348,11 +1365,11 @@ function buildPhysiqueDecision(
       detail:
         strengthProgression.length === 0
           ? "Need repeat lift history"
-          : strengthProgression[0].exercise,
+          : `${strengthProgression[0].exercise} - ${strengthProgression[0].confidenceLabel}`,
       status:
         strengthProgression.length === 0
           ? "missing"
-          : strengthProgression[0].trend === "down"
+          : strengthProgression[0].confidence === "low" || strengthProgression[0].trend === "down"
             ? "watch"
             : "good",
     },
@@ -1363,17 +1380,19 @@ function buildPhysiqueDecision(
           ? "Set target"
           : nutritionActuals.hasLoggedIntake
             ? `${nutritionActuals.proteinG}/${nutritionTargets.effectiveProteinTargetG}g`
-            : `${nutritionTargets.effectiveProteinTargetG}g`,
+            : "No meals",
       detail:
         nutritionTargets.effectiveCalorieTarget === null
           ? "Calories not set"
           : nutritionActuals.hasLoggedIntake
             ? `${nutritionActuals.calories}/${nutritionTargets.effectiveCalorieTarget} cal`
-            : `${nutritionTargets.effectiveCalorieTarget} cal ${nutritionTargets.targetSource}`,
+            : `${nutritionTargets.effectiveCalorieTarget} cal / ${nutritionTargets.effectiveProteinTargetG}g target`,
       status:
         nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
           ? "missing"
-          : "good",
+          : nutritionActuals.hasLoggedIntake
+            ? "good"
+            : "missing",
     },
   ];
 
@@ -1454,6 +1473,7 @@ function recommendation(
 function buildRecommendations(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
+  physiqueDecision: DailyPhysiqueDecision,
   stressFlags: DailyStressFlags,
   lateNightDisruption: DailyLateNightDisruption,
   freshness: DailyFreshness,
@@ -1483,6 +1503,38 @@ function buildRecommendations(
           `Recovery ${readiness.recoveryScore ?? "--"}`,
           `Sleep gap ${readiness.sleepVsNeedHours ?? "--"}h`,
           `RHR delta ${readiness.restingHeartRateVs7d ?? "--"}`,
+        ],
+        3 - stalePenalty,
+        "high",
+      ),
+    );
+  } else if (physiqueDecision.trainingIntent === "Push") {
+    const target =
+      physiqueDecision.trainingTarget === "Either"
+        ? "planned"
+        : physiqueDecision.trainingTarget.toLowerCase();
+    items.push(
+      recommendation(
+        "training",
+        `Progress ${target} day`,
+        "Use the first working sets to confirm readiness, then add load or reps on the planned anchors without adding junk volume.",
+        [
+          "Use warm-up and first working sets to confirm readiness",
+          "Add load or reps on one or two anchor lifts",
+          "Keep accessory work clean and avoid extra junk volume",
+        ],
+        [
+          { label: "Warm-up check", icon: "technique" },
+          { label: "Add reps/load", icon: "fuel" },
+          { label: "Clean accessories", icon: "technique" },
+        ],
+        undefined,
+        physiqueDecision.mainBottleneck,
+        [
+          `Target ${physiqueDecision.trainingTarget}`,
+          `Upper ${trainingLoad.upperBodyDaysSince ?? "--"}d`,
+          `Lower ${trainingLoad.lowerBodyDaysSince ?? "--"}d`,
+          `Week ${trainingLoad.hevyWorkoutCountThisWeek}/4 lifts`,
         ],
         3 - stalePenalty,
         "high",
@@ -1521,24 +1573,29 @@ function buildRecommendations(
       ),
     );
   } else {
+    const target =
+      physiqueDecision.trainingTarget === "Either"
+        ? "planned"
+        : physiqueDecision.trainingTarget.toLowerCase();
     items.push(
       recommendation(
         "training",
-        "Aim for a moderate day",
-        "Keep intensity in the middle range and let exercise selection work around recently trained areas.",
+        `Maintain ${target} day`,
+        "Hit the planned split with normal volume, then stop before the session turns into forced progression.",
         [
-          "Keep intensity in the middle range",
-          "Choose exercises that avoid recently overworked areas",
-          "Leave the session feeling better than destroyed",
+          "Use normal working weights",
+          "Hit planned volume without chasing forced PRs",
+          "Leave the session with clean reps still available",
         ],
         [
-          { label: "Moderate load", icon: "fuel" },
-          { label: "Work around fatigue", icon: "walk" },
-          { label: "Finish fresh", icon: "rest" },
+          { label: "Normal load", icon: "fuel" },
+          { label: "Planned sets", icon: "technique" },
+          { label: "Stop clean", icon: "rest" },
         ],
         undefined,
-        "Your signals are mixed, so a quality but not maximal session is the most durable option.",
+        physiqueDecision.mainBottleneck,
         [
+          `Target ${physiqueDecision.trainingTarget}`,
           `Recovery ${readiness.recoveryScore ?? "--"}`,
           `Consecutive days ${trainingLoad.hevyConsecutiveDays}`,
           `Load spike ${trainingLoad.recentLoadSpike ? "yes" : "no"}`,
@@ -1885,7 +1942,7 @@ function buildPromptText(summary: DailySummary) {
       summary.physiqueDecision.strengthProgression.length
         ? summary.physiqueDecision.strengthProgression
             .slice(0, 5)
-            .map((item) => `${item.exercise} ${item.deltaLabel}`)
+            .map((item) => `${item.exercise} ${item.deltaLabel} (${item.confidenceLabel})`)
             .join(", ")
         : "not enough repeat lift history"
     }`,
@@ -1922,6 +1979,7 @@ export function getDailySummary(): DailySummary {
   const recommendations = buildRecommendations(
     readiness,
     trainingLoad,
+    physiqueDecision,
     stressFlags,
     lateNightDisruption,
     freshness,

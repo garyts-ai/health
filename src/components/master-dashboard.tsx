@@ -164,6 +164,14 @@ function ActionTile({
   );
 }
 
+function FreshnessNotice({ message }: { message: string }) {
+  return (
+    <div className="rounded-[10px] border border-[#fed7aa] bg-[#fff7ed] px-4 py-3 text-[13px] leading-5 text-[#7c2d12] shadow-[0_2px_8px_rgba(22,20,35,0.06)]">
+      {message}
+    </div>
+  );
+}
+
 function HeroStat({
   label,
   value,
@@ -489,7 +497,7 @@ export async function MasterDashboard({
         <header className="flex items-start justify-between gap-6">
           <div>
             <div className="text-[15px] font-medium text-white/84">{vm.header.productName}</div>
-            <h1 className="mt-2 text-[64px] font-semibold leading-[0.92] tracking-[-0.06em] text-white">
+            <h1 className="mt-2 text-[48px] font-semibold leading-[0.92] tracking-[-0.06em] text-white sm:text-[64px]">
               Today
             </h1>
             <p className="mt-3 text-[15px] text-white/72">{vm.header.dateLabel}</p>
@@ -512,9 +520,10 @@ export async function MasterDashboard({
         </header>
 
         {utilityBannerMessage ? <SummaryBanner message={utilityBannerMessage} /> : null}
+        {vm.header.freshnessNotice ? <FreshnessNotice message={vm.header.freshnessNotice} /> : null}
 
-        <section className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_320px]">
-          <div className="flex flex-col gap-4">
+        <section className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="order-2 flex flex-col gap-4 lg:order-none">
           <div className="rounded-[12px] bg-[rgba(24,19,42,0.84)] px-5 py-5 text-white shadow-[0_14px_55px_rgba(17,15,31,0.2)] backdrop-blur-sm">
               <div className="text-[13px] text-white/58">Overnight read</div>
               <div className="mt-2 text-[36px] font-semibold leading-[0.98] tracking-[-0.05em]">
@@ -543,7 +552,7 @@ export async function MasterDashboard({
             </div>
           </div>
 
-          <section className="overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,_rgba(33,24,76,0.98)_0%,_rgba(85,67,148,0.95)_46%,_rgba(248,141,116,0.92)_100%)] px-6 py-6 text-white shadow-[0_20px_80px_rgba(31,24,61,0.24)]">
+          <section className="order-1 overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,_rgba(33,24,76,0.98)_0%,_rgba(85,67,148,0.95)_46%,_rgba(248,141,116,0.92)_100%)] px-5 py-5 text-white shadow-[0_20px_80px_rgba(31,24,61,0.24)] sm:px-6 sm:py-6 lg:order-none">
             <div className="flex flex-col gap-5">
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
                 <div>
@@ -670,7 +679,7 @@ export async function MasterDashboard({
             </div>
           </section>
 
-          <div className="grid gap-4">
+          <div className="order-3 grid gap-4 lg:order-none lg:col-start-2">
             <div className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] px-5 py-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[18px]">
               <div className="text-[14px] text-[#6d6785]">What changed</div>
               <div className="mt-4 space-y-3">
