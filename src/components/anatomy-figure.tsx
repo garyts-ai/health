@@ -53,7 +53,8 @@ const REGION_TO_MUSCLE_GROUPS: Record<BodyRegionId, MuscleGroup[]> = {
   abs: ["abs"],
   obliques: ["obliques"],
   glutes: ["glutes"],
-  quads: ["quads", "adductors", "abductors"],
+  quads: ["quads"],
+  adductors: ["adductors"],
   hamstrings: ["hamstrings"],
   calves: ["calves"],
 };

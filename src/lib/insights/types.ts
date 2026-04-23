@@ -187,6 +187,8 @@ export type DailyStrengthProgression = {
   previousLabel: string;
   deltaLabel: string;
   trend: "up" | "down" | "flat" | "unknown";
+  confidence: "high" | "medium" | "low";
+  confidenceLabel: string;
 };
 
 export type DailyPhysiqueDecision = {
@@ -242,6 +244,7 @@ export type BodyRegionId =
   | "obliques"
   | "glutes"
   | "quads"
+  | "adductors"
   | "hamstrings"
   | "calves";
 

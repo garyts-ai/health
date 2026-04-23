@@ -252,7 +252,7 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Strength progression: ${
       summary.physiqueDecision.strengthProgression.length > 0
         ? summary.physiqueDecision.strengthProgression
-            .map((lift) => `${lift.exercise} ${lift.deltaLabel}`)
+            .map((lift) => `${lift.exercise} ${lift.deltaLabel} (${lift.confidenceLabel})`)
             .join(", ")
         : "Not enough repeat lift history"
     }`,

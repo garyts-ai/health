@@ -211,6 +211,72 @@ test("weekly muscle volume counts effective sets without leg curl biceps leakage
   assert.equal(biceps?.effectiveSets, 2);
 });
 
+test("hip adduction is tracked as adductor volume instead of hidden quad work", () => {
+  const volume = summarizeWeeklyMuscleVolume([
+    JSON.stringify({
+      exercises: [
+        {
+          title: "Hip Adduction (Machine)",
+          sets: [
+            { type: "warmup" },
+            { type: "normal" },
+            { type: "normal" },
+          ],
+        },
+      ],
+    }),
+  ]);
+
+  assert.deepEqual(volume, [{ label: "Adductors", effectiveSets: 2, hits: 1 }]);
+});
+
+test("machine suffix does not leak unmapped lower work into pull muscles", () => {
+  const groups = summarizeWorkoutMuscleGroups(
+    JSON.stringify({
+      exercises: [{ title: "Hip Abduction (Machine)", sets: [{}, {}, {}] }],
+    }),
+  );
+
+  assert.deepEqual(groups, ["Hamstrings / glutes"]);
+});
+
+test("current lower A workout maps to lower-body weekly volume only", () => {
+  const volume = summarizeWeeklyMuscleVolume([
+    JSON.stringify({
+      exercises: [
+        {
+          title: "Squat Press",
+          sets: [{ type: "warmup" }, { type: "normal" }, { type: "normal" }],
+        },
+        {
+          title: "Seated Leg Curl (Machine)",
+          sets: [
+            { type: "warmup" },
+            { type: "normal" },
+            { type: "normal" },
+            { type: "normal" },
+          ],
+        },
+        {
+          title: "Hip Adduction (Machine)",
+          sets: [{ type: "warmup" }, { type: "normal" }, { type: "normal" }],
+        },
+        {
+          title: "Leg Extension (Machine)",
+          sets: [{ type: "normal" }, { type: "normal" }, { type: "normal" }],
+        },
+      ],
+    }),
+  ]);
+
+  assert.deepEqual(volume, [
+    { label: "Hamstrings / glutes", effectiveSets: 7.5, hits: 1 },
+    { label: "Quads", effectiveSets: 5, hits: 1 },
+    { label: "Adductors", effectiveSets: 2, hits: 1 },
+    { label: "Calves", effectiveSets: 1, hits: 1 },
+  ]);
+});
+
 test("buildWeeklyBodyHighlights maps weekly hit counts to low medium and high tiers", () => {
   const highlights = buildWeeklyBodyHighlights([
     JSON.stringify({

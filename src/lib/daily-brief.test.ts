@@ -169,6 +169,8 @@ const summary: DailySummary = {
         previousLabel: "108 prev",
         deltaLabel: "+4.0 lb",
         trend: "up",
+        confidence: "medium",
+        confidenceLabel: "estimated",
       },
     ],
     weeklyScorecard: [

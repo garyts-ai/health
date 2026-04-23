@@ -37,6 +37,7 @@ export type WeeklyMuscleGroup =
   | "Biceps"
   | "Triceps"
   | "Quads"
+  | "Adductors"
   | "Hamstrings / glutes"
   | "Calves"
   | "Abs / obliques";
@@ -56,6 +57,7 @@ const REGION_VIEW: Record<BodyRegionId, "front" | "back"> = {
   obliques: "front",
   glutes: "back",
   quads: "front",
+  adductors: "front",
   hamstrings: "back",
   calves: "back",
 };
@@ -167,6 +169,20 @@ const EXERCISE_REGION_RULES: Array<{ pattern: RegExp; match: RegionMatch }> = [
     },
   },
   {
+    pattern: /(hip adduction|adduction|adductor)/,
+    match: {
+      primary: ["adductors"],
+      secondary: [],
+    },
+  },
+  {
+    pattern: /(hip abduction|abduction|abductor)/,
+    match: {
+      primary: ["glutes"],
+      secondary: [],
+    },
+  },
+  {
     pattern: /(leg extension)/,
     match: {
       primary: ["quads"],
@@ -207,6 +223,7 @@ const REGION_GROUP_MAP: Partial<Record<BodyRegionId, WeeklyMuscleGroup>> = {
   biceps: "Biceps",
   triceps: "Triceps",
   quads: "Quads",
+  adductors: "Adductors",
   hamstrings: "Hamstrings / glutes",
   glutes: "Hamstrings / glutes",
   calves: "Calves",
@@ -224,6 +241,7 @@ const WEEKLY_GROUP_REGIONS: Record<WeeklyMuscleGroup, BodyRegionId[]> = {
   Biceps: ["biceps"],
   Triceps: ["triceps"],
   Quads: ["quads"],
+  Adductors: ["adductors"],
   "Hamstrings / glutes": ["hamstrings", "glutes"],
   Calves: ["calves"],
   "Abs / obliques": ["abs", "obliques"],
@@ -259,14 +277,18 @@ function inferRegionMatch(title: string): RegionMatch | null {
     };
   }
 
-  if (/(row|pull|chin|lat|rear delt)/.test(title)) {
+  if (/(\brow\b|\bpull[- ]?up\b|\bchin[- ]?up\b|\blat\b|pulldown|rear delt)/.test(title)) {
     return {
       primary: ["lats", "upperBack"],
       secondary: ["biceps", "rearDelts"],
     };
   }
 
-  if (/(squat|deadlift|lunge|leg|glute|hamstring|calf|quad)/.test(title)) {
+  if (
+    /(squat|deadlift|lunge|leg|glute|hamstring|calf|quad|adductor|adduction|abductor|abduction)/.test(
+      title,
+    )
+  ) {
     return {
       primary: ["quads", "glutes"],
       secondary: ["hamstrings", "calves"],
