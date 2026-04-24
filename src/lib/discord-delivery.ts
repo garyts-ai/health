@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { applySchema, getDb } from "@/lib/db";
+import { applySchema, dbGet, dbRun } from "@/lib/db";
 import { buildDiscordSummaryText, createDailyBriefImage } from "@/lib/daily-brief";
 import { getDiscordWebhookUrl } from "@/lib/env";
 import { getDailySummary } from "@/lib/insights/engine";
@@ -41,9 +41,10 @@ export function getDiscordDateKey(isoDate = new Date().toISOString()) {
 }
 
 function getDeliveryDb(db?: DatabaseSync) {
-  const resolvedDb = db ?? getDb();
-  applySchema(resolvedDb);
-  return resolvedDb;
+  if (db) {
+    applySchema(db);
+  }
+  return db;
 }
 
 function getWebhookUrl(webhookUrlOverride?: string) {
@@ -56,7 +57,7 @@ function getWebhookUrl(webhookUrlOverride?: string) {
   return webhookUrl;
 }
 
-export function recordDiscordDeliveryRun(
+export async function recordDiscordDeliveryRun(
   input: {
     dateKey: string;
     summaryDate: string;
@@ -70,8 +71,35 @@ export function recordDiscordDeliveryRun(
   const resolvedDb = getDeliveryDb(db);
   const sentAt = input.sentAt ?? new Date().toISOString();
 
-  resolvedDb
-    .prepare(
+  if (resolvedDb) {
+    resolvedDb
+      .prepare(
+        `
+          INSERT INTO discord_delivery_runs (
+            date_key,
+            summary_date,
+            trigger_source,
+            status,
+            sent_at,
+            error_message,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        input.dateKey,
+        input.summaryDate,
+        input.triggerSource,
+        input.status,
+        sentAt,
+        input.errorMessage ?? null,
+        sentAt,
+      );
+    return;
+  }
+
+  await dbRun(
       `
         INSERT INTO discord_delivery_runs (
           date_key,
@@ -84,75 +112,79 @@ export function recordDiscordDeliveryRun(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-    )
-    .run(
-      input.dateKey,
-      input.summaryDate,
-      input.triggerSource,
-      input.status,
-      sentAt,
-      input.errorMessage ?? null,
-      sentAt,
-    );
+    input.dateKey,
+    input.summaryDate,
+    input.triggerSource,
+    input.status,
+    sentAt,
+    input.errorMessage ?? null,
+    sentAt,
+  );
 }
 
-export function hasSuccessfulDiscordDeliveryForDate(dateKey: string, db?: DatabaseSync) {
+export async function hasSuccessfulDiscordDeliveryForDate(dateKey: string, db?: DatabaseSync) {
   const resolvedDb = getDeliveryDb(db);
   const row = resolvedDb
-    .prepare(
+    ? (resolvedDb
+        .prepare(
+          `
+            SELECT 1
+            FROM discord_delivery_runs
+            WHERE date_key = ? AND status = 'success'
+            LIMIT 1
+          `,
+        )
+        .get(dateKey) as { 1: number } | undefined)
+    : await dbGet<{ 1: number }>(
       `
         SELECT 1
         FROM discord_delivery_runs
         WHERE date_key = ? AND status = 'success'
         LIMIT 1
       `,
-    )
-    .get(dateKey) as { 1: number } | undefined;
+      dateKey,
+    );
 
   return Boolean(row);
 }
 
-export function getDiscordDeliveryStatus(
+export async function getDiscordDeliveryStatus(
   db?: DatabaseSync,
   todayDateKey = getDiscordDateKey(),
-): DiscordDeliveryStatus {
+): Promise<DiscordDeliveryStatus> {
   const resolvedDb = getDeliveryDb(db);
 
+  const latestTodaySql = `
+    SELECT *
+    FROM discord_delivery_runs
+    WHERE date_key = ?
+    ORDER BY sent_at DESC, id DESC
+    LIMIT 1
+  `;
+  const latestSuccessSql = `
+    SELECT *
+    FROM discord_delivery_runs
+    WHERE status = 'success'
+    ORDER BY sent_at DESC, id DESC
+    LIMIT 1
+  `;
+  const scheduledSuccessTodaySql = `
+    SELECT *
+    FROM discord_delivery_runs
+    WHERE date_key = ? AND trigger_source = 'scheduled' AND status = 'success'
+    ORDER BY sent_at DESC, id DESC
+    LIMIT 1
+  `;
+
   const latestToday = resolvedDb
-    .prepare(
-      `
-        SELECT *
-        FROM discord_delivery_runs
-        WHERE date_key = ?
-        ORDER BY sent_at DESC, id DESC
-        LIMIT 1
-      `,
-    )
-    .get(todayDateKey) as DeliveryRow | undefined;
-
+    ? (resolvedDb.prepare(latestTodaySql).get(todayDateKey) as DeliveryRow | undefined)
+    : await dbGet<DeliveryRow>(latestTodaySql, todayDateKey);
   const latestSuccess = resolvedDb
-    .prepare(
-      `
-        SELECT *
-        FROM discord_delivery_runs
-        WHERE status = 'success'
-        ORDER BY sent_at DESC, id DESC
-        LIMIT 1
-      `,
-    )
-    .get() as DeliveryRow | undefined;
-
+    ? (resolvedDb.prepare(latestSuccessSql).get() as DeliveryRow | undefined)
+    : await dbGet<DeliveryRow>(latestSuccessSql);
   const scheduledSuccessToday = resolvedDb
-    .prepare(
-      `
-        SELECT *
-        FROM discord_delivery_runs
-        WHERE date_key = ? AND trigger_source = 'scheduled' AND status = 'success'
-        ORDER BY sent_at DESC, id DESC
-        LIMIT 1
-      `,
-    )
-    .get(todayDateKey) as DeliveryRow | undefined;
+    ? (resolvedDb.prepare(scheduledSuccessTodaySql).get(todayDateKey) as DeliveryRow | undefined)
+    : await dbGet<DeliveryRow>(scheduledSuccessTodaySql, todayDateKey);
 
   return {
     today: {
@@ -161,7 +193,7 @@ export function getDiscordDeliveryStatus(
       lastTrigger: latestToday?.trigger_source ?? null,
       lastSentAt: latestToday?.sent_at ?? null,
       lastErrorMessage: latestToday?.error_message ?? null,
-      hasSuccessfulSend: hasSuccessfulDiscordDeliveryForDate(todayDateKey, resolvedDb),
+      hasSuccessfulSend: await hasSuccessfulDiscordDeliveryForDate(todayDateKey, resolvedDb),
       scheduledSentAt: scheduledSuccessToday?.sent_at ?? null,
     },
     latestSuccessfulSendAt: latestSuccess?.sent_at ?? null,
@@ -173,11 +205,11 @@ export async function sendDailyBriefToDiscord(
   options: SendDailyBriefOptions = {},
 ) {
   const db = getDeliveryDb(options.db);
-  const summary = getDailySummary();
+  const summary = await getDailySummary();
   const dateKey = getDiscordDateKey(summary.date);
 
-  if (trigger === "scheduled" && hasSuccessfulDiscordDeliveryForDate(dateKey, db)) {
-    recordDiscordDeliveryRun(
+  if (trigger === "scheduled" && (await hasSuccessfulDiscordDeliveryForDate(dateKey, db))) {
+    await recordDiscordDeliveryRun(
       {
         dateKey,
         summaryDate: summary.date,
@@ -225,7 +257,7 @@ export async function sendDailyBriefToDiscord(
       const errorText = await response.text();
       const message = `Discord rejected the message (${response.status}). ${errorText || "Please try again."}`;
 
-      recordDiscordDeliveryRun(
+      await recordDiscordDeliveryRun(
         {
           dateKey,
           summaryDate: summary.date,
@@ -243,7 +275,7 @@ export async function sendDailyBriefToDiscord(
       };
     }
 
-    recordDiscordDeliveryRun(
+    await recordDiscordDeliveryRun(
       {
         dateKey,
         summaryDate: summary.date,
@@ -265,7 +297,7 @@ export async function sendDailyBriefToDiscord(
     const message =
       error instanceof Error ? error.message : "Unable to send the daily brief to Discord.";
 
-    recordDiscordDeliveryRun(
+    await recordDiscordDeliveryRun(
       {
         dateKey,
         summaryDate: summary.date,

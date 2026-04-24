@@ -23,13 +23,13 @@ function createTestDb() {
   return db;
 }
 
-test("scheduled dedupe checks successful sends for the day", () => {
+test("scheduled dedupe checks successful sends for the day", async () => {
   const db = createTestDb();
   const dateKey = "2026-04-04";
 
-  assert.equal(hasSuccessfulDiscordDeliveryForDate(dateKey, db), false);
+  assert.equal(await hasSuccessfulDiscordDeliveryForDate(dateKey, db), false);
 
-  recordDiscordDeliveryRun(
+  await recordDiscordDeliveryRun(
     {
       dateKey,
       summaryDate: "2026-04-04T12:00:00.000Z",
@@ -39,14 +39,14 @@ test("scheduled dedupe checks successful sends for the day", () => {
     db,
   );
 
-  assert.equal(hasSuccessfulDiscordDeliveryForDate(dateKey, db), true);
+  assert.equal(await hasSuccessfulDiscordDeliveryForDate(dateKey, db), true);
 });
 
-test("delivery status surfaces today's latest attempt and latest success", () => {
+test("delivery status surfaces today's latest attempt and latest success", async () => {
   const db = createTestDb();
   const dateKey = "2026-04-04";
 
-  recordDiscordDeliveryRun(
+  await recordDiscordDeliveryRun(
     {
       dateKey,
       summaryDate: "2026-04-04T11:00:00.000Z",
@@ -56,7 +56,7 @@ test("delivery status surfaces today's latest attempt and latest success", () =>
     },
     db,
   );
-  recordDiscordDeliveryRun(
+  await recordDiscordDeliveryRun(
     {
       dateKey,
       summaryDate: "2026-04-04T13:00:00.000Z",
@@ -68,7 +68,7 @@ test("delivery status surfaces today's latest attempt and latest success", () =>
     db,
   );
 
-  const status = getDiscordDeliveryStatus(db, dateKey);
+  const status = await getDiscordDeliveryStatus(db, dateKey);
 
   assert.equal(status.today.lastStatus, "failed");
   assert.equal(status.today.lastTrigger, "manual");

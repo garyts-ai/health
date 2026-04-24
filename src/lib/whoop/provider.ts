@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { getDb } from "@/lib/db";
+import { dbAll, dbGet, dbInsert, dbRun } from "@/lib/db";
 import { getWhoopEnv, hasWhoopEnv } from "@/lib/env";
 import {
   WHOOP_API_BASE_URL,
@@ -116,14 +116,15 @@ async function refreshAccessToken(refreshToken: string) {
   return (await response.json()) as WhoopTokenPayload;
 }
 
-function saveTokenPayload(payload: WhoopTokenPayload) {
-  const db = getDb();
-  const existing = db
-    .prepare("SELECT created_at, user_id, email FROM provider_connections WHERE provider = ?")
-    .get("whoop") as { created_at?: string; user_id?: number | null; email?: string | null } | undefined;
+async function saveTokenPayload(payload: WhoopTokenPayload) {
+  const existing = await dbGet<{
+    created_at?: string;
+    user_id?: number | null;
+    email?: string | null;
+  }>("SELECT created_at, user_id, email FROM provider_connections WHERE provider = ?", "whoop");
   const timestamp = nowIso();
 
-  db.prepare(`
+  await dbRun(`
     INSERT INTO provider_connections (
       provider,
       status,
@@ -149,7 +150,7 @@ function saveTokenPayload(payload: WhoopTokenPayload) {
       refresh_token_expires_at = excluded.refresh_token_expires_at,
       last_connected_at = excluded.last_connected_at,
       updated_at = excluded.updated_at
-  `).run(
+  `,
     "whoop",
     "connected",
     existing?.user_id ?? null,
@@ -243,20 +244,18 @@ async function fetchWhoopBodyMeasurement(accessToken: string, retryOnUnauthorize
 }
 
 async function ensureValidAccessToken(forceRefresh = false) {
-  const db = getDb();
-  const connection = db
-    .prepare(`
+  const connection = await dbGet<{
+    access_token?: string | null;
+    refresh_token?: string | null;
+    access_token_expires_at?: string | null;
+  }>(
+    `
       SELECT access_token, refresh_token, access_token_expires_at
       FROM provider_connections
       WHERE provider = ?
-    `)
-    .get("whoop") as
-    | {
-        access_token?: string | null;
-        refresh_token?: string | null;
-        access_token_expires_at?: string | null;
-      }
-    | undefined;
+    `,
+    "whoop",
+  );
 
   if (!connection?.access_token) {
     throw new Error("WHOOP is not connected.");
@@ -275,7 +274,7 @@ async function ensureValidAccessToken(forceRefresh = false) {
   }
 
   const refreshed = await refreshAccessToken(connection.refresh_token);
-  saveTokenPayload({
+  await saveTokenPayload({
     ...refreshed,
     refresh_token: refreshed.refresh_token ?? connection.refresh_token,
   });
@@ -283,56 +282,54 @@ async function ensureValidAccessToken(forceRefresh = false) {
   return refreshed.access_token;
 }
 
-function markSyncStarted() {
-  const db = getDb();
+async function markSyncStarted() {
   const timestamp = nowIso();
-  const result = db
-    .prepare("INSERT INTO whoop_sync_runs (started_at, status) VALUES (?, ?)")
-    .run(timestamp, "running");
+  const runId = await dbInsert(
+    "INSERT INTO whoop_sync_runs (started_at, status) VALUES (?, ?)",
+    timestamp,
+    "running",
+  );
 
-  db.prepare(`
+  await dbRun(`
     UPDATE provider_connections
     SET last_sync_started_at = ?, last_sync_status = ?, last_sync_error = ?, updated_at = ?
     WHERE provider = ?
-  `).run(timestamp, "running", null, timestamp, "whoop");
+  `, timestamp, "running", null, timestamp, "whoop");
 
-  return { runId: Number(result.lastInsertRowid), startedAt: timestamp };
+  return { runId, startedAt: timestamp };
 }
 
-function markSyncFinished(runId: number, status: "success" | "failed", errorMessage?: string) {
-  const db = getDb();
+async function markSyncFinished(runId: number, status: "success" | "failed", errorMessage?: string) {
   const completedAt = nowIso();
 
-  db.prepare(`
+  await dbRun(`
     UPDATE whoop_sync_runs
     SET completed_at = ?, status = ?, error_message = ?
     WHERE id = ?
-  `).run(completedAt, status, errorMessage ?? null, runId);
+  `, completedAt, status, errorMessage ?? null, runId);
 
-  db.prepare(`
+  await dbRun(`
     UPDATE provider_connections
     SET last_sync_completed_at = ?, last_sync_status = ?, last_sync_error = ?, updated_at = ?
     WHERE provider = ?
-  `).run(completedAt, status, errorMessage ?? null, completedAt, "whoop");
+  `, completedAt, status, errorMessage ?? null, completedAt, "whoop");
 }
 
-function upsertWhoopProfile(profile: { user_id?: number; email?: string } | null) {
+async function upsertWhoopProfile(profile: { user_id?: number; email?: string } | null) {
   if (!profile) {
     return;
   }
 
-  const db = getDb();
-  db.prepare(`
+  await dbRun(`
     UPDATE provider_connections
     SET user_id = ?, email = ?, updated_at = ?
     WHERE provider = ?
-  `).run(profile.user_id ?? null, profile.email ?? null, nowIso(), "whoop");
+  `, profile.user_id ?? null, profile.email ?? null, nowIso(), "whoop");
 }
 
-function saveSleepSummaries(records: WhoopSleepSummary[]) {
-  const db = getDb();
+async function saveSleepSummaries(records: WhoopSleepSummary[]) {
   const syncedAt = nowIso();
-  const statement = db.prepare(`
+  const statement = `
     INSERT INTO whoop_sleep_summaries (
       id, cycle_id, start, "end", timezone_offset, nap, score_state,
       sleep_performance_percentage, sleep_consistency_percentage, sleep_efficiency_percentage,
@@ -363,10 +360,11 @@ function saveSleepSummaries(records: WhoopSleepSummary[]) {
       sleep_needed_nap_milli = excluded.sleep_needed_nap_milli,
       raw_json = excluded.raw_json,
       synced_at = excluded.synced_at
-  `);
+  `;
 
   for (const record of records) {
-    statement.run(
+    await dbRun(
+      statement,
       record.id,
       record.cycleId,
       record.start,
@@ -393,10 +391,9 @@ function saveSleepSummaries(records: WhoopSleepSummary[]) {
   }
 }
 
-function saveRecoverySummaries(records: WhoopRecoverySummary[]) {
-  const db = getDb();
+async function saveRecoverySummaries(records: WhoopRecoverySummary[]) {
   const syncedAt = nowIso();
-  const statement = db.prepare(`
+  const statement = `
     INSERT INTO whoop_recovery_summaries (
       cycle_id, created_at, updated_at, score_state, user_calibrating,
       recovery_score, resting_heart_rate, hrv_rmssd_milli, spo2_percentage,
@@ -414,10 +411,11 @@ function saveRecoverySummaries(records: WhoopRecoverySummary[]) {
       skin_temp_celsius = excluded.skin_temp_celsius,
       raw_json = excluded.raw_json,
       synced_at = excluded.synced_at
-  `);
+  `;
 
   for (const record of records) {
-    statement.run(
+    await dbRun(
+      statement,
       record.cycleId,
       record.createdAt,
       record.updatedAt,
@@ -434,10 +432,9 @@ function saveRecoverySummaries(records: WhoopRecoverySummary[]) {
   }
 }
 
-function saveCycleSummaries(records: WhoopCycleSummary[]) {
-  const db = getDb();
+async function saveCycleSummaries(records: WhoopCycleSummary[]) {
   const syncedAt = nowIso();
-  const statement = db.prepare(`
+  const statement = `
     INSERT INTO whoop_cycles (
       id, start, "end", timezone_offset, score_state, strain,
       kilojoule, average_heart_rate, max_heart_rate, raw_json, synced_at
@@ -453,10 +450,11 @@ function saveCycleSummaries(records: WhoopCycleSummary[]) {
       max_heart_rate = excluded.max_heart_rate,
       raw_json = excluded.raw_json,
       synced_at = excluded.synced_at
-  `);
+  `;
 
   for (const record of records) {
-    statement.run(
+    await dbRun(
+      statement,
       record.id,
       record.start,
       record.end,
@@ -472,10 +470,9 @@ function saveCycleSummaries(records: WhoopCycleSummary[]) {
   }
 }
 
-function saveWorkoutSummaries(records: WhoopWorkoutSummary[]) {
-  const db = getDb();
+async function saveWorkoutSummaries(records: WhoopWorkoutSummary[]) {
   const syncedAt = nowIso();
-  const statement = db.prepare(`
+  const statement = `
     INSERT INTO whoop_workouts (
       id, sport_id, sport_name, start, "end", timezone_offset, score_state,
       strain, average_heart_rate, max_heart_rate, kilojoule, percent_recorded,
@@ -495,10 +492,11 @@ function saveWorkoutSummaries(records: WhoopWorkoutSummary[]) {
       percent_recorded = excluded.percent_recorded,
       raw_json = excluded.raw_json,
       synced_at = excluded.synced_at
-  `);
+  `;
 
   for (const record of records) {
-    statement.run(
+    await dbRun(
+      statement,
       record.id,
       record.sportId,
       record.sportName,
@@ -517,14 +515,13 @@ function saveWorkoutSummaries(records: WhoopWorkoutSummary[]) {
   }
 }
 
-function saveBodyMeasurement(record: WhoopBodyMeasurementSummary | null) {
+async function saveBodyMeasurement(record: WhoopBodyMeasurementSummary | null) {
   if (!record) {
     return;
   }
 
-  const db = getDb();
   const syncedAt = nowIso();
-  db.prepare(`
+  await dbRun(`
     INSERT INTO whoop_body_measurements (
       observed_on, observed_at, height_meter, weight_kilogram,
       max_heart_rate, raw_json, synced_at
@@ -536,7 +533,7 @@ function saveBodyMeasurement(record: WhoopBodyMeasurementSummary | null) {
       max_heart_rate = excluded.max_heart_rate,
       raw_json = excluded.raw_json,
       synced_at = excluded.synced_at
-  `).run(
+  `,
     record.observedOn,
     record.observedAt,
     record.heightMeter,
@@ -547,11 +544,10 @@ function saveBodyMeasurement(record: WhoopBodyMeasurementSummary | null) {
   );
 }
 
-function readLatestSleep(): WhoopSleepSummary | null {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT * FROM whoop_sleep_summaries ORDER BY start DESC LIMIT 1")
-    .get() as Record<string, unknown> | undefined;
+async function readLatestSleep(): Promise<WhoopSleepSummary | null> {
+  const row = await dbGet<Record<string, unknown>>(
+    "SELECT * FROM whoop_sleep_summaries ORDER BY start DESC LIMIT 1",
+  );
 
   if (!row) {
     return null;
@@ -606,11 +602,10 @@ function readLatestSleep(): WhoopSleepSummary | null {
   };
 }
 
-function readLatestRecovery(): WhoopRecoverySummary | null {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT * FROM whoop_recovery_summaries ORDER BY created_at DESC LIMIT 1")
-    .get() as Record<string, unknown> | undefined;
+async function readLatestRecovery(): Promise<WhoopRecoverySummary | null> {
+  const row = await dbGet<Record<string, unknown>>(
+    "SELECT * FROM whoop_recovery_summaries ORDER BY created_at DESC LIMIT 1",
+  );
 
   if (!row) {
     return null;
@@ -633,11 +628,10 @@ function readLatestRecovery(): WhoopRecoverySummary | null {
   };
 }
 
-function readLatestBodyMeasurement(): WhoopBodyMeasurementSummary | null {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT * FROM whoop_body_measurements ORDER BY observed_on DESC LIMIT 1")
-    .get() as Record<string, unknown> | undefined;
+async function readLatestBodyMeasurement(): Promise<WhoopBodyMeasurementSummary | null> {
+  const row = await dbGet<Record<string, unknown>>(
+    "SELECT * FROM whoop_body_measurements ORDER BY observed_on DESC LIMIT 1",
+  );
 
   if (!row) {
     return null;
@@ -653,11 +647,10 @@ function readLatestBodyMeasurement(): WhoopBodyMeasurementSummary | null {
   };
 }
 
-function readLatestCycle(): WhoopCycleSummary | null {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT * FROM whoop_cycles ORDER BY start DESC LIMIT 1")
-    .get() as Record<string, unknown> | undefined;
+async function readLatestCycle(): Promise<WhoopCycleSummary | null> {
+  const row = await dbGet<Record<string, unknown>>(
+    "SELECT * FROM whoop_cycles ORDER BY start DESC LIMIT 1",
+  );
 
   if (!row) {
     return null;
@@ -677,11 +670,10 @@ function readLatestCycle(): WhoopCycleSummary | null {
   };
 }
 
-function readLatestWorkouts() {
-  const db = getDb();
-  const rows = db
-    .prepare("SELECT * FROM whoop_workouts ORDER BY start DESC LIMIT 3")
-    .all() as Record<string, unknown>[];
+async function readLatestWorkouts() {
+  const rows = await dbAll<Record<string, unknown>>(
+    "SELECT * FROM whoop_workouts ORDER BY start DESC LIMIT 3",
+  );
 
   return rows.map((row) => ({
     id: String(row.id),
@@ -719,12 +711,12 @@ export async function connectWhoop() {
 
 export async function handleWhoopCallback(code: string) {
   const tokenPayload = await exchangeCodeForToken(code);
-  saveTokenPayload(tokenPayload);
+  await saveTokenPayload(tokenPayload);
   await syncWhoopData();
 }
 
 export async function syncWhoopData() {
-  const run = markSyncStarted();
+  const run = await markSyncStarted();
 
   try {
     const accessToken = await ensureValidAccessToken();
@@ -752,13 +744,13 @@ export async function syncWhoopData() {
       ? normalizeBodyMeasurementRecord(bodyMeasurement)
       : null;
 
-    saveSleepSummaries(normalizedSleep);
-    saveRecoverySummaries(normalizedRecovery);
-    saveCycleSummaries(normalizedCycles);
-    saveWorkoutSummaries(normalizedWorkouts);
-    saveBodyMeasurement(normalizedBodyMeasurement);
-    upsertWhoopProfile(profile);
-    markSyncFinished(run.runId, "success");
+    await saveSleepSummaries(normalizedSleep);
+    await saveRecoverySummaries(normalizedRecovery);
+    await saveCycleSummaries(normalizedCycles);
+    await saveWorkoutSummaries(normalizedWorkouts);
+    await saveBodyMeasurement(normalizedBodyMeasurement);
+    await upsertWhoopProfile(profile);
+    await markSyncFinished(run.runId, "success");
 
     return {
       sleepCount: normalizedSleep.length,
@@ -773,40 +765,41 @@ export async function syncWhoopData() {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown WHOOP sync error";
-    markSyncFinished(run.runId, "failed", message);
+    await markSyncFinished(run.runId, "failed", message);
     throw error;
   }
 }
 
-export function getWhoopConnectionStatus(): WhoopConnectionStatus {
-  const db = getDb();
+export async function getWhoopConnectionStatus(): Promise<WhoopConnectionStatus> {
   const isConfigured = hasWhoopEnv();
-  const row = db
-    .prepare(`
+  const row = await dbGet<{
+    status?: string | null;
+    user_id?: number | null;
+    email?: string | null;
+    scopes?: string | null;
+    last_connected_at?: string | null;
+    last_sync_started_at?: string | null;
+    last_sync_completed_at?: string | null;
+    last_sync_status?: string | null;
+    last_sync_error?: string | null;
+  }>(
+    `
       SELECT provider, status, user_id, email, scopes, last_connected_at,
              last_sync_started_at, last_sync_completed_at, last_sync_status, last_sync_error
       FROM provider_connections
       WHERE provider = ?
-    `)
-    .get("whoop") as
-    | {
-        status?: string | null;
-        user_id?: number | null;
-        email?: string | null;
-        scopes?: string | null;
-        last_connected_at?: string | null;
-        last_sync_started_at?: string | null;
-        last_sync_completed_at?: string | null;
-        last_sync_status?: string | null;
-        last_sync_error?: string | null;
-      }
-    | undefined;
+    `,
+    "whoop",
+  );
 
-  const latestSleep = readLatestSleep();
-  const latestRecovery = readLatestRecovery();
-  const latestCycle = readLatestCycle();
-  const latestBodyMeasurement = readLatestBodyMeasurement();
-  const latestWorkouts = readLatestWorkouts();
+  const [latestSleep, latestRecovery, latestCycle, latestBodyMeasurement, latestWorkouts] =
+    await Promise.all([
+      readLatestSleep(),
+      readLatestRecovery(),
+      readLatestCycle(),
+      readLatestBodyMeasurement(),
+      readLatestWorkouts(),
+    ]);
   const lastSyncCompletedAt = row?.last_sync_completed_at ?? null;
   const isStale =
     !lastSyncCompletedAt ||
@@ -817,7 +810,7 @@ export function getWhoopConnectionStatus(): WhoopConnectionStatus {
     isConfigured,
     status: isConfigured ? row?.status ?? "disconnected" : "not_configured",
     hasOfflineAccess: getScopesFromString(row?.scopes ?? null).includes("offline"),
-    userId: row?.user_id ?? null,
+    userId: row?.user_id === null || row?.user_id === undefined ? null : Number(row.user_id),
     email: row?.email ?? null,
     lastConnectedAt: row?.last_connected_at ?? null,
     lastSyncStartedAt: row?.last_sync_started_at ?? null,

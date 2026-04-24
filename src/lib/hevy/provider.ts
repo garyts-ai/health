@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { dbAll, dbGet, dbInsert, dbRun } from "@/lib/db";
 import { getHevyApiKey, hasHevyApiKey } from "@/lib/env";
 import { HEVY_API_BASE_URL, HEVY_PAGE_SIZE } from "@/lib/hevy/constants";
 import { getLatestHevyWorkouts, normalizeHevyWorkout } from "@/lib/hevy/normalize";
@@ -43,27 +43,30 @@ async function hevyFetch<T>(path: string) {
   return (await response.json()) as T;
 }
 
-function markSyncStarted() {
-  const db = getDb();
+async function markSyncStarted() {
   const timestamp = nowIso();
-  const result = db
-    .prepare("INSERT INTO hevy_sync_runs (started_at, status) VALUES (?, ?)")
-    .run(timestamp, "running");
+  const runId = await dbInsert(
+    "INSERT INTO hevy_sync_runs (started_at, status) VALUES (?, ?)",
+    timestamp,
+    "running",
+  );
 
-  const existing = db
-    .prepare("SELECT created_at FROM provider_connections WHERE provider = ?")
-    .get("hevy") as { created_at?: string } | undefined;
+  const existing = await dbGet<{ created_at?: string }>(
+    "SELECT created_at FROM provider_connections WHERE provider = ?",
+    "hevy",
+  );
 
-  db.prepare(`
-    INSERT INTO provider_connections (
-      provider, status, created_at, updated_at, last_sync_started_at, last_sync_status, last_sync_error
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(provider) DO UPDATE SET
-      last_sync_started_at = excluded.last_sync_started_at,
-      last_sync_status = excluded.last_sync_status,
-      last_sync_error = excluded.last_sync_error,
-      updated_at = excluded.updated_at
-  `).run(
+  await dbRun(
+    `
+      INSERT INTO provider_connections (
+        provider, status, created_at, updated_at, last_sync_started_at, last_sync_status, last_sync_error
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider) DO UPDATE SET
+        last_sync_started_at = excluded.last_sync_started_at,
+        last_sync_status = excluded.last_sync_status,
+        last_sync_error = excluded.last_sync_error,
+        updated_at = excluded.updated_at
+    `,
     "hevy",
     "connecting",
     existing?.created_at ?? timestamp,
@@ -73,42 +76,47 @@ function markSyncStarted() {
     null,
   );
 
-  return Number(result.lastInsertRowid);
+  return runId;
 }
 
-function markSyncFinished(status: "connected" | "failed", errorMessage?: string) {
-  const db = getDb();
+async function markSyncFinished(status: "connected" | "failed", errorMessage?: string) {
   const timestamp = nowIso();
-  const run = db
-    .prepare("SELECT id FROM hevy_sync_runs ORDER BY id DESC LIMIT 1")
-    .get() as { id?: number } | undefined;
+  const run = await dbGet<{ id?: number }>("SELECT id FROM hevy_sync_runs ORDER BY id DESC LIMIT 1");
 
   if (run?.id) {
-    db.prepare(`
-      UPDATE hevy_sync_runs
-      SET completed_at = ?, status = ?, error_message = ?
-      WHERE id = ?
-    `).run(timestamp, status === "connected" ? "success" : "failed", errorMessage ?? null, run.id);
+    await dbRun(
+      `
+        UPDATE hevy_sync_runs
+        SET completed_at = ?, status = ?, error_message = ?
+        WHERE id = ?
+      `,
+      timestamp,
+      status === "connected" ? "success" : "failed",
+      errorMessage ?? null,
+      run.id,
+    );
   }
 
-  const existing = db
-    .prepare("SELECT created_at FROM provider_connections WHERE provider = ?")
-    .get("hevy") as { created_at?: string } | undefined;
+  const existing = await dbGet<{ created_at?: string }>(
+    "SELECT created_at FROM provider_connections WHERE provider = ?",
+    "hevy",
+  );
 
-  db.prepare(`
-    INSERT INTO provider_connections (
-      provider, status, created_at, updated_at, last_connected_at, last_sync_completed_at,
-      last_sync_status, last_sync_error, scopes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(provider) DO UPDATE SET
-      status = excluded.status,
-      updated_at = excluded.updated_at,
-      last_connected_at = excluded.last_connected_at,
-      last_sync_completed_at = excluded.last_sync_completed_at,
-      last_sync_status = excluded.last_sync_status,
-      last_sync_error = excluded.last_sync_error,
-      scopes = excluded.scopes
-  `).run(
+  await dbRun(
+    `
+      INSERT INTO provider_connections (
+        provider, status, created_at, updated_at, last_connected_at, last_sync_completed_at,
+        last_sync_status, last_sync_error, scopes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider) DO UPDATE SET
+        status = excluded.status,
+        updated_at = excluded.updated_at,
+        last_connected_at = excluded.last_connected_at,
+        last_sync_completed_at = excluded.last_sync_completed_at,
+        last_sync_status = excluded.last_sync_status,
+        last_sync_error = excluded.last_sync_error,
+        scopes = excluded.scopes
+    `,
     "hevy",
     status,
     existing?.created_at ?? timestamp,
@@ -121,23 +129,27 @@ function markSyncFinished(status: "connected" | "failed", errorMessage?: string)
   );
 }
 
-function saveUserInfo(user: HevyUserInfoResponse["data"]) {
-  const db = getDb();
+async function saveUserInfo(user: HevyUserInfoResponse["data"]) {
   if (!user) {
     return;
   }
 
-  db.prepare(`
-    UPDATE provider_connections
-    SET user_id = ?, email = ?, updated_at = ?
-    WHERE provider = ?
-  `).run(user.id ?? null, user.name ?? null, nowIso(), "hevy");
+  await dbRun(
+    `
+      UPDATE provider_connections
+      SET user_id = ?, email = ?, updated_at = ?
+      WHERE provider = ?
+    `,
+    user.id ?? null,
+    user.name ?? null,
+    nowIso(),
+    "hevy",
+  );
 }
 
-function saveHevyWorkouts(workouts: HevyWorkoutSummary[]) {
-  const db = getDb();
+async function saveHevyWorkouts(workouts: HevyWorkoutSummary[]) {
   const syncedAt = nowIso();
-  const statement = db.prepare(`
+  const statement = `
     INSERT INTO hevy_workouts (
       id, title, description, routine_id, start_time, end_time, created_at, updated_at,
       exercise_count, set_count, volume_kg, duration_seconds, raw_json, synced_at
@@ -156,10 +168,11 @@ function saveHevyWorkouts(workouts: HevyWorkoutSummary[]) {
       duration_seconds = excluded.duration_seconds,
       raw_json = excluded.raw_json,
       synced_at = excluded.synced_at
-  `);
+  `;
 
   for (const workout of workouts) {
-    statement.run(
+    await dbRun(
+      statement,
       workout.id,
       workout.title,
       workout.description,
@@ -195,11 +208,10 @@ async function fetchAllHevyWorkouts() {
   return workouts;
 }
 
-function readLatestWorkouts() {
-  const db = getDb();
-  const rows = db
-    .prepare("SELECT * FROM hevy_workouts ORDER BY start_time DESC LIMIT 3")
-    .all() as Record<string, unknown>[];
+async function readLatestWorkouts() {
+  const rows = await dbAll<Record<string, unknown>>(
+    "SELECT * FROM hevy_workouts ORDER BY start_time DESC LIMIT 3",
+  );
 
   return rows.map((row) => ({
     id: String(row.id),
@@ -219,7 +231,7 @@ function readLatestWorkouts() {
 }
 
 export async function syncHevyData() {
-  markSyncStarted();
+  await markSyncStarted();
 
   try {
     const [userInfo, workouts] = await Promise.all([
@@ -231,9 +243,9 @@ export async function syncHevyData() {
       .map(normalizeHevyWorkout)
       .filter((workout) => workout.id);
 
-    saveUserInfo(userInfo.data);
-    saveHevyWorkouts(normalizedWorkouts);
-    markSyncFinished("connected");
+    await saveUserInfo(userInfo.data);
+    await saveHevyWorkouts(normalizedWorkouts);
+    await markSyncFinished("connected");
 
     return {
       workoutCount: normalizedWorkouts.length,
@@ -241,36 +253,34 @@ export async function syncHevyData() {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Hevy sync error";
-    markSyncFinished("failed", message);
+    await markSyncFinished("failed", message);
     throw error;
   }
 }
 
-export function getHevyConnectionStatus(): HevyConnectionStatus {
-  const db = getDb();
+export async function getHevyConnectionStatus(): Promise<HevyConnectionStatus> {
   const isConfigured = hasHevyApiKey();
-  const row = db
-    .prepare(`
+  const row = await dbGet<{
+    status?: string | null;
+    user_id?: string | null;
+    email?: string | null;
+    token_type?: string | null;
+    last_connected_at?: string | null;
+    last_sync_started_at?: string | null;
+    last_sync_completed_at?: string | null;
+    last_sync_status?: string | null;
+    last_sync_error?: string | null;
+  }>(
+    `
       SELECT status, user_id, email, token_type, last_connected_at, last_sync_started_at,
              last_sync_completed_at, last_sync_status, last_sync_error
       FROM provider_connections
       WHERE provider = ?
-    `)
-    .get("hevy") as
-    | {
-        status?: string | null;
-        user_id?: string | null;
-        email?: string | null;
-        token_type?: string | null;
-        last_connected_at?: string | null;
-        last_sync_started_at?: string | null;
-        last_sync_completed_at?: string | null;
-        last_sync_status?: string | null;
-        last_sync_error?: string | null;
-      }
-    | undefined;
+    `,
+    "hevy",
+  );
 
-  const latestWorkouts = readLatestWorkouts();
+  const latestWorkouts = await readLatestWorkouts();
   const lastSyncCompletedAt = row?.last_sync_completed_at ?? null;
   const isStale =
     !lastSyncCompletedAt ||

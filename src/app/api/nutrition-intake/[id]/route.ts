@@ -18,6 +18,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ ok: false, error: "Invalid intake id." }, { status: 400 });
   }
 
-  deleteNutritionIntakeEntry(parsedId);
+  await deleteNutritionIntakeEntry(parsedId);
   return NextResponse.json({ ok: true });
 }

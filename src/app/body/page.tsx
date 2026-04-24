@@ -2,8 +2,11 @@ import { BodySummaryCard } from "@/components/body-summary-card";
 import { ProductShell } from "@/components/product-shell";
 import { getDailySummary } from "@/lib/insights/engine";
 
-export default function BodyPage() {
-  const summary = getDailySummary();
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function BodyPage() {
+  const summary = await getDailySummary();
 
   return (
     <ProductShell

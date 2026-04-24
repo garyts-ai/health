@@ -4,6 +4,6 @@ import { getDailySummary } from "@/lib/insights/engine";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const summary = getDailySummary();
+  const summary = await getDailySummary();
   return await createDailyBriefImage(summary);
 }

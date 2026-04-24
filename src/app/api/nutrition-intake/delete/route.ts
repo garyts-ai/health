@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       throw new Error("Missing nutrition intake id.");
     }
 
-    deleteNutritionIntakeEntry(id);
+    await deleteNutritionIntakeEntry(id);
     redirectUrl.searchParams.set("intake", "deleted");
   } catch {
     redirectUrl.searchParams.set("intake", "failed");

@@ -10,7 +10,7 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData();
-    saveNutritionTargets(nutritionTargetsFromFormData(formData));
+    await saveNutritionTargets(nutritionTargetsFromFormData(formData));
     redirectUrl.searchParams.set("targets", "saved");
   } catch {
     redirectUrl.searchParams.set("targets", "failed");

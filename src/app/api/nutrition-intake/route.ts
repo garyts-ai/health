@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const dateKey = url.searchParams.get("date") ?? undefined;
 
-  return NextResponse.json(getNutritionIntakeSummary(dateKey));
+  return NextResponse.json(await getNutritionIntakeSummary(dateKey));
 }
 
 export async function POST(request: Request) {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData();
-    createNutritionIntakeEntry(nutritionIntakeFromFormData(formData));
+    await createNutritionIntakeEntry(nutritionIntakeFromFormData(formData));
     redirectUrl.searchParams.set("intake", "saved");
   } catch {
     redirectUrl.searchParams.set("intake", "failed");
