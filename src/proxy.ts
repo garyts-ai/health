@@ -30,16 +30,29 @@ function isAuthEnabled() {
   );
 }
 
+function shouldFailClosedWithoutAuth() {
+  return process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (
-    !isAuthEnabled() ||
     isStaticAsset(pathname) ||
     pathname === "/login" ||
     pathname === "/api/auth/whoop/callback" ||
     isNextAuthPath(pathname)
   ) {
+    return NextResponse.next();
+  }
+
+  if (!isAuthEnabled()) {
+    if (shouldFailClosedWithoutAuth()) {
+      return new NextResponse("Health OS auth is not configured.", {
+        status: 503,
+      });
+    }
+
     return NextResponse.next();
   }
 

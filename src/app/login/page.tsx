@@ -13,6 +13,14 @@ type LoginPageProps = {
   }>;
 };
 
+function getSafeCallbackUrl(callbackUrl?: string) {
+  if (!callbackUrl || !callbackUrl.startsWith("/") || callbackUrl.startsWith("//")) {
+    return "/";
+  }
+
+  return callbackUrl;
+}
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (!isAppAuthEnabled()) {
     redirect("/");
@@ -22,10 +30,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
 
   if (session?.user?.email) {
-    redirect(resolvedSearchParams.callbackUrl || "/");
+    redirect(getSafeCallbackUrl(resolvedSearchParams.callbackUrl));
   }
 
-  const callbackUrl = resolvedSearchParams.callbackUrl || "/";
+  const callbackUrl = getSafeCallbackUrl(resolvedSearchParams.callbackUrl);
   const signInUrl = `/api/auth/signin/github?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
   return (
