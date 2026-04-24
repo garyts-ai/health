@@ -22,6 +22,7 @@ type ActionCard = {
   isConfigured: boolean;
   isStale: boolean;
   lastSyncCompletedAt: string | null;
+  lastSyncError: string | null;
   lastSyncStatus: string | null;
   primaryHref: string | null;
   primaryDisabledLabel: string;
@@ -52,12 +53,16 @@ function isLocalOAuthHost(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
+function isSafeOAuthLocation(location: Location) {
+  return location.protocol === "https:" || isLocalOAuthHost(location.hostname);
+}
+
 function subscribeToBrowserHost() {
   return () => {};
 }
 
 function getBrowserOAuthSnapshot() {
-  return typeof window !== "undefined" && isLocalOAuthHost(window.location.hostname);
+  return typeof window !== "undefined" && isSafeOAuthLocation(window.location);
 }
 
 function getServerOAuthSnapshot() {
@@ -130,14 +135,15 @@ export function ProtectedSettingsActions({
       isConfigured: whoop.isConfigured,
       isStale: whoop.isStale,
       lastSyncCompletedAt: whoop.lastSyncCompletedAt,
+      lastSyncError: whoop.lastSyncError,
       lastSyncStatus: whoop.lastSyncStatus,
       primaryHref: whoop.isConfigured && canUseWhoopOAuth ? "/api/auth/whoop" : null,
-      primaryDisabledLabel: whoop.isConfigured ? "Reconnect on desktop" : "Configure WHOOP",
+      primaryDisabledLabel: whoop.isConfigured ? "Reconnect requires HTTPS" : "Configure WHOOP",
       primaryLabel: whoop.connected ? "Reconnect WHOOP" : "Connect WHOOP",
       statusNote: whoop.isConfigured
         ? canUseWhoopOAuth
-          ? "OAuth reconnect is available from the local desktop URL. Mobile sync uses the stored token."
-          : "Mobile sync uses the stored WHOOP token. Reconnect from localhost on the PC if OAuth needs renewal."
+          ? "OAuth reconnect is available from this secure app URL. Sync uses the stored token after connection."
+          : "Sync can use a stored token, but reconnect needs the Vercel HTTPS URL or localhost."
         : "Add WHOOP credentials to enable connect and sync actions.",
       syncFormAction: "/api/whoop/sync",
     },
@@ -147,6 +153,7 @@ export function ProtectedSettingsActions({
       isConfigured: hevy.isConfigured,
       isStale: hevy.isStale,
       lastSyncCompletedAt: hevy.lastSyncCompletedAt,
+      lastSyncError: null,
       lastSyncStatus: hevy.lastSyncStatus,
       primaryHref: null,
       primaryDisabledLabel: "Configure Hevy",
@@ -205,6 +212,11 @@ export function ProtectedSettingsActions({
                 Last sync: {formatTimestamp(card.lastSyncCompletedAt)}
               </p>
               <p className="mt-2 text-sm leading-6 text-[#645c7d]">{card.statusNote}</p>
+              {card.lastSyncStatus === "failed" && card.lastSyncError ? (
+                <p className="mt-3 rounded-[8px] border border-[#c85f6e]/20 bg-[#c85f6e]/8 px-3 py-2 text-xs leading-5 text-[#7b2f3a]">
+                  Last error: {card.lastSyncError}
+                </p>
+              ) : null}
               <div className="mt-5 flex flex-wrap gap-3">
                 {card.primaryHref ? (
                   <a
