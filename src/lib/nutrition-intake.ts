@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { dbAll, dbInsert, dbRun } from "@/lib/db";
 
 const NEW_YORK_DAY = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York",
@@ -100,7 +100,7 @@ export function nutritionIntakeFromFormData(formData: FormData): NutritionIntake
   };
 }
 
-export function createNutritionIntakeEntry(input: NutritionIntakeInput) {
+export async function createNutritionIntakeEntry(input: NutritionIntakeInput) {
   const now = new Date().toISOString();
   const dateKey = input.dateKey ?? currentDateKey();
 
@@ -108,54 +108,53 @@ export function createNutritionIntakeEntry(input: NutritionIntakeInput) {
     throw new Error("Nutrition entry needs at least one macro value.");
   }
 
-  const result = getDb()
-    .prepare(`
+  return dbInsert(
+    `
       INSERT INTO nutrition_intake_entries (
         date_key, meal_type, label, calories, protein_g, carbs_g, fat_g, note, logged_at, created_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-    .run(
-      dateKey,
-      input.mealType,
-      input.label,
-      input.calories,
-      input.proteinG,
-      input.carbsG,
-      input.fatG,
-      input.note && input.note.length > 0 ? input.note : null,
-      now,
-      now,
-    );
-
-  return Number(result.lastInsertRowid);
+    `,
+    dateKey,
+    input.mealType,
+    input.label,
+    input.calories,
+    input.proteinG,
+    input.carbsG,
+    input.fatG,
+    input.note && input.note.length > 0 ? input.note : null,
+    now,
+    now,
+  );
 }
 
-export function deleteNutritionIntakeEntry(id: number) {
-  getDb()
-    .prepare(`
+export async function deleteNutritionIntakeEntry(id: number) {
+  await dbRun(
+    `
       DELETE FROM nutrition_intake_entries
       WHERE id = ?
-    `)
-    .run(id);
+    `,
+    id,
+  );
 }
 
-export function listNutritionIntakeEntries(dateKey = currentDateKey()) {
+export async function listNutritionIntakeEntries(dateKey = currentDateKey()) {
   return (
-    getDb()
-      .prepare(`
+    await dbAll<NutritionIntakeRow>(
+      `
         SELECT id, date_key, meal_type, label, calories, protein_g, carbs_g, fat_g, note,
                logged_at, created_at
         FROM nutrition_intake_entries
         WHERE date_key = ?
         ORDER BY logged_at DESC, id DESC
-      `)
-      .all(dateKey) as NutritionIntakeRow[]
+      `,
+      dateKey,
+    )
   ).map(mapRow);
 }
 
-export function getNutritionIntakeSummary(dateKey = currentDateKey()) {
-  const entries = listNutritionIntakeEntries(dateKey);
+export async function getNutritionIntakeSummary(dateKey = currentDateKey()) {
+  const entries = await listNutritionIntakeEntries(dateKey);
   const totals = entries.reduce(
     (sum, entry) => ({
       calories: sum.calories + entry.calories,

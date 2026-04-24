@@ -21,10 +21,12 @@ type HomePageProps = {
 
 export default async function Home({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
-  const summary = getDailySummary();
-  const whoopStatus = getWhoopConnectionStatus();
-  const hevyStatus = getHevyConnectionStatus();
-  const deliveryStatus = getDiscordDeliveryStatus();
+  const [summary, whoopStatus, hevyStatus, deliveryStatus] = await Promise.all([
+    getDailySummary(),
+    getWhoopConnectionStatus(),
+    getHevyConnectionStatus(),
+    getDiscordDeliveryStatus(),
+  ]);
 
   return (
     <MasterDashboard

@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { dbAll, dbGet } from "@/lib/db";
 import { getHevyConnectionStatus } from "@/lib/hevy/provider";
 import {
   buildBodyHighlightsFromWorkout,
@@ -531,9 +531,8 @@ function signedPoundsText(value: number | null, digits = 1) {
   return `${prefix}${pounds.toFixed(digits)} lb`;
 }
 
-function buildFreshness(): DailyFreshness {
-  const whoop = getWhoopConnectionStatus();
-  const hevy = getHevyConnectionStatus();
+async function buildFreshness(): Promise<DailyFreshness> {
+  const [whoop, hevy] = await Promise.all([getWhoopConnectionStatus(), getHevyConnectionStatus()]);
 
   return {
     whoop: {
@@ -549,51 +548,57 @@ function buildFreshness(): DailyFreshness {
   };
 }
 
-function buildReadiness(): DailyReadiness {
-  const db = getDb();
-  const sleepRows = db
-    .prepare(`
+async function buildReadiness(): Promise<DailyReadiness> {
+  const [sleepRows, recoveryRows, cycleRows, bodyRows, workoutRows] = await Promise.all([
+    dbAll<WhoopSleepRow>(
+      `
       SELECT start, "end", sleep_performance_percentage, sleep_consistency_percentage,
              sleep_efficiency_percentage, total_in_bed_time_milli, total_awake_time_milli, sleep_needed_baseline_milli,
              sleep_needed_debt_milli, sleep_needed_strain_milli, sleep_needed_nap_milli
       FROM whoop_sleep_summaries
       WHERE start >= ?
       ORDER BY start DESC
-    `)
-    .all(getStartDate(28)) as WhoopSleepRow[];
-  const recoveryRows = db
-    .prepare(`
+    `,
+      getStartDate(28),
+    ),
+    dbAll<WhoopRecoveryRow>(
+      `
       SELECT created_at, recovery_score, resting_heart_rate, hrv_rmssd_milli,
              skin_temp_celsius, raw_json
       FROM whoop_recovery_summaries
       WHERE created_at >= ?
       ORDER BY created_at DESC
-    `)
-    .all(getStartDate(28)) as WhoopRecoveryRow[];
-  const cycleRows = db
-    .prepare(`
+    `,
+      getStartDate(28),
+    ),
+    dbAll<WhoopCycleRow>(
+      `
       SELECT id, start, "end", strain, kilojoule, average_heart_rate, max_heart_rate, raw_json
       FROM whoop_cycles
       WHERE start >= ?
       ORDER BY start DESC
-    `)
-    .all(getStartDate(28)) as WhoopCycleRow[];
-  const bodyRows = db
-    .prepare(`
+    `,
+      getStartDate(28),
+    ),
+    dbAll<WhoopBodyMeasurementRow>(
+      `
       SELECT observed_on, observed_at, weight_kilogram, height_meter, max_heart_rate
       FROM whoop_body_measurements
       WHERE observed_on >= ?
       ORDER BY observed_on DESC
-    `)
-    .all(getStartDate(28).slice(0, 10)) as WhoopBodyMeasurementRow[];
-  const workoutRows = db
-    .prepare(`
+    `,
+      getStartDate(28).slice(0, 10),
+    ),
+    dbAll<WhoopWorkoutRow>(
+      `
       SELECT start, strain
       FROM whoop_workouts
       WHERE start >= ?
       ORDER BY start DESC
-    `)
-    .all(getStartDate(28)) as WhoopWorkoutRow[];
+    `,
+      getStartDate(28),
+    ),
+  ]);
 
   const latestSleep = sleepRows[0] ?? null;
   const latestRecovery = recoveryRows[0] ?? null;
@@ -669,53 +674,59 @@ function buildReadiness(): DailyReadiness {
 }
 
 
-function buildMiniTrends() {
-  const db = getDb();
-  const recoveryRows = db
-    .prepare(`
+async function buildMiniTrends() {
+  const [recoveryRows, cycleRows, sleepRows, bodyRows, liftsThisWeek] = await Promise.all([
+    dbAll<Array<{ created_at: string; recovery_score: number | null }>[number]>(
+      `
       SELECT created_at, recovery_score
       FROM whoop_recovery_summaries
       WHERE created_at >= ?
       ORDER BY created_at DESC
-    `)
-    .all(getStartDate(7)) as Array<{ created_at: string; recovery_score: number | null }>;
-  const cycleRows = db
-    .prepare(`
+    `,
+      getStartDate(7),
+    ),
+    dbAll<Array<{ start: string; strain: number | null }>[number]>(
+      `
       SELECT start, strain
       FROM whoop_cycles
       WHERE start >= ?
       ORDER BY start DESC
-    `)
-    .all(getStartDate(7)) as Array<{ start: string; strain: number | null }>;
-  const sleepRows = db
-    .prepare(`
+    `,
+      getStartDate(7),
+    ),
+    dbAll<{
+      start: string;
+      end: string;
+      total_in_bed_time_milli: number | null;
+      total_awake_time_milli: number | null;
+    }>(
+      `
       SELECT start, total_in_bed_time_milli, total_awake_time_milli
              , "end"
       FROM whoop_sleep_summaries
       WHERE start >= ?
       ORDER BY start DESC
-    `)
-    .all(getStartDate(7)) as Array<{
-      start: string;
-      end: string;
-      total_in_bed_time_milli: number | null;
-      total_awake_time_milli: number | null;
-    }>;
-  const bodyRows = db
-    .prepare(`
+    `,
+      getStartDate(7),
+    ),
+    dbAll<{ observed_on: string; weight_kilogram: number | null }>(
+      `
       SELECT observed_on, weight_kilogram
       FROM whoop_body_measurements
       WHERE observed_on >= ?
       ORDER BY observed_on ASC
-    `)
-    .all(getStartDate(7).slice(0, 10)) as Array<{ observed_on: string; weight_kilogram: number | null }>;
-  const liftsThisWeek = db
-    .prepare(`
+    `,
+      getStartDate(7).slice(0, 10),
+    ),
+    dbGet<{ count: number }>(
+      `
       SELECT COUNT(*) AS count
       FROM hevy_workouts
       WHERE start_time >= ?
-    `)
-    .get(getStartOfWeekIso()) as { count: number };
+    `,
+      getStartOfWeekIso(),
+    ),
+  ]);
 
   return {
     recovery3d: toThreePointSeries(
@@ -747,64 +758,70 @@ function buildMiniTrends() {
         ),
     ),
     weightTrend: toThreePointSeries(bodyRows.map((row) => round(row.weight_kilogram))),
-    liftsThisWeek: liftsThisWeek.count,
+    liftsThisWeek: Number(liftsThisWeek?.count ?? 0),
   };
 }
 
-function buildTrendSeries() {
-  const db = getDb();
+async function buildTrendSeries() {
   const dateWindow7 = getDateWindow(7);
   const dateWindow14 = getDateWindow(14);
-  const recoveryRows = db
-    .prepare(`
+  const [recoveryRows, cycleRows, sleepRows, bodyRows, loadRows] = await Promise.all([
+    dbAll<{ created_at: string; recovery_score: number | null }>(
+      `
       SELECT created_at, recovery_score
       FROM whoop_recovery_summaries
       WHERE created_at >= ?
       ORDER BY created_at DESC
-    `)
-    .all(getStartDate(14)) as Array<{ created_at: string; recovery_score: number | null }>;
-  const cycleRows = db
-    .prepare(`
+    `,
+      getStartDate(14),
+    ),
+    dbAll<{ start: string; strain: number | null }>(
+      `
       SELECT start, strain
       FROM whoop_cycles
       WHERE start >= ?
       ORDER BY start DESC
-    `)
-    .all(getStartDate(14)) as Array<{ start: string; strain: number | null }>;
-  const sleepRows = db
-    .prepare(`
+    `,
+      getStartDate(14),
+    ),
+    dbAll<{
+      start: string;
+      end: string;
+      total_in_bed_time_milli: number | null;
+      total_awake_time_milli: number | null;
+    }>(
+      `
       SELECT start, total_in_bed_time_milli, total_awake_time_milli
              , "end"
       FROM whoop_sleep_summaries
       WHERE start >= ?
       ORDER BY start DESC
-    `)
-    .all(getStartDate(14)) as Array<{
-      start: string;
-      end: string;
-      total_in_bed_time_milli: number | null;
-      total_awake_time_milli: number | null;
-    }>;
-  const bodyRows = db
-    .prepare(`
+    `,
+      getStartDate(14),
+    ),
+    dbAll<{
+      observed_on: string;
+      observed_at: string;
+      weight_kilogram: number | null;
+    }>(
+      `
       SELECT observed_on, observed_at, weight_kilogram
       FROM whoop_body_measurements
       WHERE observed_on >= ?
       ORDER BY observed_on DESC, observed_at DESC
-    `)
-    .all(getStartDate(21).slice(0, 10)) as Array<{
-      observed_on: string;
-      observed_at: string;
-      weight_kilogram: number | null;
-    }>;
-  const loadRows = db
-    .prepare(`
+    `,
+      getStartDate(21).slice(0, 10),
+    ),
+    dbAll<{ start_time: string }>(
+      `
       SELECT start_time
       FROM hevy_workouts
       WHERE start_time >= ?
       ORDER BY start_time DESC
-    `)
-    .all(getStartDate(14)) as Array<{ start_time: string }>;
+    `,
+      getStartDate(14),
+    ),
+  ]);
 
   const latestRecoveryByDay = new Map<string, number | null>();
   for (const row of recoveryRows) {
@@ -882,26 +899,28 @@ function buildTrendSeries() {
   };
 }
 
-function buildBodyCard(readiness: DailyReadiness): BodyCardSummary {
-  const db = getDb();
+async function buildBodyCard(readiness: DailyReadiness): Promise<BodyCardSummary> {
   const startOfWeekIso = getStartOfWeekIso();
   const startOfWeek = new Date(startOfWeekIso);
-  const latestWorkout = db
-    .prepare(`
+  const [latestWorkout, weekWorkouts] = await Promise.all([
+    dbGet<{ title: string | null; start_time: string; raw_json: string }>(
+      `
       SELECT title, start_time, raw_json
       FROM hevy_workouts
       ORDER BY start_time DESC
       LIMIT 1
-    `)
-    .get() as { title: string | null; start_time: string; raw_json: string } | undefined;
-  const weekWorkouts = db
-    .prepare(`
+    `,
+    ),
+    dbAll<{ raw_json: string }>(
+      `
       SELECT raw_json
       FROM hevy_workouts
       WHERE start_time >= ?
       ORDER BY start_time DESC
-    `)
-    .all(getStartOfWeekIso()) as Array<{ raw_json: string }>;
+    `,
+      getStartOfWeekIso(),
+    ),
+  ]);
   const weeklyHighlightedRegions = buildWeeklyBodyHighlights(
     weekWorkouts.map((workout) => workout.raw_json),
   );
@@ -945,20 +964,21 @@ function buildBodyCard(readiness: DailyReadiness): BodyCardSummary {
   };
 }
 
-function buildStrainSummary(readiness: DailyReadiness, trainingLoad: DailyTrainingLoad) {
+async function buildStrainSummary(readiness: DailyReadiness, trainingLoad: DailyTrainingLoad) {
   const score = readiness.whoopDayStrain;
-  const latestCycleStart = getDb()
-    .prepare(`SELECT start FROM whoop_cycles ORDER BY start DESC LIMIT 1`)
-    .get() as { start?: string } | undefined;
+  const latestCycleStart = await dbGet<{ start?: string }>(
+    `SELECT start FROM whoop_cycles ORDER BY start DESC LIMIT 1`,
+  );
   const todayActivities = latestCycleStart?.start
-    ? (getDb()
-        .prepare(`
+    ? await dbAll<WhoopWorkoutRow>(
+        `
           SELECT id, sport_name, start, "end", strain, average_heart_rate, max_heart_rate
           FROM whoop_workouts
           WHERE start >= ?
           ORDER BY start DESC
-        `)
-        .all(latestCycleStart.start) as WhoopWorkoutRow[])
+        `,
+        latestCycleStart.start,
+      )
     : [];
   const topActivity =
     [...todayActivities]
@@ -1022,17 +1042,17 @@ function buildStrainSummary(readiness: DailyReadiness, trainingLoad: DailyTraini
   };
 }
 
-function buildTrainingLoad(): DailyTrainingLoad {
-  const db = getDb();
-  const workouts = db
-    .prepare(`
+async function buildTrainingLoad(): Promise<DailyTrainingLoad> {
+  const workouts = await dbAll<HevyWorkoutRow>(
+    `
       SELECT id, title, start_time, exercise_count, set_count, volume_kg,
              duration_seconds, raw_json
       FROM hevy_workouts
       WHERE start_time >= ?
       ORDER BY start_time DESC
-    `)
-    .all(getStartDate(28)) as HevyWorkoutRow[];
+    `,
+    getStartDate(28),
+  );
   const workouts7d = workouts.filter((workout) => workout.start_time >= getStartDate(7));
   const workoutsThisWeek = workouts.filter((workout) => workout.start_time >= getStartOfWeekIso());
   const latestWorkout = workouts[0] ?? null;
@@ -1113,16 +1133,17 @@ function buildTrainingLoad(): DailyTrainingLoad {
   };
 }
 
-function getRecentHevyWorkouts(days: number) {
-  return getDb()
-    .prepare(`
+async function getRecentHevyWorkouts(days: number) {
+  return dbAll<HevyWorkoutRow>(
+    `
       SELECT id, title, start_time, exercise_count, set_count, volume_kg,
              duration_seconds, raw_json
       FROM hevy_workouts
       WHERE start_time >= ?
       ORDER BY start_time DESC
-    `)
-    .all(getStartDate(days)) as HevyWorkoutRow[];
+    `,
+    getStartDate(days),
+  );
 }
 
 function buildWeightTrend(readiness: DailyReadiness): DailyWeightTrend {
@@ -1210,11 +1231,11 @@ function buildNutritionTargets(
   };
 }
 
-function buildNutritionActuals(
+async function buildNutritionActuals(
   dateKey: string,
   nutritionTargets: DailyNutritionTargets,
-): DailyNutritionActuals {
-  const intake = getNutritionIntakeSummary(dateKey);
+): Promise<DailyNutritionActuals> {
+  const intake = await getNutritionIntakeSummary(dateKey);
   const calorieTarget = nutritionTargets.effectiveCalorieTarget;
   const proteinTargetG = nutritionTargets.effectiveProteinTargetG;
 
@@ -1952,18 +1973,20 @@ function buildPromptText(summary: DailySummary) {
   ].join("\n");
 }
 
-export function getDailySummary(): DailySummary {
+export async function getDailySummary(): Promise<DailySummary> {
   const now = new Date();
   const dateKey = getDateKey(now);
-  const freshness = buildFreshness();
-  const miniTrends = buildMiniTrends();
-  const trendSeries = buildTrendSeries();
-  const readiness = buildReadiness();
-  const trainingLoad = buildTrainingLoad();
+  const [freshness, miniTrends, trendSeries, readiness, trainingLoad] = await Promise.all([
+    buildFreshness(),
+    buildMiniTrends(),
+    buildTrendSeries(),
+    buildReadiness(),
+    buildTrainingLoad(),
+  ]);
   const stressFlags = buildStressFlags(readiness, trainingLoad);
-  const nutritionTargets = buildNutritionTargets(getNutritionTargets(), readiness, trainingLoad);
-  const nutritionActuals = buildNutritionActuals(dateKey, nutritionTargets);
-  const strengthProgression = buildStrengthProgression(getRecentHevyWorkouts(90));
+  const nutritionTargets = buildNutritionTargets(await getNutritionTargets(), readiness, trainingLoad);
+  const nutritionActuals = await buildNutritionActuals(dateKey, nutritionTargets);
+  const strengthProgression = buildStrengthProgression(await getRecentHevyWorkouts(90));
   const physiqueDecision = buildPhysiqueDecision(
     readiness,
     trainingLoad,
@@ -1974,8 +1997,10 @@ export function getDailySummary(): DailySummary {
   );
   const lateNightDisruption = deriveLateNightDisruption(readiness, stressFlags);
   const overnightRead = buildOvernightRead(lateNightDisruption, readiness);
-  const strainSummary = buildStrainSummary(readiness, trainingLoad);
-  const bodyCard = buildBodyCard(readiness);
+  const [strainSummary, bodyCard] = await Promise.all([
+    buildStrainSummary(readiness, trainingLoad),
+    buildBodyCard(readiness),
+  ]);
   const recommendations = buildRecommendations(
     readiness,
     trainingLoad,

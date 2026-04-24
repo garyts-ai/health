@@ -3,8 +3,11 @@ import { ProductShell } from "@/components/product-shell";
 import { getDailySummary } from "@/lib/insights/engine";
 import { formatPounds, kilogramsToPounds } from "@/lib/units";
 
-export default function TrendsPage() {
-  const summary = getDailySummary();
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function TrendsPage() {
+  const summary = await getDailySummary();
 
   return (
     <ProductShell
