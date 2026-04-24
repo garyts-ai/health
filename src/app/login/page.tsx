@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
 import { authOptions, isAppAuthEnabled } from "@/lib/auth";
+import { SignInButton } from "@/app/login/sign-in-button";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,7 +35,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const callbackUrl = getSafeCallbackUrl(resolvedSearchParams.callbackUrl);
-  const signInUrl = `/api/auth/signin/github?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
   return (
     <main className="min-h-screen bg-[#1f1840] px-5 py-8 text-[#f8f5ff]">
@@ -55,12 +55,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </p>
           ) : null}
 
-          <a
-            className="mt-6 inline-flex w-full items-center justify-center rounded-[10px] bg-[#f8f5ff] px-4 py-3 text-sm font-semibold text-[#21183d] transition-colors hover:bg-white"
-            href={signInUrl}
-          >
-            Continue with GitHub
-          </a>
+          <SignInButton callbackUrl={callbackUrl} />
         </div>
       </section>
     </main>
