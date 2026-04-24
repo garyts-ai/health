@@ -22,6 +22,21 @@ function getSafeCallbackUrl(callbackUrl?: string) {
   return callbackUrl;
 }
 
+function getLoginErrorMessage(error?: string) {
+  switch (error) {
+    case "AccessDenied":
+      return "GitHub signed in, but that account is not on the Health OS allowlist. Use the allowed GitHub account, then retry.";
+    case "github":
+      return "GitHub did not complete a clean sign-in. Clear this app session, then retry GitHub from a fresh flow.";
+    case "Configuration":
+      return "Health OS auth is misconfigured. Check the GitHub OAuth env values in Vercel, then redeploy.";
+    default:
+      return error
+        ? "Sign-in did not complete. Clear this app session, then retry GitHub."
+        : null;
+  }
+}
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (!isAppAuthEnabled()) {
     redirect("/");
@@ -35,6 +50,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const callbackUrl = getSafeCallbackUrl(resolvedSearchParams.callbackUrl);
+  const errorMessage = getLoginErrorMessage(resolvedSearchParams.error);
 
   return (
     <main className="min-h-screen bg-[#1f1840] px-5 py-8 text-[#f8f5ff]">
@@ -49,13 +65,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             your iPhone Home Screen.
           </p>
 
-          {resolvedSearchParams.error ? (
+          {errorMessage ? (
             <p className="mt-5 rounded-[10px] border border-[#ff8d75]/30 bg-[#ff8d75]/12 px-4 py-3 text-sm text-[#ffe2dc]">
-              That GitHub account is not allowed for this Health OS instance.
+              {errorMessage}
             </p>
           ) : null}
 
-          <SignInButton callbackUrl={callbackUrl} />
+          <SignInButton callbackUrl={callbackUrl} hasError={Boolean(errorMessage)} />
         </div>
       </section>
     </main>
