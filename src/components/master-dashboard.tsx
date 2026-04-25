@@ -1,6 +1,7 @@
 import { AnatomyFigure } from "@/components/anatomy-figure";
 import { DailyBriefPreviewCard } from "@/components/daily-brief-preview-card";
 import { SummaryBanner } from "@/components/dashboard-sections";
+import { HeroStatCard } from "@/components/hero-stat-card";
 import { UtilityDrawer } from "@/components/utility-drawer";
 import { buildTodayViewModel } from "@/lib/today-view-model";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
@@ -172,211 +173,6 @@ function FreshnessNotice({ message }: { message: string }) {
   );
 }
 
-function HeroStat({
-  label,
-  value,
-  detail,
-  trend,
-  trendLabels,
-  gaugeValue,
-  sleepWindow,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  trend: Array<number | null>;
-  trendLabels: string[];
-  gaugeValue?: number | null;
-  sleepWindow?: {
-    startLabel: string | null;
-    endLabel: string | null;
-  };
-}) {
-  const formatSleepDuration = (rawValue: string) => {
-    const parsed = Number.parseFloat(rawValue.replace("h", ""));
-    if (!Number.isFinite(parsed)) {
-      return rawValue;
-    }
-
-    const hours = Math.floor(parsed);
-    const minutes = Math.round((parsed - hours) * 60);
-    return `${hours}:${minutes.toString().padStart(2, "0")}`;
-  };
-
-  const formatTrendValue = (point: number | null) => {
-    if (point === null) {
-      return "--";
-    }
-
-    if (label === "Recovery") {
-      return `${Math.round(point)}%`;
-    }
-
-    if (label === "Sleep") {
-      return `${point.toFixed(1)}h`;
-    }
-
-    return point.toFixed(1);
-  };
-
-  const numericTrend = trend.filter((point): point is number => typeof point === "number");
-  const min = numericTrend.length ? Math.min(...numericTrend) : 0;
-  const max = numericTrend.length ? Math.max(...numericTrend) : 0;
-  const range = max - min || 1;
-  const chartMode =
-    label === "Recovery" ? "gauge" : label === "Sleep" ? "timeline" : "bars";
-
-  const bars = trend.map((point) => {
-    if (point === null) {
-      return { height: 6 };
-    }
-
-    const normalized = (point - min) / range;
-    const height = 12 + normalized * 20;
-    return { height };
-  });
-
-  const recoveryGauge = typeof gaugeValue === "number" ? Math.max(0, Math.min(100, gaugeValue)) : 0;
-
-  const sleepStartMinutes = (() => {
-    if (!sleepWindow?.startLabel) return null;
-    const match = sleepWindow.startLabel.match(/(\d+):(\d+)\s?(AM|PM)/i);
-    if (!match) return null;
-    let hours = Number(match[1]) % 12;
-    const minutes = Number(match[2]);
-    const period = match[3].toUpperCase();
-    if (period === "PM") hours += 12;
-    return hours * 60 + minutes;
-  })();
-  const sleepEndMinutes = (() => {
-    if (!sleepWindow?.endLabel) return null;
-    const match = sleepWindow.endLabel.match(/(\d+):(\d+)\s?(AM|PM)/i);
-    if (!match) return null;
-    let hours = Number(match[1]) % 12;
-    const minutes = Number(match[2]);
-    const period = match[3].toUpperCase();
-    if (period === "PM") hours += 12;
-    return hours * 60 + minutes;
-  })();
-  const timelineStart = 20 * 60;
-  const timelineEnd = 12 * 60 + 24 * 60;
-  const normalizedSleepStart =
-    sleepStartMinutes === null
-      ? null
-      : (sleepStartMinutes < timelineStart ? sleepStartMinutes + 24 * 60 : sleepStartMinutes);
-  const normalizedSleepEnd =
-    sleepEndMinutes === null
-      ? null
-      : (sleepEndMinutes < timelineStart ? sleepEndMinutes + 24 * 60 : sleepEndMinutes);
-  const sleepStartX =
-    normalizedSleepStart === null
-      ? 18
-      : 18 + ((normalizedSleepStart - timelineStart) / (timelineEnd - timelineStart)) * 116;
-  const sleepEndX =
-    normalizedSleepEnd === null
-      ? 134
-      : 18 + ((normalizedSleepEnd - timelineStart) / (timelineEnd - timelineStart)) * 116;
-  const sleepDurationLabel = label === "Sleep" ? formatSleepDuration(value) : value;
-  const latestStrainValue =
-    trend.length && trend[trend.length - 1] !== null
-      ? trend[trend.length - 1]!.toFixed(1)
-      : value;
-  const historyStrip = (
-    <div className="grid grid-cols-3 gap-0 overflow-hidden rounded-[10px] bg-[rgba(104,96,153,0.08)] ring-1 ring-[rgba(116,108,152,0.06)]">
-      {trend.map((point, index) => (
-        <div
-          key={`${label}-trend-${index}`}
-          className="border-l border-[rgba(116,108,152,0.08)] px-2 py-2 text-center first:border-l-0"
-        >
-          <div className="text-[9px] text-[#8a83a4]">{trendLabels[index] ?? ""}</div>
-          <div className="mt-0.5 text-[11px] font-semibold text-[#433a72]">
-            {formatTrendValue(point)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="rounded-[10px] bg-[linear-gradient(180deg,_rgba(245,242,252,0.84)_0%,_rgba(250,248,255,0.74)_100%)] px-4 py-3 text-[#171329] ring-1 ring-[rgba(116,108,152,0.08)]">
-      <div className="text-[12px] text-[#746d8e]">{label}</div>
-
-      <div className="mt-2.5 flex min-h-[84px] items-center justify-center">
-        {chartMode === "gauge" ? (
-          <svg aria-hidden="true" viewBox="0 0 110 110" className="h-[88px] w-[88px] overflow-visible">
-            <circle cx="55" cy="55" r="34" fill="none" stroke="rgba(112,104,151,0.14)" strokeWidth="9" />
-            <circle
-              cx="55"
-              cy="55"
-              r="34"
-              fill="none"
-              stroke="#6a64b5"
-              strokeWidth="9"
-              strokeLinecap="round"
-              strokeDasharray={2 * Math.PI * 34}
-              strokeDashoffset={(2 * Math.PI * 34) * (1 - recoveryGauge / 100)}
-              transform="rotate(-90 55 55)"
-            />
-            <text x="55" y="54" textAnchor="middle" className="fill-[#332b64] text-[22px] font-semibold">
-              {value}
-            </text>
-            <text x="55" y="70" textAnchor="middle" className="fill-[#8a83a4] text-[9px] font-medium">
-              WHOOP score
-            </text>
-          </svg>
-        ) : chartMode === "timeline" ? (
-          <svg aria-hidden="true" viewBox="0 0 240 70" className="h-[68px] w-full max-w-[240px] overflow-visible">
-            <text x="130" y="18" textAnchor="middle" className="fill-[#332b64] text-[24px] font-semibold">
-              {sleepDurationLabel}
-            </text>
-            <line x1="20" y1="38" x2="220" y2="38" stroke="rgba(112,104,151,0.18)" strokeWidth="6" strokeLinecap="round" />
-            <line
-              x1={20 + ((sleepStartX - 18) / 116) * 200}
-              y1="38"
-              x2={20 + ((sleepEndX - 18) / 116) * 200}
-              y2="38"
-              stroke="#6a64b5"
-              strokeWidth="6"
-              strokeLinecap="round"
-            />
-            <circle cx={20 + ((sleepStartX - 18) / 116) * 200} cy="38" r="4.5" fill="#6a64b5" />
-            <circle cx={20 + ((sleepEndX - 18) / 116) * 200} cy="38" r="4.5" fill="#8b84db" />
-            <text x="20" y="64" className="fill-[#6d6690] text-[10px] font-medium">
-              {sleepWindow?.startLabel ?? "--"}
-            </text>
-            <text x="220" y="64" textAnchor="end" className="fill-[#6d6690] text-[10px] font-medium">
-              {sleepWindow?.endLabel ?? "--"}
-            </text>
-          </svg>
-        ) : chartMode === "bars" ? (
-          <svg aria-hidden="true" viewBox="0 0 220 76" className="h-[68px] w-full max-w-[220px] overflow-visible">
-            <text x="110" y="22" textAnchor="middle" className="fill-[#332b64] text-[24px] font-semibold">
-              {latestStrainValue}
-            </text>
-            <line x1="56" y1="50" x2="164" y2="50" stroke="rgba(123,115,146,0.16)" strokeWidth="1.5" />
-            {bars.map((bar, index) => (
-              <rect
-                key={`${label}-bar-${index}`}
-                x={70 + index * 28}
-                y={52 - bar.height}
-                width={16}
-                height={bar.height}
-                rx="3"
-                fill={index === bars.length - 1 ? "#ff967e" : "rgba(255, 150, 126, 0.45)"}
-              />
-            ))}
-          </svg>
-        ) : (
-          <div className="h-px w-20 bg-[#d7d1ea]" />
-        )}
-      </div>
-
-      <div className="mt-2 text-center text-[13px] leading-5 text-[#6b6484]">{detail}</div>
-      <div className="mt-3">{historyStrip}</div>
-    </div>
-  );
-}
-
 function ActionCard({ item }: { item: DailyRecommendation }) {
   const title = item.title
     .replace("Use symptom-matched head and stomach support", "Support head and stomach")
@@ -537,7 +333,7 @@ export async function MasterDashboard({
             <div className="overflow-hidden rounded-[12px] bg-[linear-gradient(180deg,_rgba(242,238,251,0.9)_0%,_rgba(247,244,255,0.82)_100%)] p-2 shadow-[0_10px_28px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(255,255,255,0.48)] backdrop-blur-[18px]">
               <div className="grid gap-2">
                 {vm.hero.metrics.map((metric) => (
-                  <HeroStat
+                  <HeroStatCard
                     key={metric.label}
                     label={metric.label}
                     value={metric.value}

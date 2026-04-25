@@ -30,6 +30,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 /tmp-next-dev*.log
+/tmp-ux-dev*.log
 
 # env files
 .env
