@@ -184,6 +184,7 @@ export function HeroStatCard({
 
       <div className="mt-2 @lg:grid @lg:grid-cols-[minmax(180px,0.82fr)_minmax(210px,1fr)] @lg:items-center @lg:gap-4">
         <button
+          aria-label={`${expanded ? "Hide" : "Show"} ${label} trend details`}
           aria-expanded={expanded}
           className="flex min-h-[104px] w-full items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-[#6d68bd]/35"
           onClick={() => setExpanded((value) => !value)}
