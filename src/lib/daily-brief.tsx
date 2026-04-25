@@ -30,6 +30,7 @@ export function buildDiscordSummaryText(summary: DailySummary) {
     `Overnight read: ${summary.overnightRead.label} | ${summary.overnightRead.detail}`,
     `Weekly muscle focus: ${weeklyFocusText} | ${summary.trainingLoad.hevyWorkoutCountThisWeek} workouts this week`,
     `Weekly effective sets: ${summary.trainingLoad.weeklyMuscleVolume.length > 0 ? summary.trainingLoad.weeklyMuscleVolume.slice(0, 6).map((group) => `${group.label} ${group.effectiveSets}`).join(", ") : "none logged"}`,
+    `Activity context (${summary.activityContext.displayWindowLabel}): ${summary.activityContext.summaryLine}`,
     `Strength: ${summary.physiqueDecision.strengthProgression.length > 0 ? summary.physiqueDecision.strengthProgression.slice(0, 3).map((lift) => `${lift.exercise} ${lift.deltaLabel}`).join(", ") : "repeat lift history needed"}`,
     `Latest session: ${summary.trainingLoad.hevyLastWorkoutTitle ?? "None logged"} | ${handoff.latestLiftFocus.length > 0 ? handoff.latestLiftFocus.slice(0, 4).join(", ") : "No recent focus logged"}`,
     `Body weight: ${formatPounds(kilogramsToPounds(summary.readiness.bodyWeightKg))} | ${handoff.bodyWeightTrendLabel}`,

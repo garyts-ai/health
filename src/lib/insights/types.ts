@@ -277,6 +277,58 @@ export type TrendPoint = {
   value: number | null;
 };
 
+export type DailyActivityKind = "walking" | "tennis" | "other_conditioning";
+
+export type DailyActivitySession = {
+  id: string;
+  kind: DailyActivityKind;
+  sportName: string;
+  start: string;
+  end: string | null;
+  durationMinutes: number;
+  strain: number | null;
+  averageHeartRate: number | null;
+  maxHeartRate: number | null;
+  distanceMeter: number | null;
+};
+
+export type DailyActivityBucket = {
+  kind: DailyActivityKind;
+  label: string;
+  count: number;
+  durationMinutes: number;
+  strain: number;
+  distanceMeter: number | null;
+};
+
+export type DailyActivityDay = {
+  dateKey: string;
+  label: string;
+  buckets: Array<{
+    kind: DailyActivityKind;
+    count: number;
+    strain: number;
+  }>;
+  totalStrain: number;
+  hasActivity: boolean;
+};
+
+export type DailyActivityContext = {
+  displayWindowLabel: "This week" | "Last week";
+  currentWeekHasActivity: boolean;
+  fallbackUsed: boolean;
+  hasActivity: boolean;
+  summaryLine: string;
+  interpretation: string;
+  latestSession: DailyActivitySession | null;
+  buckets: DailyActivityBucket[];
+  days: DailyActivityDay[];
+  totalSessions: number;
+  totalDurationMinutes: number;
+  totalStrain: number;
+  totalDistanceMeter: number | null;
+};
+
 export type DailySummary = {
   date: string;
   contextLine: string;
@@ -307,6 +359,7 @@ export type DailySummary = {
   nutritionTargets: DailyNutritionTargets;
   nutritionActuals: DailyNutritionActuals;
   physiqueDecision: DailyPhysiqueDecision;
+  activityContext: DailyActivityContext;
   bodyCard: BodyCardSummary;
   recommendations: DailyRecommendation[];
   freshness: DailyFreshness;

@@ -180,6 +180,36 @@ const summary: DailySummary = {
       { label: "Nutrition", value: "112/150g", detail: "1780/2500 cal", status: "good" },
     ],
   },
+  activityContext: {
+    displayWindowLabel: "Last week",
+    currentWeekHasActivity: false,
+    fallbackUsed: true,
+    hasActivity: true,
+    summaryLine: "No walks or tennis logged yet this week. Last week had 5 walks and 1 tennis session.",
+    interpretation:
+      "Last week shows tennis as meaningful conditioning load; it can matter when recovery is low even though it does not count as lifting volume.",
+    latestSession: {
+      id: "tennis-1",
+      kind: "tennis",
+      sportName: "Tennis",
+      start: "2026-03-29T18:00:00.000Z",
+      end: "2026-03-29T18:57:00.000Z",
+      durationMinutes: 57,
+      strain: 8.6,
+      averageHeartRate: 120,
+      maxHeartRate: 146,
+      distanceMeter: null,
+    },
+    buckets: [
+      { kind: "walking", label: "Walking", count: 5, durationMinutes: 132, strain: 25.2, distanceMeter: null },
+      { kind: "tennis", label: "Tennis", count: 1, durationMinutes: 57, strain: 8.6, distanceMeter: null },
+    ],
+    days: [],
+    totalSessions: 6,
+    totalDurationMinutes: 189,
+    totalStrain: 33.8,
+    totalDistanceMeter: null,
+  },
   bodyCard: {
     recoveryScore: 71,
     sleepHours: 7.5,
@@ -288,6 +318,7 @@ test("buildDiscordSummaryText stays metrics-led for fresh LLM judgment", () => {
   assert.match(text, /Recovery 71%/);
   assert.match(text, /Overnight read: Normal night/);
   assert.match(text, /Weekly muscle focus: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x/);
+  assert.match(text, /Activity context \(Last week\): No walks or tennis logged yet this week/);
   assert.match(text, /Nutrition: 1780\/2500 cal \| 112\/150g protein/);
   assert.match(text, /Body weight: 162\.0 lb \| stable versus last week/);
   assert.match(text, /Latest session:/);
@@ -307,6 +338,8 @@ test("buildLlmHandoff prompt asks the model to infer priorities from metrics", (
   assert.match(handoff.promptText, /Overnight read: Normal night/);
   assert.match(handoff.promptText, /Weekly muscle groups hit: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x, Lats 1x/);
   assert.match(handoff.promptText, /Intake logged today: 1780\/2500 cal, 112\/150g protein/);
+  assert.match(handoff.promptText, /Activity context \(Last week\): No walks or tennis logged yet this week/);
+  assert.match(handoff.promptText, /Latest non-lifting activity: Tennis: 57 min \/ strain 8\.6/);
   assert.match(handoff.promptText, /Body weight context: stable versus last week/);
   assert.match(handoff.promptText, /Latest workout muscle groups: Chest, Front delts, Biceps, Triceps/);
   assert.match(handoff.promptText, /Output/);

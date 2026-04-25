@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
-import { inferBuckets } from "@/lib/insights/engine";
+import {
+  buildActivityContextFromRows,
+  classifyWhoopActivity,
+  inferBuckets,
+} from "@/lib/insights/engine";
 import type { DailyReadiness, DailyStressFlags, DailyTrainingLoad } from "@/lib/insights/types";
 
 function makeReadiness(overrides: Partial<DailyReadiness> = {}): DailyReadiness {
@@ -120,6 +124,122 @@ test("squat press is classified as lower body, not upper push", () => {
   ]);
 
   assert.deepEqual(buckets, ["lower"]);
+});
+
+test("WHOOP activity classification excludes lifting and separates walking, tennis, and conditioning", () => {
+  assert.equal(classifyWhoopActivity("Weightlifting"), null);
+  assert.equal(classifyWhoopActivity("walking"), "walking");
+  assert.equal(classifyWhoopActivity("Hiking-Rucking"), "walking");
+  assert.equal(classifyWhoopActivity("Tennis"), "tennis");
+  assert.equal(classifyWhoopActivity("Activity"), "other_conditioning");
+});
+
+test("activity context falls back to last week and keeps latest tennis visible", () => {
+  const context = buildActivityContextFromRows(
+    [
+      {
+        id: "lift-current",
+        sport_name: "weightlifting",
+        start: "2026-04-23T14:00:00.000Z",
+        end: "2026-04-23T15:00:00.000Z",
+        strain: 10,
+      },
+      {
+        id: "tennis",
+        sport_name: "tennis",
+        start: "2026-04-19T15:00:00.000Z",
+        end: "2026-04-19T15:57:00.000Z",
+        strain: 8.6,
+        average_heart_rate: 120,
+        max_heart_rate: 146,
+      },
+      {
+        id: "walk-1",
+        sport_name: "walking",
+        start: "2026-04-15T13:00:00.000Z",
+        end: "2026-04-15T13:38:00.000Z",
+        strain: 5.5,
+      },
+      {
+        id: "walk-2",
+        sport_name: "walking",
+        start: "2026-04-15T18:00:00.000Z",
+        end: "2026-04-15T18:24:00.000Z",
+        strain: 5.2,
+      },
+      {
+        id: "ruck",
+        sport_name: "hiking-rucking",
+        start: "2026-04-14T13:00:00.000Z",
+        end: "2026-04-14T13:13:00.000Z",
+        strain: 4.4,
+      },
+      {
+        id: "other",
+        sport_name: "activity",
+        start: "2026-04-13T13:00:00.000Z",
+        end: "2026-04-13T13:51:00.000Z",
+        strain: 7.4,
+      },
+    ],
+    new Date("2026-04-25T12:00:00.000Z"),
+  );
+
+  assert.equal(context.displayWindowLabel, "Last week");
+  assert.equal(context.currentWeekHasActivity, false);
+  assert.equal(context.fallbackUsed, true);
+  assert.equal(context.latestSession?.sportName, "tennis");
+  assert.equal(context.buckets.find((bucket) => bucket.kind === "walking")?.count, 3);
+  assert.equal(context.buckets.find((bucket) => bucket.kind === "tennis")?.count, 1);
+  assert.equal(context.buckets.find((bucket) => bucket.kind === "other_conditioning")?.count, 1);
+  assert.match(context.summaryLine, /Last week had 3 walks, 1 tennis session, and 1 conditioning session/);
+});
+
+test("activity context uses current week when present", () => {
+  const context = buildActivityContextFromRows(
+    [
+      {
+        id: "walk-current",
+        sport_name: "walking",
+        start: "2026-04-21T13:00:00.000Z",
+        end: "2026-04-21T13:30:00.000Z",
+        strain: 4,
+      },
+      {
+        id: "tennis-last",
+        sport_name: "tennis",
+        start: "2026-04-19T13:00:00.000Z",
+        end: "2026-04-19T14:00:00.000Z",
+        strain: 8,
+      },
+    ],
+    new Date("2026-04-25T12:00:00.000Z"),
+  );
+
+  assert.equal(context.displayWindowLabel, "This week");
+  assert.equal(context.currentWeekHasActivity, true);
+  assert.equal(context.fallbackUsed, false);
+  assert.equal(context.latestSession?.id, "walk-current");
+  assert.equal(context.buckets.length, 1);
+});
+
+test("activity context exposes a quiet empty state when no non-lifting activity exists", () => {
+  const context = buildActivityContextFromRows(
+    [
+      {
+        id: "lift",
+        sport_name: "weightlifting",
+        start: "2026-04-21T13:00:00.000Z",
+        end: "2026-04-21T14:00:00.000Z",
+        strain: 9,
+      },
+    ],
+    new Date("2026-04-25T12:00:00.000Z"),
+  );
+
+  assert.equal(context.hasActivity, false);
+  assert.equal(context.latestSession, null);
+  assert.match(context.summaryLine, /No walks, tennis, or conditioning logged/);
 });
 
 test("late-night disruption infers a hangover-like lane from a rough night without illness markers", () => {

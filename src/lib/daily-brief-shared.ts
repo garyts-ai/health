@@ -83,6 +83,18 @@ function getBodyWeightTrendLabel(summary: DailySummary) {
   return "slightly up this week";
 }
 
+function activityDetail(summary: DailySummary) {
+  const latest = summary.activityContext.latestSession;
+
+  if (!latest) {
+    return summary.activityContext.summaryLine;
+  }
+
+  return `${latest.sportName}: ${latest.durationMinutes} min / strain ${
+    latest.strain?.toFixed(1) ?? "--"
+  }`;
+}
+
 export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
   const weeklyMuscleFocus = summary.trainingLoad.weeklyMuscleFocus;
   const weeklyMuscleVolume = summary.trainingLoad.weeklyMuscleVolume;
@@ -143,6 +155,11 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
         latestLiftFocus.length > 0
           ? `${latestLiftFocus.slice(0, 3).join(" - ")}`
           : `Upper ${formatDaysSince(summary.trainingLoad.upperBodyDaysSince)} - Lower ${formatDaysSince(summary.trainingLoad.lowerBodyDaysSince)}`,
+    },
+    {
+      label: "Activity",
+      value: summary.activityContext.displayWindowLabel,
+      detail: activityDetail(summary),
     },
   ];
 
@@ -233,6 +250,9 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Actual sleep: ${handoffMetric(summary.readiness.sleepHours, "h", 1)}`,
     `- Sleep vs need: ${handoffMetric(summary.readiness.sleepVsNeedHours, "h", 1)}`,
     `- WHOOP day strain: ${handoffMetric(summary.strainSummary.score, "", 1)}`,
+    `- Activity context (${summary.activityContext.displayWindowLabel}): ${summary.activityContext.summaryLine}`,
+    `- Latest non-lifting activity: ${activityDetail(summary)}`,
+    `- Activity interpretation: ${summary.activityContext.interpretation}`,
     `- Overnight read: ${summary.overnightRead.label}`,
     `- Overnight disruption context: ${summary.lateNightDisruption.blurb}`,
     `- Overnight disruption signal: ${summary.lateNightDisruption.active ? `${summary.lateNightDisruption.likelyLane} (${summary.lateNightDisruption.confidence})` : "inactive"}`,

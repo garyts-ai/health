@@ -32,6 +32,7 @@ yarn-error.log*
 /tmp-next-dev*.log
 /tmp-ux-dev*.log
 /tmp-pull-sync*.log
+/tmp-activity-context*.log
 
 # env files
 .env
