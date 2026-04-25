@@ -476,8 +476,10 @@ async function saveWorkoutSummaries(records: WhoopWorkoutSummary[]) {
     INSERT INTO whoop_workouts (
       id, sport_id, sport_name, start, "end", timezone_offset, score_state,
       strain, average_heart_rate, max_heart_rate, kilojoule, percent_recorded,
-      raw_json, synced_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      distance_meter, altitude_gain_meter, altitude_change_meter,
+      zone_zero_milli, zone_one_milli, zone_two_milli, zone_three_milli,
+      zone_four_milli, zone_five_milli, raw_json, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       sport_id = excluded.sport_id,
       sport_name = excluded.sport_name,
@@ -490,6 +492,15 @@ async function saveWorkoutSummaries(records: WhoopWorkoutSummary[]) {
       max_heart_rate = excluded.max_heart_rate,
       kilojoule = excluded.kilojoule,
       percent_recorded = excluded.percent_recorded,
+      distance_meter = excluded.distance_meter,
+      altitude_gain_meter = excluded.altitude_gain_meter,
+      altitude_change_meter = excluded.altitude_change_meter,
+      zone_zero_milli = excluded.zone_zero_milli,
+      zone_one_milli = excluded.zone_one_milli,
+      zone_two_milli = excluded.zone_two_milli,
+      zone_three_milli = excluded.zone_three_milli,
+      zone_four_milli = excluded.zone_four_milli,
+      zone_five_milli = excluded.zone_five_milli,
       raw_json = excluded.raw_json,
       synced_at = excluded.synced_at
   `;
@@ -509,6 +520,15 @@ async function saveWorkoutSummaries(records: WhoopWorkoutSummary[]) {
       record.maxHeartRate,
       record.kilojoule,
       record.percentRecorded,
+      record.distanceMeter,
+      record.altitudeGainMeter,
+      record.altitudeChangeMeter,
+      record.zoneZeroMilli,
+      record.zoneOneMilli,
+      record.zoneTwoMilli,
+      record.zoneThreeMilli,
+      record.zoneFourMilli,
+      record.zoneFiveMilli,
       record.rawJson,
       syncedAt,
     );
@@ -690,6 +710,17 @@ async function readLatestWorkouts() {
     kilojoule: typeof row.kilojoule === "number" ? row.kilojoule : null,
     percentRecorded:
       typeof row.percent_recorded === "number" ? row.percent_recorded : null,
+    distanceMeter: typeof row.distance_meter === "number" ? row.distance_meter : null,
+    altitudeGainMeter:
+      typeof row.altitude_gain_meter === "number" ? row.altitude_gain_meter : null,
+    altitudeChangeMeter:
+      typeof row.altitude_change_meter === "number" ? row.altitude_change_meter : null,
+    zoneZeroMilli: typeof row.zone_zero_milli === "number" ? row.zone_zero_milli : null,
+    zoneOneMilli: typeof row.zone_one_milli === "number" ? row.zone_one_milli : null,
+    zoneTwoMilli: typeof row.zone_two_milli === "number" ? row.zone_two_milli : null,
+    zoneThreeMilli: typeof row.zone_three_milli === "number" ? row.zone_three_milli : null,
+    zoneFourMilli: typeof row.zone_four_milli === "number" ? row.zone_four_milli : null,
+    zoneFiveMilli: typeof row.zone_five_milli === "number" ? row.zone_five_milli : null,
     rawJson: String(row.raw_json),
   }));
 }

@@ -126,6 +126,10 @@ export function normalizeWorkoutRecord(
     typeof record.sport === "object" && record.sport !== null
       ? (record.sport as Record<string, unknown>)
       : {};
+  const zoneDurations =
+    typeof score.zone_durations === "object" && score.zone_durations !== null
+      ? (score.zone_durations as Record<string, unknown>)
+      : {};
 
   return {
     id: asString(record.id) ?? crypto.randomUUID(),
@@ -140,6 +144,15 @@ export function normalizeWorkoutRecord(
     maxHeartRate: asNumber(score.max_heart_rate),
     kilojoule: asNumber(score.kilojoule),
     percentRecorded: asNumber(score.percent_recorded),
+    distanceMeter: asNumber(score.distance_meter),
+    altitudeGainMeter: asNumber(score.altitude_gain_meter),
+    altitudeChangeMeter: asNumber(score.altitude_change_meter),
+    zoneZeroMilli: asNumber(zoneDurations.zone_zero_milli),
+    zoneOneMilli: asNumber(zoneDurations.zone_one_milli),
+    zoneTwoMilli: asNumber(zoneDurations.zone_two_milli),
+    zoneThreeMilli: asNumber(zoneDurations.zone_three_milli),
+    zoneFourMilli: asNumber(zoneDurations.zone_four_milli),
+    zoneFiveMilli: asNumber(zoneDurations.zone_five_milli),
     rawJson: JSON.stringify(record),
   };
 }

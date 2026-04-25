@@ -113,12 +113,28 @@ test("normalizeWorkoutRecord maps workout score metrics", () => {
       max_heart_rate: 172,
       kilojoule: 520.2,
       percent_recorded: 98.2,
+      distance_meter: 3200,
+      altitude_gain_meter: 42,
+      altitude_change_meter: -3,
+      zone_durations: {
+        zone_zero_milli: 1000,
+        zone_one_milli: 2000,
+        zone_two_milli: 3000,
+        zone_three_milli: 4000,
+        zone_four_milli: 5000,
+        zone_five_milli: 6000,
+      },
     },
   });
 
   assert.equal(result.id, "workout-1");
   assert.equal(result.sportName, "Strength Training");
   assert.equal(result.strain, 12.4);
+  assert.equal(result.distanceMeter, 3200);
+  assert.equal(result.altitudeGainMeter, 42);
+  assert.equal(result.altitudeChangeMeter, -3);
+  assert.equal(result.zoneZeroMilli, 1000);
+  assert.equal(result.zoneFiveMilli, 6000);
 });
 
 test("getLatestRecord returns most recent item", () => {
