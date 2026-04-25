@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { deriveLateNightDisruption } from "@/lib/insights/overnight-read";
+import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
 import { inferBuckets } from "@/lib/insights/engine";
 import type { DailyReadiness, DailyStressFlags, DailyTrainingLoad } from "@/lib/insights/types";
 
@@ -140,6 +140,28 @@ test("late-night disruption infers a hangover-like lane from a rough night witho
 
   assert.equal(disruption.active, true);
   assert.equal(disruption.likelyLane, "hangover_like");
+});
+
+test("overnight read does not present late-night disruption as confirmed alcohol", () => {
+  const readiness = makeReadiness({
+    recoveryScore: 18,
+    sleepHours: 6.4,
+    sleepPerformance: 39,
+    sleepConsistency: 44,
+    sleepEfficiency: 72,
+    awakeHours: 1.4,
+    restingHeartRateVs7d: 9,
+    hrvVs7d: -18,
+    respiratoryRateVs7d: 0.1,
+    skinTempVs7d: 0.1,
+  });
+  const disruption = deriveLateNightDisruption(readiness, makeStressFlags());
+  const overnightRead = buildOvernightRead(disruption, readiness);
+
+  assert.equal(disruption.likelyLane, "hangover_like");
+  assert.equal(overnightRead.label, "Short sleep + recovery hit");
+  assert.doesNotMatch(overnightRead.label, /alcohol/i);
+  assert.doesNotMatch(overnightRead.detail, /alcohol/i);
 });
 
 test("late-night disruption infers an illness-like lane when respiratory and temperature markers drift", () => {
