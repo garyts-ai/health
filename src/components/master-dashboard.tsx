@@ -2,6 +2,7 @@ import { AnatomyFigure } from "@/components/anatomy-figure";
 import { DailyBriefPreviewCard } from "@/components/daily-brief-preview-card";
 import { SummaryBanner } from "@/components/dashboard-sections";
 import { HeroStatCard } from "@/components/hero-stat-card";
+import { MobilePullSync } from "@/components/mobile-pull-sync";
 import { UtilityDrawer } from "@/components/utility-drawer";
 import { buildTodayViewModel } from "@/lib/today-view-model";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
@@ -286,6 +287,7 @@ export async function MasterDashboard({
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5f2fb] text-[#171329]">
+      <MobilePullSync />
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(253,132,122,0.55),_transparent_23%),radial-gradient(circle_at_top_right,_rgba(93,92,186,0.46),_transparent_26%),linear-gradient(180deg,_#766db9_0%,_#5d54a3_16%,_#f5f2fb_54%)]" />
       <div className="pointer-events-none fixed inset-x-0 top-[26vh] h-[44rem] bg-[radial-gradient(circle_at_center,_rgba(255,164,136,0.18),_transparent_34%)]" />
 
