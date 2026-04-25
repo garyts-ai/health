@@ -71,6 +71,15 @@ export type WhoopWorkoutSummary = {
   maxHeartRate: number | null;
   kilojoule: number | null;
   percentRecorded: number | null;
+  distanceMeter: number | null;
+  altitudeGainMeter: number | null;
+  altitudeChangeMeter: number | null;
+  zoneZeroMilli: number | null;
+  zoneOneMilli: number | null;
+  zoneTwoMilli: number | null;
+  zoneThreeMilli: number | null;
+  zoneFourMilli: number | null;
+  zoneFiveMilli: number | null;
   rawJson: string;
 };
 

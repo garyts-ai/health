@@ -19,8 +19,39 @@ type GlobalWithDb = typeof globalThis & {
   __healthDashboardPgSchemaReady?: boolean;
 };
 
+const WHOOP_WORKOUT_EXTRA_COLUMNS: Array<{
+  name: string;
+  sqliteType: string;
+  postgresType: string;
+}> = [
+  { name: "distance_meter", sqliteType: "REAL", postgresType: "DOUBLE PRECISION" },
+  { name: "altitude_gain_meter", sqliteType: "REAL", postgresType: "DOUBLE PRECISION" },
+  { name: "altitude_change_meter", sqliteType: "REAL", postgresType: "DOUBLE PRECISION" },
+  { name: "zone_zero_milli", sqliteType: "INTEGER", postgresType: "INTEGER" },
+  { name: "zone_one_milli", sqliteType: "INTEGER", postgresType: "INTEGER" },
+  { name: "zone_two_milli", sqliteType: "INTEGER", postgresType: "INTEGER" },
+  { name: "zone_three_milli", sqliteType: "INTEGER", postgresType: "INTEGER" },
+  { name: "zone_four_milli", sqliteType: "INTEGER", postgresType: "INTEGER" },
+  { name: "zone_five_milli", sqliteType: "INTEGER", postgresType: "INTEGER" },
+];
+
 function ensureDatabaseDirectory() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function addSqliteColumnIfMissing(db: DatabaseSync, tableName: string, columnName: string, type: string) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name?: unknown }>;
+  const exists = columns.some((column) => column.name === columnName);
+
+  if (!exists) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${type}`);
+  }
+}
+
+function applySqliteSchemaUpgrades(db: DatabaseSync) {
+  for (const column of WHOOP_WORKOUT_EXTRA_COLUMNS) {
+    addSqliteColumnIfMissing(db, "whoop_workouts", column.name, column.sqliteType);
+  }
 }
 
 export function applySchema(db: DatabaseSync) {
@@ -133,6 +164,15 @@ export function applySchema(db: DatabaseSync) {
       max_heart_rate INTEGER,
       kilojoule REAL,
       percent_recorded REAL,
+      distance_meter REAL,
+      altitude_gain_meter REAL,
+      altitude_change_meter REAL,
+      zone_zero_milli INTEGER,
+      zone_one_milli INTEGER,
+      zone_two_milli INTEGER,
+      zone_three_milli INTEGER,
+      zone_four_milli INTEGER,
+      zone_five_milli INTEGER,
       raw_json TEXT NOT NULL,
       synced_at TEXT NOT NULL
     );
@@ -197,6 +237,7 @@ export function applySchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_nutrition_intake_date
       ON nutrition_intake_entries (date_key, logged_at);
   `);
+  applySqliteSchemaUpgrades(db);
 }
 
 const POSTGRES_SCHEMA = `
@@ -305,6 +346,15 @@ const POSTGRES_SCHEMA = `
     max_heart_rate INTEGER,
     kilojoule DOUBLE PRECISION,
     percent_recorded DOUBLE PRECISION,
+    distance_meter DOUBLE PRECISION,
+    altitude_gain_meter DOUBLE PRECISION,
+    altitude_change_meter DOUBLE PRECISION,
+    zone_zero_milli INTEGER,
+    zone_one_milli INTEGER,
+    zone_two_milli INTEGER,
+    zone_three_milli INTEGER,
+    zone_four_milli INTEGER,
+    zone_five_milli INTEGER,
     raw_json TEXT NOT NULL,
     synced_at TEXT NOT NULL
   );
@@ -420,6 +470,12 @@ async function ensurePostgresSchema() {
   const sql = getPostgresClient();
   for (const statement of POSTGRES_SCHEMA.split(";").map((part) => part.trim()).filter(Boolean)) {
     await sql.query(statement, []);
+  }
+  for (const column of WHOOP_WORKOUT_EXTRA_COLUMNS) {
+    await sql.query(
+      `ALTER TABLE whoop_workouts ADD COLUMN IF NOT EXISTS ${column.name} ${column.postgresType}`,
+      [],
+    );
   }
   globalWithDb.__healthDashboardPgSchemaReady = true;
 }
