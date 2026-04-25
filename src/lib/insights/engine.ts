@@ -14,6 +14,9 @@ import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
 import type {
   BodyCardSummary,
+  DailyActivityContext,
+  DailyActivityKind,
+  DailyActivitySession,
   DailyFreshness,
   DailyLateNightDisruption,
   DailyReadiness,
@@ -83,6 +86,7 @@ type WhoopWorkoutRow = {
   strain: number | null;
   average_heart_rate?: number | null;
   max_heart_rate?: number | null;
+  distance_meter?: number | null;
 };
 
 type HevyWorkoutRow = {
@@ -212,6 +216,267 @@ function getDateWindow(days: number) {
       monthDay: NEW_YORK_MONTH_DAY.format(date),
     };
   });
+}
+
+function getStartOfWeek(date: Date) {
+  const day = date.getDay();
+  const distanceFromMonday = (day + 6) % 7;
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(date.getDate() - distanceFromMonday);
+  return start;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(date.getDate() + days);
+  return next;
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function activityKindLabel(kind: DailyActivityKind) {
+  if (kind === "walking") {
+    return "Walking";
+  }
+
+  if (kind === "tennis") {
+    return "Tennis";
+  }
+
+  return "Other conditioning";
+}
+
+function activitySummaryNoun(kind: DailyActivityKind) {
+  if (kind === "walking") {
+    return "walk";
+  }
+
+  if (kind === "tennis") {
+    return "tennis session";
+  }
+
+  return "conditioning session";
+}
+
+function formatActivityList(parts: string[]) {
+  if (parts.length <= 1) {
+    return parts[0] ?? "no activity";
+  }
+
+  if (parts.length === 2) {
+    return `${parts[0]} and ${parts[1]}`;
+  }
+
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+export function classifyWhoopActivity(sportName: string | null | undefined): DailyActivityKind | null {
+  const normalized = sportName?.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  if (
+    normalized.includes("weightlifting") ||
+    normalized.includes("weight lifting") ||
+    normalized.includes("strength") ||
+    normalized.includes("lifting")
+  ) {
+    return null;
+  }
+
+  if (
+    normalized.includes("walking") ||
+    normalized === "walk" ||
+    normalized.includes("hiking") ||
+    normalized.includes("rucking")
+  ) {
+    return "walking";
+  }
+
+  if (normalized.includes("tennis")) {
+    return "tennis";
+  }
+
+  return "other_conditioning";
+}
+
+function getActivityDurationMinutes(row: Pick<WhoopWorkoutRow, "start" | "end">) {
+  if (!row.end) {
+    return 0;
+  }
+
+  const durationMs = new Date(row.end).getTime() - new Date(row.start).getTime();
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    return 0;
+  }
+
+  return Math.round(durationMs / 60_000);
+}
+
+function toActivitySession(row: WhoopWorkoutRow): DailyActivitySession | null {
+  const kind = classifyWhoopActivity(row.sport_name);
+  if (!kind) {
+    return null;
+  }
+
+  return {
+    id: row.id ?? `${row.sport_name ?? "activity"}-${row.start}`,
+    kind,
+    sportName: row.sport_name ?? activityKindLabel(kind),
+    start: row.start,
+    end: row.end ?? null,
+    durationMinutes: getActivityDurationMinutes(row),
+    strain: typeof row.strain === "number" ? round(row.strain, 1) : null,
+    averageHeartRate:
+      typeof row.average_heart_rate === "number" ? Math.round(row.average_heart_rate) : null,
+    maxHeartRate: typeof row.max_heart_rate === "number" ? Math.round(row.max_heart_rate) : null,
+    distanceMeter: typeof row.distance_meter === "number" ? row.distance_meter : null,
+  };
+}
+
+function summarizeActivityBuckets(sessions: DailyActivitySession[]) {
+  const kinds: DailyActivityKind[] = ["walking", "tennis", "other_conditioning"];
+  return kinds
+    .map((kind) => {
+      const kindSessions = sessions.filter((session) => session.kind === kind);
+      const distanceValues = kindSessions.map((session) => session.distanceMeter);
+      const hasDistance = distanceValues.some((value) => typeof value === "number");
+
+      return {
+        kind,
+        label: activityKindLabel(kind),
+        count: kindSessions.length,
+        durationMinutes: sum(kindSessions.map((session) => session.durationMinutes)),
+        strain: round(sum(kindSessions.map((session) => session.strain)), 1) ?? 0,
+        distanceMeter: hasDistance ? sum(distanceValues) : null,
+      };
+    })
+    .filter((bucket) => bucket.count > 0);
+}
+
+function buildActivityDays(windowStart: Date, sessions: DailyActivitySession[]) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(windowStart, index);
+    const dateKey = getDateKey(date);
+    const daySessions = sessions.filter((session) => getDateKey(session.start) === dateKey);
+    const buckets = summarizeActivityBuckets(daySessions).map((bucket) => ({
+      kind: bucket.kind,
+      count: bucket.count,
+      strain: bucket.strain,
+    }));
+
+    return {
+      dateKey,
+      label: NEW_YORK_WEEKDAY.format(date),
+      buckets,
+      totalStrain: round(sum(daySessions.map((session) => session.strain)), 1) ?? 0,
+      hasActivity: daySessions.length > 0,
+    };
+  });
+}
+
+function buildActivitySummaryLine(
+  displayWindowLabel: DailyActivityContext["displayWindowLabel"],
+  currentWeekHasActivity: boolean,
+  buckets: ReturnType<typeof summarizeActivityBuckets>,
+) {
+  const parts = buckets.map((bucket) =>
+    pluralize(bucket.count, activitySummaryNoun(bucket.kind), `${activitySummaryNoun(bucket.kind)}s`),
+  );
+  const summary = formatActivityList(parts);
+
+  if (displayWindowLabel === "This week" && currentWeekHasActivity) {
+    return `${summary} logged this week.`;
+  }
+
+  if (displayWindowLabel === "Last week" && buckets.length > 0) {
+    return `No walks or tennis logged yet this week. Last week had ${summary}.`;
+  }
+
+  return "No walks, tennis, or conditioning logged in the current or previous week.";
+}
+
+function buildActivityInterpretation(sessions: DailyActivitySession[], fallbackUsed: boolean) {
+  if (sessions.length === 0) {
+    return "Activity context will appear after WHOOP logs walks, tennis, or conditioning.";
+  }
+
+  const tennis = sessions.filter((session) => session.kind === "tennis");
+  const walking = sessions.filter((session) => session.kind === "walking");
+  const other = sessions.filter((session) => session.kind === "other_conditioning");
+  const maxTennisStrain = Math.max(...tennis.map((session) => session.strain ?? 0), 0);
+  const totalWalkingMinutes = sum(walking.map((session) => session.durationMinutes));
+  const totalOtherStrain = sum(other.map((session) => session.strain));
+  const prefix = fallbackUsed ? "Last week shows" : "This week shows";
+
+  if (maxTennisStrain >= 8) {
+    return `${prefix} tennis as meaningful conditioning load; it can matter when recovery is low even though it does not count as lifting volume.`;
+  }
+
+  if (totalWalkingMinutes >= 60) {
+    return `${prefix} a useful walking base, which is health-positive movement unless daily strain starts stacking unusually high.`;
+  }
+
+  if (totalOtherStrain >= 10) {
+    return `${prefix} non-lifting conditioning load that should sit beside recovery and strain, not inside the muscle map.`;
+  }
+
+  return `${prefix} light non-lifting movement. Treat it as context, while Hevy still owns lifting volume and muscle exposure.`;
+}
+
+export function buildActivityContextFromRows(
+  rows: WhoopWorkoutRow[],
+  now = new Date(),
+): DailyActivityContext {
+  const currentWeekStart = getStartOfWeek(now);
+  const previousWeekStart = addDays(currentWeekStart, -7);
+  const currentWeekStartMs = currentWeekStart.getTime();
+  const previousWeekStartMs = previousWeekStart.getTime();
+
+  const sessions = rows
+    .map(toActivitySession)
+    .filter((session): session is DailyActivitySession => session !== null)
+    .sort((left, right) => new Date(right.start).getTime() - new Date(left.start).getTime());
+
+  const currentWeekSessions = sessions.filter(
+    (session) => new Date(session.start).getTime() >= currentWeekStartMs,
+  );
+  const previousWeekSessions = sessions.filter((session) => {
+    const time = new Date(session.start).getTime();
+    return time >= previousWeekStartMs && time < currentWeekStartMs;
+  });
+  const currentWeekHasActivity = currentWeekSessions.length > 0;
+  const fallbackUsed = !currentWeekHasActivity && previousWeekSessions.length > 0;
+  const displaySessions = currentWeekHasActivity
+    ? currentWeekSessions
+    : fallbackUsed
+      ? previousWeekSessions
+      : [];
+  const displayWindowLabel = fallbackUsed ? "Last week" : "This week";
+  const windowStart = fallbackUsed ? previousWeekStart : currentWeekStart;
+  const buckets = summarizeActivityBuckets(displaySessions);
+  const distanceValues = displaySessions.map((session) => session.distanceMeter);
+  const hasDistance = distanceValues.some((value) => typeof value === "number");
+
+  return {
+    displayWindowLabel,
+    currentWeekHasActivity,
+    fallbackUsed,
+    hasActivity: displaySessions.length > 0,
+    summaryLine: buildActivitySummaryLine(displayWindowLabel, currentWeekHasActivity, buckets),
+    interpretation: buildActivityInterpretation(displaySessions, fallbackUsed),
+    latestSession: displaySessions[0] ?? null,
+    buckets,
+    days: buildActivityDays(windowStart, displaySessions),
+    totalSessions: displaySessions.length,
+    totalDurationMinutes: sum(displaySessions.map((session) => session.durationMinutes)),
+    totalStrain: round(sum(displaySessions.map((session) => session.strain)), 1) ?? 0,
+    totalDistanceMeter: hasDistance ? sum(distanceValues) : null,
+  };
 }
 
 function toThreePointSeries(values: Array<number | null>) {
@@ -1042,6 +1307,22 @@ async function buildStrainSummary(readiness: DailyReadiness, trainingLoad: Daily
   };
 }
 
+async function buildActivityContext(now: Date) {
+  const previousWeekStart = addDays(getStartOfWeek(now), -7);
+  const rows = await dbAll<WhoopWorkoutRow>(
+    `
+      SELECT id, sport_name, start, "end", strain, average_heart_rate, max_heart_rate,
+             distance_meter
+      FROM whoop_workouts
+      WHERE start >= ?
+      ORDER BY start DESC
+    `,
+    previousWeekStart.toISOString(),
+  );
+
+  return buildActivityContextFromRows(rows, now);
+}
+
 async function buildTrainingLoad(): Promise<DailyTrainingLoad> {
   const workouts = await dbAll<HevyWorkoutRow>(
     `
@@ -1495,6 +1776,7 @@ function buildRecommendations(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
   physiqueDecision: DailyPhysiqueDecision,
+  activityContext: DailyActivityContext,
   stressFlags: DailyStressFlags,
   lateNightDisruption: DailyLateNightDisruption,
   freshness: DailyFreshness,
@@ -1620,6 +1902,40 @@ function buildRecommendations(
           `Recovery ${readiness.recoveryScore ?? "--"}`,
           `Consecutive days ${trainingLoad.hevyConsecutiveDays}`,
           `Load spike ${trainingLoad.recentLoadSpike ? "yes" : "no"}`,
+        ],
+        2 - stalePenalty,
+        "medium",
+      ),
+    );
+  }
+
+  const latestActivity = activityContext.latestSession;
+  if (
+    latestActivity?.kind === "tennis" &&
+    (latestActivity.strain ?? 0) >= 8 &&
+    (stressFlags.lowRecovery || stressFlags.poorSleepTrend || lateNightDisruption.active)
+  ) {
+    items.push(
+      recommendation(
+        "recovery",
+        "Account for tennis conditioning load",
+        "Treat the tennis session as real conditioning stress when deciding whether warm-up quality is good enough to push.",
+        [
+          "Let warm-up quality decide whether to progress",
+          "Keep easy movement easy if recovery is soft",
+          "Do not count tennis as lifting volume, but do count it as fatigue context",
+        ],
+        [
+          { label: "Warm-up check", icon: "technique" },
+          { label: "Easy movement", icon: "walk" },
+          { label: "Downshift", icon: "rest" },
+        ],
+        undefined,
+        activityContext.interpretation,
+        [
+          `${latestActivity.sportName} strain ${latestActivity.strain?.toFixed(1) ?? "--"}`,
+          `${latestActivity.durationMinutes} min`,
+          `${activityContext.displayWindowLabel} context`,
         ],
         2 - stalePenalty,
         "medium",
@@ -1865,6 +2181,7 @@ function buildRecommendations(
 function buildWhyChangedToday(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
+  activityContext: DailyActivityContext,
   stressFlags: DailyStressFlags,
   lateNightDisruption: DailyLateNightDisruption,
 ): DailyWhyChanged {
@@ -1891,6 +2208,22 @@ function buildWhyChangedToday(
   if (trainingLoad.hevyConsecutiveDays >= 3) {
     deltas.push(`You are on a ${trainingLoad.hevyConsecutiveDays}-day lifting streak.`);
   }
+  if (activityContext.hasActivity) {
+    const latest = activityContext.latestSession;
+    if (activityContext.fallbackUsed) {
+      deltas.push(
+        `${activityContext.displayWindowLabel} activity context: ${activityContext.summaryLine} This is reference context, not current-week lifting load.`,
+      );
+    } else if (latest?.kind === "tennis" && (latest.strain ?? 0) >= 8) {
+      deltas.push(
+        `Tennis added a meaningful conditioning load this week at strain ${latest.strain?.toFixed(1) ?? "--"}.`,
+      );
+    } else if (activityContext.totalDurationMinutes >= 60) {
+      deltas.push(
+        `${activityContext.displayWindowLabel} includes ${activityContext.totalDurationMinutes} minutes of non-lifting movement.`,
+      );
+    }
+  }
   if (stressFlags.illnessRisk) {
     deltas.push("Recovery markers suggest extra physiological stress today.");
   }
@@ -1909,6 +2242,7 @@ function buildPromptText(summary: DailySummary) {
     summary.physiqueDecision.trainingIntent === "Push"
       ? "Progress"
       : summary.physiqueDecision.trainingIntent;
+  const latestActivity = summary.activityContext.latestSession;
 
   return [
     "Goal",
@@ -1950,6 +2284,13 @@ function buildPromptText(summary: DailySummary) {
     `- Weight: ${summary.physiqueDecision.weightTrend.currentLb ?? "--"} lb (${formatSignedPounds(summary.physiqueDecision.weightTrend.weeklyDeltaLb)} vs 7d avg)`,
     `- Training this week: ${summary.trainingLoad.hevyWorkoutCountThisWeek} workouts, ${summary.trainingLoad.hevySetCountThisWeek} sets`,
     `- Rolling 7-day training: ${summary.trainingLoad.hevyWorkoutCount7d} workouts, ${summary.trainingLoad.hevySetCount7d} sets`,
+    `- Activity context (${summary.activityContext.displayWindowLabel}): ${summary.activityContext.summaryLine}`,
+    `- Latest non-lifting activity: ${
+      latestActivity
+        ? `${latestActivity.sportName}, ${latestActivity.durationMinutes} min, strain ${latestActivity.strain ?? "--"}`
+        : "none"
+    }`,
+    `- Activity interpretation: ${summary.activityContext.interpretation}`,
     `- Weekly effective sets: ${
       summary.trainingLoad.weeklyMuscleVolume.length
         ? summary.trainingLoad.weeklyMuscleVolume
@@ -1996,14 +2337,16 @@ export async function getDailySummary(): Promise<DailySummary> {
   );
   const lateNightDisruption = deriveLateNightDisruption(readiness, stressFlags);
   const overnightRead = buildOvernightRead(lateNightDisruption, readiness);
-  const [strainSummary, bodyCard] = await Promise.all([
+  const [strainSummary, bodyCard, activityContext] = await Promise.all([
     buildStrainSummary(readiness, trainingLoad),
     buildBodyCard(readiness),
+    buildActivityContext(now),
   ]);
   const recommendations = buildRecommendations(
     readiness,
     trainingLoad,
     physiqueDecision,
+    activityContext,
     stressFlags,
     lateNightDisruption,
     freshness,
@@ -2011,6 +2354,7 @@ export async function getDailySummary(): Promise<DailySummary> {
   const whyChangedToday = buildWhyChangedToday(
     readiness,
     trainingLoad,
+    activityContext,
     stressFlags,
     lateNightDisruption,
   );
@@ -2029,6 +2373,7 @@ export async function getDailySummary(): Promise<DailySummary> {
     nutritionTargets,
     nutritionActuals,
     physiqueDecision,
+    activityContext,
     bodyCard,
     recommendations,
     freshness,

@@ -40,6 +40,28 @@ function formatMacroGrams(value: number) {
   return `${Math.round(value)}g`;
 }
 
+function formatMinutes(value: number) {
+  if (value <= 0) {
+    return "--";
+  }
+
+  if (value < 60) {
+    return `${value} min`;
+  }
+
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+function formatDistanceMiles(value: number | null) {
+  if (value === null) {
+    return null;
+  }
+
+  return `${(value / 1609.344).toFixed(1)} mi`;
+}
+
 function sanitizeTrend(values: Array<number | null>) {
   return values.slice(-3).map((value) => (typeof value === "number" ? value : null));
 }
@@ -212,6 +234,7 @@ export function buildTodayViewModel(
   const activeSignals = ACTIVE_SIGNAL_LABELS.filter(({ key }) => summary.stressFlags[key])
     .map((item) => item.label)
     .slice(0, 3);
+  const latestActivity = summary.activityContext.latestSession;
 
   if (summary.overnightRead.label !== "Normal night") {
     activeSignals.unshift(
@@ -326,6 +349,45 @@ export function buildTodayViewModel(
           : `${summary.physiqueDecision.trainingTarget} day`,
     },
     actionCards: summary.recommendations.slice(0, 3),
+    activityContext: {
+      title: "Activity context",
+      windowLabel: summary.activityContext.displayWindowLabel,
+      summaryLine: summary.activityContext.summaryLine,
+      interpretation: summary.activityContext.interpretation,
+      hasActivity: summary.activityContext.hasActivity,
+      fallbackUsed: summary.activityContext.fallbackUsed,
+      totalLine: summary.activityContext.hasActivity
+        ? `${formatMinutes(summary.activityContext.totalDurationMinutes)} / strain ${summary.activityContext.totalStrain.toFixed(1)}`
+        : "No activity window",
+      latest: latestActivity
+        ? {
+            label: latestActivity.sportName,
+            detail: [
+              formatMinutes(latestActivity.durationMinutes),
+              latestActivity.strain === null ? null : `strain ${latestActivity.strain.toFixed(1)}`,
+              latestActivity.averageHeartRate === null
+                ? null
+                : `${latestActivity.averageHeartRate} avg HR`,
+              formatDistanceMiles(latestActivity.distanceMeter),
+            ]
+              .filter((item): item is string => item !== null)
+              .join(" / "),
+            kind: latestActivity.kind,
+          }
+        : null,
+      buckets: summary.activityContext.buckets.map((bucket) => ({
+        kind: bucket.kind,
+        label: bucket.label,
+        value: `${bucket.count}x`,
+        detail: `${formatMinutes(bucket.durationMinutes)} / strain ${bucket.strain.toFixed(1)}`,
+      })),
+      days: summary.activityContext.days.map((day) => ({
+        label: day.label,
+        totalStrain: day.totalStrain,
+        hasActivity: day.hasActivity,
+        buckets: day.buckets,
+      })),
+    },
     contextBand: {
       whyChanged: summary.whyChangedToday.deltas.slice(0, 3),
       activeSignals: activeSignals.slice(0, 4),
