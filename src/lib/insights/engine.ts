@@ -1632,21 +1632,21 @@ function buildRecommendations(
       recommendation(
         "recovery",
         lateNightDisruption.likelyLane === "hangover_like"
-          ? "Use symptom-matched head and stomach support"
+          ? "Use late-night recovery support"
           : lateNightDisruption.likelyLane === "illness_like"
             ? "Use simple sick-day support, not a normal training day"
             : "Use gentle stomach and recovery support first",
         lateNightDisruption.likelyLane === "hangover_like"
-          ? "Start with water plus electrolytes, eat something bland like toast, crackers, banana, rice, or broth if your stomach is off, use ginger chews if nausea is the main issue, and only use Pepcid for acid/heartburn or Gas-X for true bloating/gas. Do not expect B vitamins, vitamin D, a multivitamin, or magnesium to rescue the morning."
+          ? "Start with water plus electrolytes, keep food easy to digest if your stomach is off, and use caffeine carefully instead of trying to force intensity through a rough recovery signal."
           : lateNightDisruption.likelyLane === "illness_like"
             ? "Hydrate, use electrolytes if intake feels low, keep food bland and easy to tolerate like toast or broth if your stomach is off, and rest more aggressively. Let symptoms, not ambition, decide whether any movement is worth it."
             : "Hydrate first, keep food gentle and bland if your stomach feels off, use ginger chews if nausea shows up, and let symptoms rather than ambition decide how active you should be today.",
         lateNightDisruption.likelyLane === "hangover_like"
           ? [
               "Start with water plus electrolytes",
-              "Use bland food like toast, crackers, banana, rice, or broth if your stomach is off",
-              "Use ginger chews if nausea is the main issue",
-              "Use Pepcid only for acid or Gas-X only for true gas/bloating",
+              "Keep food easy to digest if your stomach is off",
+              "Use caffeine carefully rather than forcing intensity",
+              "Downshift training if warm-up feels unusually flat",
             ]
           : lateNightDisruption.likelyLane === "illness_like"
             ? [
@@ -1664,7 +1664,7 @@ function buildRecommendations(
         lateNightDisruption.likelyLane === "hangover_like"
           ? [
               { label: "Electrolytes", icon: "electrolytes" },
-              { label: "Bland food", icon: "food" },
+              { label: "Easy food", icon: "food" },
             ]
           : lateNightDisruption.likelyLane === "illness_like"
             ? [
@@ -1679,9 +1679,8 @@ function buildRecommendations(
               ],
         lateNightDisruption.likelyLane === "hangover_like"
           ? [
-              { label: "Ginger", icon: "ginger", conditionLabel: "if nausea" },
-              { label: "Pepcid", icon: "stomach", conditionLabel: "if acid" },
-              { label: "Gas-X", icon: "stomach", conditionLabel: "if bloating" },
+              { label: "Easy walk", icon: "walk", conditionLabel: "if stiff" },
+              { label: "Early meal", icon: "food", conditionLabel: "if flat" },
             ]
           : undefined,
         lateNightDisruption.blurb,

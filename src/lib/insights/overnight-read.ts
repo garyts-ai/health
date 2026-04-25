@@ -143,14 +143,14 @@ export function deriveLateNightDisruption(
     likelyLane === "illness_like"
       ? "Likely sick"
       : likelyLane === "hangover_like"
-        ? "Likely went out"
+        ? "Late-night disruption"
         : "Disrupted night";
 
   const blurb =
     likelyLane === "illness_like"
       ? "Recovery took a clear overnight hit and the physiology leans more illness-like than just a rough night."
       : likelyLane === "hangover_like"
-        ? "Sleep and recovery took a sharp overnight hit that looks more like a late-night / going-out pattern than a clean illness signature."
+        ? "Sleep and recovery took a sharp overnight hit without a clean illness signature. Treat this as a late-night disruption pattern, not a specific cause."
         : "Sleep and recovery took a clear overnight hit, but the cause is not cleanly separable from WHOOP data alone.";
 
   if (illnessPressure !== null && illnessLike) {
@@ -197,10 +197,10 @@ export function buildOvernightRead(
   if (disruption.likelyLane === "hangover_like") {
     return {
       label: shortSleep
-        ? `Alcohol + ${readiness.sleepHours?.toFixed(1) ?? "--"}h sleep`
+        ? `Short sleep + recovery hit`
         : lateSleep.isLate
-          ? "Alcohol + late sleep"
-          : "Alcohol disruption",
+          ? "Late sleep + recovery hit"
+          : "Recovery disruption",
       tone: "warning",
       detail: shortSleep
         ? `Slept ${readiness.sleepHours?.toFixed(1) ?? "--"}h and recovery took a clear hit`
