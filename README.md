@@ -23,15 +23,13 @@ This builds the app and starts the production server on [http://localhost:3000](
 
 ## Private mobile access
 
-The local phone setup is Tailscale. Install Tailscale on this Windows PC and on your iPhone, sign into the same account, then run:
+The primary mobile setup is the Vercel deployment:
 
-```bash
-npm run mobile
+```text
+https://healthmax-two.vercel.app
 ```
 
-Open the app from the phone at `http://<your-pc-tailscale-name>:8000` or `http://<your-pc-tailscale-ip>:8000`. In Safari, use Share -> Add to Home Screen to install it like a private app. The PC must stay awake and the mobile server must keep running.
-
-For persistent mobile access without keeping the PC awake, deploy to Vercel Hobby with a free Neon Postgres database. The deployed app uses GitHub SSO and stores dashboard data in Postgres instead of the local SQLite file.
+Open that URL on iPhone Safari, sign in with GitHub SSO, then use Share -> Add to Home Screen. The deployed app stores dashboard data in Neon Postgres, so phone access does not require this PC to stay awake or a local server to keep running.
 
 Vercel setup:
 

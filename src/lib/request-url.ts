@@ -47,5 +47,5 @@ export function buildRequestRedirectUrl(request: Request, path: string) {
     }
   }
 
-  return new URL(path, "http://localhost:8000");
+  return new URL(path, "http://localhost:3000");
 }

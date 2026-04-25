@@ -1,6 +1,6 @@
 # Vercel Mobile Persistence Setup
 
-This guide moves Health OS from local/Tailscale-only access to a persistent mobile web app on Vercel Hobby with Neon Postgres and GitHub SSO.
+This guide keeps Health OS available as a persistent mobile web app on Vercel Hobby with Neon Postgres and GitHub SSO.
 
 ## 1. Commit And Push The App Changes
 
@@ -169,8 +169,8 @@ Then open the same Vercel URL on iPhone Safari and use Share -> Add to Home Scre
 
 ## Notes
 
-Local mode still works without `DATABASE_URL`; it uses SQLite.
+Local development still works without `DATABASE_URL`; it uses SQLite.
 
 Vercel mode should use `DATABASE_URL`; it uses Neon Postgres.
 
-Tailscale can stay as a backup, but the Vercel URL is the persistent mobile path.
+The Vercel URL is the primary mobile path. The old local mobile server workflow has been removed from the app scripts.
