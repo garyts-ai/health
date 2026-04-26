@@ -1,4 +1,5 @@
 import { AnatomyFigure } from "@/components/anatomy-figure";
+import { BodyAssemblyStage } from "@/components/body-assembly-stage";
 import { DailyBriefPreviewCard } from "@/components/daily-brief-preview-card";
 import { SummaryBanner } from "@/components/dashboard-sections";
 import { HeroStatCard } from "@/components/hero-stat-card";
@@ -432,6 +433,7 @@ export async function MasterDashboard({
                 </div>
               </div>
 
+              <BodyAssemblyStage>
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
                 <div className="relative overflow-hidden rounded-[24px] border border-white/12 bg-[radial-gradient(circle_at_50%_16%,_rgba(255,255,255,0.13),_transparent_16%),radial-gradient(circle_at_78%_84%,_rgba(255,146,118,0.20),_transparent_26%),radial-gradient(circle_at_50%_100%,_rgba(67,66,154,0.44),_transparent_42%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]">
                   <div className="pointer-events-none absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:42px_42px]" />
@@ -530,6 +532,7 @@ export async function MasterDashboard({
                   )}
                 </aside>
               </div>
+              </BodyAssemblyStage>
             </div>
           </section>
 
