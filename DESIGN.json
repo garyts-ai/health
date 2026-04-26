@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-04-26T00:00:00.000Z",
+  "title": "Design System: Health OS",
+  "extensions": {
+    "colorMeta": {
+      "atmosphere-ink": {
+        "role": "neutral",
+        "displayName": "Atmosphere Ink",
+        "canonical": "#120d24",
+        "tonalRamp": ["#0b0718", "#120d24", "#21163f", "#332461", "#4f3b93", "#7868b4", "#b7ace0", "#f0ecfb"]
+      },
+      "atmosphere-coral": {
+        "role": "secondary",
+        "displayName": "Atmosphere Coral",
+        "canonical": "#ff8b72",
+        "tonalRamp": ["#2d0f0a", "#673024", "#a85343", "#d96d58", "#ff8b72", "#ffb09e", "#ffd0c6", "#fff0ec"]
+      },
+      "signal-neon": {
+        "role": "primary",
+        "displayName": "Signal Neon",
+        "canonical": "#71fff1",
+        "tonalRamp": ["#06302e", "#0d5a55", "#16877f", "#27baaf", "#71fff1", "#a9fff8", "#d6fffc", "#f0fffd"]
+      }
+    },
+    "motion": [
+      {
+        "name": "ease-product",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Default state and entrance transitions."
+      },
+      {
+        "name": "ease-precision",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Body map assembly and focused reveals."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Body Training Map",
+      "kind": "custom",
+      "refersTo": "body-map",
+      "description": "Accurate anatomy map with weekly load fill and latest-workout edge state.",
+      "html": "<section class=\"ds-body-map\">Weekly training map</section>",
+      "css": ".ds-body-map { background: #120d24; color: #f8f5ff; border: 1px solid rgba(255,255,255,0.14); border-radius: 20px; padding: 24px; transition: border-color 180ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-body-map:focus-visible { outline: 2px solid #71fff1; outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Training Instrument",
+    "overview": "Health OS is a compact, calibrated, responsive personal performance instrument. Data trust beats generated spectacle.",
+    "keyCharacteristics": [
+      "Dense but legible decision surfaces.",
+      "Indigo-violet atmosphere with restrained coral and neon signals.",
+      "Accurate anatomical overlays with clear weekly and latest-session semantics.",
+      "Crisp motion, short timings, no bounce or elastic effects."
+    ],
+    "rules": [
+      {
+        "name": "The Neon Is Evidence Rule",
+        "body": "Neon cyan is not decoration. It means latest workout, focus, or live interaction.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat Until It Moves Rule",
+        "body": "Static surfaces stay calm. Elevation appears as feedback or hierarchy.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep the body map anatomically accurate and data-driven.",
+      "Do keep motion short, crisp, and reversible."
+    ],
+    "donts": [
+      "Don't use imagegen realism that compromises highlight alignment.",
+      "Don't make users wait through cinematic choreography to read today's decision."
+    ]
+  }
+}

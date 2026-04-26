@@ -12,17 +12,16 @@ function clamp(value: number, min = 0, max = 1) {
   return Math.min(max, Math.max(min, value));
 }
 
-function smooth(value: number) {
-  const t = clamp(value);
-  return t * t * (3 - 2 * t);
+function easeOutQuint(value: number) {
+  return 1 - (1 - clamp(value)) ** 5;
 }
 
 function phase(progress: number, start: number, end: number) {
-  return smooth((progress - start) / (end - start));
+  return easeOutQuint((progress - start) / (end - start));
 }
 
 function layerTransformVars(name: string, value: number, x: number, y: number, scalePeak: number) {
-  const eased = smooth(value);
+  const eased = easeOutQuint(value);
   const inverse = 1 - eased;
 
   return {
@@ -30,15 +29,34 @@ function layerTransformVars(name: string, value: number, x: number, y: number, s
     [`--${name}-x`]: `${(inverse * x).toFixed(2)}%`,
     [`--${name}-y`]: `${(inverse * y).toFixed(2)}%`,
     [`--${name}-scale`]: (1 + inverse * scalePeak).toFixed(4),
-    [`--${name}-blur`]: `${(inverse * 10).toFixed(2)}px`,
+    [`--${name}-blur`]: `${(inverse * 5.5).toFixed(2)}px`,
   };
+}
+
+function syncRegionPlateProgress(stage: HTMLElement, progress: number) {
+  const plates = stage.querySelectorAll<HTMLElement>(".anatomy-region-plate");
+
+  plates.forEach((plate) => {
+    const index = Number(plate.style.getPropertyValue("--region-index")) || 0;
+    const x = Number.parseFloat(plate.style.getPropertyValue("--region-x")) || 0;
+    const y = Number.parseFloat(plate.style.getPropertyValue("--region-y")) || 0;
+    const scale = Number.parseFloat(plate.style.getPropertyValue("--region-scale")) || 1;
+    const start = Math.min(0.1 + index * 0.034, 0.46);
+    const enter = easeOutQuint((progress - start) / 0.24);
+    const inverse = 1 - enter;
+
+    plate.style.setProperty("--region-progress", enter.toFixed(3));
+    plate.style.setProperty("--region-current-x", `${(x * inverse).toFixed(2)}%`);
+    plate.style.setProperty("--region-current-y", `${(y * inverse).toFixed(2)}%`);
+    plate.style.setProperty("--region-current-scale", (1 + (scale - 1) * inverse).toFixed(4));
+  });
 }
 
 export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const replayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progress, setProgress] = useState(0);
-  const [isReplaying, setIsReplaying] = useState(true);
+  const [isReplaying, setIsReplaying] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -70,9 +88,12 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
       }
 
       const rect = stage.getBoundingClientRect();
-      const startLine = window.innerHeight * 0.72;
-      const travel = Math.max(1, rect.height - window.innerHeight * 0.5);
-      setProgress(clamp((startLine - rect.top) / travel));
+      const viewport = window.innerHeight;
+      const startLine = viewport * 0.18;
+      const travel = Math.max(1, stage.offsetHeight - viewport);
+      const nextProgress = clamp((startLine - rect.top) / travel);
+      syncRegionPlateProgress(stage, nextProgress);
+      setProgress(nextProgress);
     };
 
     const requestUpdate = () => {
@@ -101,7 +122,23 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
       return undefined;
     }
 
-    replayTimerRef.current = setTimeout(() => setIsReplaying(false), 2900);
+    if (window.innerWidth < 1024) {
+      const frame = window.requestAnimationFrame(() => {
+        if (stageRef.current) {
+          syncRegionPlateProgress(stageRef.current, 1);
+        }
+        setIsReplaying(true);
+        replayTimerRef.current = setTimeout(() => setIsReplaying(false), 2300);
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frame);
+        if (replayTimerRef.current) {
+          clearTimeout(replayTimerRef.current);
+        }
+      };
+    }
+
     return () => {
       if (replayTimerRef.current) {
         clearTimeout(replayTimerRef.current);
@@ -111,31 +148,35 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
 
   const style = useMemo<AssemblyStyle>(() => {
     const effectiveProgress = prefersReducedMotion ? 1 : progress;
-    const base = phase(effectiveProgress, 0, 0.14);
-    const low = phase(effectiveProgress, 0.12, 0.34);
-    const mid = phase(effectiveProgress, 0.28, 0.52);
-    const high = phase(effectiveProgress, 0.46, 0.68);
-    const latest = phase(effectiveProgress, 0.64, 0.88);
-    const rail = phase(effectiveProgress, 0.78, 1);
+    const base = phase(effectiveProgress, 0, 0.1);
+    const low = phase(effectiveProgress, 0.08, 0.24);
+    const mid = phase(effectiveProgress, 0.2, 0.36);
+    const high = phase(effectiveProgress, 0.32, 0.49);
+    const latest = phase(effectiveProgress, 0.48, 0.64);
+    const rail = phase(effectiveProgress, 0.58, 0.72);
 
     return {
       "--assembly-progress": effectiveProgress.toFixed(3),
       "--assembly-base": base.toFixed(3),
       "--assembly-latest": latest.toFixed(3),
       "--assembly-rail": rail.toFixed(3),
-      "--base-y": `${((1 - base) * 18).toFixed(2)}px`,
-      "--base-scale": (0.94 + base * 0.06).toFixed(4),
-      "--base-blur": `${((1 - base) * 14).toFixed(2)}px`,
-      "--base-brightness": (1 + (1 - base) * 0.5).toFixed(3),
-      "--latest-scale": (1 + (1 - latest) * 0.08).toFixed(4),
+      "--base-y": `${((1 - base) * 12).toFixed(2)}px`,
+      "--base-scale": (0.97 + base * 0.03).toFixed(4),
+      "--base-blur": `${((1 - base) * 8).toFixed(2)}px`,
+      "--base-brightness": (1 + (1 - base) * 0.28).toFixed(3),
+      "--dock-left-x": `${((1 - base) * -14).toFixed(2)}px`,
+      "--dock-right-x": `${((1 - base) * 14).toFixed(2)}px`,
+      "--scanline-y": `${(20 + effectiveProgress * 54).toFixed(2)}%`,
+      "--svg-base-opacity": "1",
+      "--latest-scale": (1 + (1 - latest) * 0.035).toFixed(4),
       "--latest-clip-right": `${((1 - latest) * 100).toFixed(2)}%`,
-      "--latest-glow-tight": `${(3 + latest * 5).toFixed(2)}px`,
-      "--latest-glow-wide": `${(8 + latest * 16).toFixed(2)}px`,
+      "--latest-glow-tight": `${(4 + latest * 7).toFixed(2)}px`,
+      "--latest-glow-wide": `${(10 + latest * 18).toFixed(2)}px`,
       "--rail-opacity": (0.26 + rail * 0.74).toFixed(3),
-      "--rail-x": `${((1 - rail) * 18).toFixed(2)}px`,
-      ...layerTransformVars("weekly-low", low, -8, 5, 0.08),
-      ...layerTransformVars("weekly-mid", mid, 8, 6, 0.1),
-      ...layerTransformVars("weekly-high", high, -5, -4, 0.07),
+      "--rail-x": `${((1 - rail) * 12).toFixed(2)}px`,
+      ...layerTransformVars("weekly-low", low, -10, 7, 0.08),
+      ...layerTransformVars("weekly-mid", mid, 10, 8, 0.09),
+      ...layerTransformVars("weekly-high", high, -7, -7, 0.08),
     };
   }, [prefersReducedMotion, progress]);
 
@@ -150,8 +191,11 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
 
     setIsReplaying(false);
     window.requestAnimationFrame(() => {
+      if (stageRef.current) {
+        syncRegionPlateProgress(stageRef.current, 1);
+      }
       setIsReplaying(true);
-      replayTimerRef.current = setTimeout(() => setIsReplaying(false), 2900);
+      replayTimerRef.current = setTimeout(() => setIsReplaying(false), 2300);
     });
   };
 
@@ -161,6 +205,7 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
       className={`body-assembly-stage ${
         isReplaying && !prefersReducedMotion ? "is-replaying" : "is-scroll-scrubbed"
       }`}
+      data-assembly-progress={progress.toFixed(2)}
       style={style}
     >
       <div className="body-assembly-sticky">

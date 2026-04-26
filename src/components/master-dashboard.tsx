@@ -316,7 +316,7 @@ export async function MasterDashboard({
   };
 
   return (
-    <main className="giga-shell relative min-h-screen overflow-x-hidden bg-[#120d24] text-[#171329]">
+    <main className="giga-shell relative min-h-screen overflow-x-clip bg-[#120d24] text-[#171329]">
       <MobilePullSync />
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_4%,_rgba(255,139,114,0.56),_transparent_22%),radial-gradient(circle_at_76%_5%,_rgba(112,255,241,0.18),_transparent_18%),radial-gradient(circle_at_50%_36%,_rgba(88,65,168,0.82),_transparent_32%),linear-gradient(180deg,_#100b22_0%,_#28194d_28%,_#6c569f_58%,_#f08a76_100%)]" />
       <div className="pointer-events-none fixed inset-0 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:72px_72px]" />
@@ -381,7 +381,7 @@ export async function MasterDashboard({
             </div>
           </div>
 
-          <section className="giga-reveal giga-reveal-delay-1 order-1 overflow-hidden rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_54%_42%,_rgba(114,255,242,0.16),_transparent_18%),radial-gradient(circle_at_30%_18%,_rgba(255,139,114,0.22),_transparent_24%),linear-gradient(135deg,_rgba(20,12,48,0.98)_0%,_rgba(61,43,119,0.96)_46%,_rgba(244,137,115,0.94)_100%)] px-5 py-5 text-white shadow-[0_30px_110px_rgba(11,6,29,0.44)] sm:px-7 sm:py-7 xl:order-none">
+          <section className="relative order-1 rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_54%_42%,_rgba(114,255,242,0.16),_transparent_18%),radial-gradient(circle_at_30%_18%,_rgba(255,139,114,0.22),_transparent_24%),linear-gradient(135deg,_rgba(20,12,48,0.98)_0%,_rgba(61,43,119,0.96)_46%,_rgba(244,137,115,0.94)_100%)] px-5 py-5 text-white shadow-[0_30px_110px_rgba(11,6,29,0.44)] sm:px-7 sm:py-7 xl:order-none">
             <div className="flex flex-col gap-6">
               <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_21rem]">
                 <div>
@@ -435,14 +435,14 @@ export async function MasterDashboard({
 
               <BodyAssemblyStage>
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
-                <div className="relative overflow-hidden rounded-[24px] border border-white/12 bg-[radial-gradient(circle_at_50%_16%,_rgba(255,255,255,0.13),_transparent_16%),radial-gradient(circle_at_78%_84%,_rgba(255,146,118,0.20),_transparent_26%),radial-gradient(circle_at_50%_100%,_rgba(67,66,154,0.44),_transparent_42%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]">
+                <div className="biomech-map-stage relative overflow-hidden rounded-[24px] border border-white/12 bg-[radial-gradient(circle_at_50%_16%,_rgba(255,255,255,0.13),_transparent_16%),radial-gradient(circle_at_78%_84%,_rgba(255,146,118,0.20),_transparent_26%),radial-gradient(circle_at_50%_100%,_rgba(67,66,154,0.44),_transparent_42%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]">
                   <div className="pointer-events-none absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:42px_42px]" />
-                  <div className="relative z-10 mb-4 flex items-center justify-between gap-4 text-[13px] text-white/68">
+                  <div className="relative z-10 mb-4 flex flex-col items-start gap-3 text-[13px] text-white/68 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
                       <span>This week&apos;s training map</span>
-                      <div className="mt-1 text-[11px] text-white/42">assembly sequence: base / weekly panels / latest edge</div>
+                      <div className="mt-1 text-[11px] text-white/42">weekly exposure, latest edge</div>
                     </div>
-                    <div className="flex items-center gap-3.5 text-[12px]">
+                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12px]">
                       <span className="inline-flex items-center gap-1.5">
                         <span className="h-3 w-3 rounded-full bg-[#b5abff]" />
                         1x
@@ -462,18 +462,14 @@ export async function MasterDashboard({
                     </div>
                   </div>
 
-                  <div className="relative z-10 flex min-h-[35rem] items-center justify-center xl:min-h-[40rem]">
+                  <div className="biomech-body-bay relative z-10 flex min-h-[35rem] items-center justify-center xl:min-h-[40rem]">
                     <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#72fff2]/18 bg-[radial-gradient(circle,_rgba(114,255,242,0.11),_transparent_58%)] shadow-[0_0_80px_rgba(114,255,242,0.12)]" />
-                    <div className="pointer-events-none absolute left-[12%] top-[18%] hidden w-28 border-t border-[#72fff2]/30 text-[10px] text-[#c8fffb]/70 md:block">
-                      neural edge
-                    </div>
-                    <div className="pointer-events-none absolute bottom-[17%] right-[9%] hidden w-32 border-t border-[#ffb19d]/30 pt-1 text-right text-[10px] text-[#ffe0d7]/70 md:block">
-                      weekly load panels
-                    </div>
+                    <div className="biomech-scanline" />
                     <div className="relative w-full max-w-[48rem]">
                       <AnatomyFigure
                         weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
                         latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
+                        mode="instrument"
                         className="h-[31rem] w-full lg:h-[39rem] xl:h-[44rem]"
                       />
                     </div>
