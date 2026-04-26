@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { ProtectedSettingsActions } from "@/components/protected-settings-actions";
@@ -31,6 +32,11 @@ export function UtilityDrawer({
   const router = useRouter();
   const searchParams = useSearchParams();
   const open = searchParams.get("utilities") === "open";
+  const portalRoot = useSyncExternalStore(
+    () => () => undefined,
+    () => document.body,
+    () => null,
+  );
 
   const setDrawerState = useCallback((nextOpen: boolean) => {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -71,52 +77,55 @@ export function UtilityDrawer({
 
   return (
     <>
-        <button
-          type="button"
-          onClick={() => setDrawerState(true)}
-          className="inline-flex h-11 items-center gap-3 rounded-[10px] border border-white/14 bg-[rgba(20,14,38,0.18)] px-4 text-sm font-medium text-white transition hover:border-white/28 hover:bg-[rgba(20,14,38,0.28)]"
-        >
+      <button
+        type="button"
+        onClick={() => setDrawerState(true)}
+        className="inline-flex h-11 items-center gap-3 rounded-[10px] border border-white/14 bg-[rgba(20,14,38,0.18)] px-4 text-sm font-medium text-white transition hover:border-white/28 hover:bg-[rgba(20,14,38,0.28)]"
+      >
         <span className="block h-2 w-2 rounded-full bg-[#ff8d72]" />
         <span>Utilities</span>
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50">
-          <button
-            type="button"
-            aria-label="Close utilities"
-            className="absolute inset-0 bg-[rgba(18,14,31,0.56)]"
-            onClick={() => setDrawerState(false)}
-          />
-
-          <aside className="absolute right-0 top-0 h-full w-full max-w-[42rem] overflow-y-auto border-l border-[#dad4eb] bg-[#f6f3fb] shadow-[-18px_0_72px_rgba(18,14,30,0.22)]">
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e7e2f2] bg-[#f6f3fb]/96 px-6 py-5 backdrop-blur">
-              <div>
-                <h2 className="text-xl font-semibold text-[#19162a]">Utilities</h2>
-                <p className="mt-1 text-sm text-[#645c7d]">{utilityLabel}</p>
-              </div>
+      {open && portalRoot
+        ? createPortal(
+            <div className="fixed inset-0 z-50 min-h-dvh">
               <button
                 type="button"
+                aria-label="Close utilities"
+                className="absolute inset-0 bg-[rgba(18,14,31,0.56)]"
                 onClick={() => setDrawerState(false)}
-                className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-sm font-medium text-[#2a2540] transition hover:border-[#bdb2e0] hover:bg-[#faf8ff]"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="px-6 py-6">
-              <ProtectedSettingsActions
-                deliveryStatus={deliveryStatus}
-                hevy={hevy}
-                isDiscordConfigured={isDiscordConfigured}
-                preview={preview}
-                summary={summary}
-                whoop={whoop}
               />
-            </div>
-          </aside>
-        </div>
-      ) : null}
+
+              <aside className="absolute right-0 top-0 h-dvh w-full overflow-y-auto border-l border-[#dad4eb] bg-[#f6f3fb] shadow-[-18px_0_72px_rgba(18,14,30,0.22)] sm:max-w-[42rem]">
+                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e7e2f2] bg-[#f6f3fb]/96 px-6 py-5 backdrop-blur">
+                  <div>
+                    <h2 className="text-xl font-semibold text-[#19162a]">Utilities</h2>
+                    <p className="mt-1 text-sm text-[#645c7d]">{utilityLabel}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerState(false)}
+                    className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-sm font-medium text-[#2a2540] transition hover:border-[#bdb2e0] hover:bg-[#faf8ff]"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="px-6 py-6">
+                  <ProtectedSettingsActions
+                    deliveryStatus={deliveryStatus}
+                    hevy={hevy}
+                    isDiscordConfigured={isDiscordConfigured}
+                    preview={preview}
+                    summary={summary}
+                    whoop={whoop}
+                  />
+                </div>
+              </aside>
+            </div>,
+            portalRoot,
+          )
+        : null}
     </>
   );
 }
