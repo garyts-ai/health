@@ -1,4 +1,5 @@
 import { AnatomyFigure } from "@/components/anatomy-figure";
+import { BodyAssemblyStage } from "@/components/body-assembly-stage";
 import { DailyBriefPreviewCard } from "@/components/daily-brief-preview-card";
 import { SummaryBanner } from "@/components/dashboard-sections";
 import { HeroStatCard } from "@/components/hero-stat-card";
@@ -213,23 +214,23 @@ function ActionCard({ item }: { item: DailyRecommendation }) {
     item.category === "training"
       ? {
           shell:
-            "bg-[linear-gradient(180deg,_rgba(247,244,255,0.96)_0%,_rgba(255,255,255,0.94)_68%)] ring-[rgba(115,101,171,0.12)]",
+            "bg-[linear-gradient(180deg,_rgba(250,247,255,0.98)_0%,_rgba(238,232,255,0.94)_100%)] ring-[rgba(115,101,171,0.18)]",
           icon: "bg-[#efe9ff] text-[#4a4390]",
         }
       : item.category === "recovery"
         ? {
             shell:
-              "bg-[linear-gradient(180deg,_rgba(245,249,255,0.96)_0%,_rgba(255,255,255,0.94)_68%)] ring-[rgba(109,131,191,0.12)]",
+              "bg-[linear-gradient(180deg,_rgba(246,251,255,0.98)_0%,_rgba(237,243,255,0.94)_100%)] ring-[rgba(109,131,191,0.18)]",
             icon: "bg-[#edf1ff] text-[#4a5f9f]",
           }
         : {
             shell:
-              "bg-[linear-gradient(180deg,_rgba(255,246,242,0.96)_0%,_rgba(255,255,255,0.94)_68%)] ring-[rgba(194,118,83,0.12)]",
+              "bg-[linear-gradient(180deg,_rgba(255,248,244,0.98)_0%,_rgba(255,238,230,0.94)_100%)] ring-[rgba(194,118,83,0.18)]",
             icon: "bg-[#fff0e8] text-[#91563a]",
           };
 
   return (
-    <article className={`rounded-[12px] p-5 shadow-[0_10px_28px_rgba(22,20,35,0.08)] ring-1 ${theme.shell}`}>
+    <article className={`giga-reveal rounded-[20px] p-5 shadow-[0_24px_80px_rgba(18,11,42,0.18)] ring-1 ${theme.shell}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-[10px] ${theme.icon}`}>
@@ -315,19 +316,20 @@ export async function MasterDashboard({
   };
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f5f2fb] text-[#171329]">
+    <main className="giga-shell relative min-h-screen overflow-x-clip bg-[#120d24] text-[#171329]">
       <MobilePullSync />
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(253,132,122,0.55),_transparent_23%),radial-gradient(circle_at_top_right,_rgba(93,92,186,0.46),_transparent_26%),linear-gradient(180deg,_#766db9_0%,_#5d54a3_16%,_#f5f2fb_54%)]" />
-      <div className="pointer-events-none fixed inset-x-0 top-[26vh] h-[44rem] bg-[radial-gradient(circle_at_center,_rgba(255,164,136,0.18),_transparent_34%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_4%,_rgba(255,139,114,0.56),_transparent_22%),radial-gradient(circle_at_76%_5%,_rgba(112,255,241,0.18),_transparent_18%),radial-gradient(circle_at_50%_36%,_rgba(88,65,168,0.82),_transparent_32%),linear-gradient(180deg,_#100b22_0%,_#28194d_28%,_#6c569f_58%,_#f08a76_100%)]" />
+      <div className="pointer-events-none fixed inset-0 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:72px_72px]" />
+      <div className="pointer-events-none fixed inset-x-[-10%] top-[18vh] h-[42rem] bg-[radial-gradient(circle_at_center,_rgba(114,255,242,0.18),_transparent_18%),radial-gradient(circle_at_58%_58%,_rgba(255,139,114,0.18),_transparent_32%)] blur-2xl" />
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1400px] flex-col gap-8 px-6 py-6 lg:px-10 lg:py-8">
-        <header className="flex items-start justify-between gap-6">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1520px] flex-col gap-8 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        <header className="giga-reveal flex items-start justify-between gap-6">
           <div>
-            <div className="text-[15px] font-medium text-white/84">{vm.header.productName}</div>
-            <h1 className="mt-2 text-[48px] font-semibold leading-[0.92] tracking-[-0.06em] text-white sm:text-[64px]">
+            <div className="text-[13px] font-medium text-white/62">{vm.header.productName}</div>
+            <h1 className="mt-2 text-[54px] font-semibold leading-[0.86] tracking-[-0.075em] text-white sm:text-[78px] lg:text-[96px]">
               Today
             </h1>
-            <p className="mt-3 text-[15px] text-white/72">{vm.header.dateLabel}</p>
+            <p className="mt-4 text-[15px] text-white/68">{vm.header.dateLabel}</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -349,9 +351,9 @@ export async function MasterDashboard({
         {utilityBannerMessage ? <SummaryBanner message={utilityBannerMessage} /> : null}
         {vm.header.freshnessNotice ? <FreshnessNotice message={vm.header.freshnessNotice} /> : null}
 
-        <section className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="order-2 flex flex-col gap-4 lg:order-none">
-          <div className="rounded-[12px] bg-[rgba(24,19,42,0.84)] px-5 py-5 text-white shadow-[0_14px_55px_rgba(17,15,31,0.2)] backdrop-blur-sm">
+        <section className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="giga-reveal giga-reveal-delay-2 order-2 flex flex-col gap-4 xl:order-none">
+          <div className="rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,_rgba(15,10,31,0.92),_rgba(33,22,62,0.84))] px-5 py-5 text-white shadow-[0_24px_80px_rgba(8,5,22,0.34)] backdrop-blur-xl">
               <div className="text-[13px] text-white/58">Overnight read</div>
               <div className="mt-2 text-[36px] font-semibold leading-[0.98] tracking-[-0.05em]">
                 {vm.hero.overnightRead.label}
@@ -361,7 +363,7 @@ export async function MasterDashboard({
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-[12px] bg-[linear-gradient(180deg,_rgba(242,238,251,0.9)_0%,_rgba(247,244,255,0.82)_100%)] p-2 shadow-[0_10px_28px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(255,255,255,0.48)] backdrop-blur-[18px]">
+            <div className="overflow-hidden rounded-[18px] border border-white/20 bg-[linear-gradient(180deg,_rgba(250,247,255,0.96)_0%,_rgba(239,234,255,0.88)_100%)] p-2 shadow-[0_22px_70px_rgba(15,9,32,0.22)] ring-1 ring-[rgba(255,255,255,0.35)] backdrop-blur-[18px]">
               <div className="grid gap-2">
                 {vm.hero.metrics.map((metric) => (
                   <HeroStatCard
@@ -379,23 +381,38 @@ export async function MasterDashboard({
             </div>
           </div>
 
-          <section className="order-1 overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,_rgba(33,24,76,0.98)_0%,_rgba(85,67,148,0.95)_46%,_rgba(248,141,116,0.92)_100%)] px-5 py-5 text-white shadow-[0_20px_80px_rgba(31,24,61,0.24)] sm:px-6 sm:py-6 lg:order-none">
-            <div className="flex flex-col gap-5">
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <section className="relative order-1 rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_54%_42%,_rgba(114,255,242,0.16),_transparent_18%),radial-gradient(circle_at_30%_18%,_rgba(255,139,114,0.22),_transparent_24%),linear-gradient(135deg,_rgba(20,12,48,0.98)_0%,_rgba(61,43,119,0.96)_46%,_rgba(244,137,115,0.94)_100%)] px-5 py-5 text-white shadow-[0_30px_110px_rgba(11,6,29,0.44)] sm:px-7 sm:py-7 xl:order-none">
+            <div className="flex flex-col gap-6">
+              <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_21rem]">
                 <div>
                   <div className="text-[13px] text-white/58">Today&apos;s split call</div>
-                  <div className="mt-2 max-w-[21rem] text-[44px] font-semibold leading-[0.92] tracking-[-0.06em]">
+                  <div className="mt-2 max-w-[28rem] text-[46px] font-semibold leading-[0.86] tracking-[-0.075em] sm:text-[58px]">
                     {vm.hero.todayCall}
                   </div>
-                  <div className="mt-4 text-[14px] leading-6 text-white/74">
+                  <div className="mt-4 text-[15px] leading-6 text-white/78">
                     {vm.hero.decision.intensityIntentLabel}: {vm.hero.decision.intensity}
                   </div>
-                  <div className="mt-2 max-w-[34rem] text-[13px] leading-6 text-white/66">
+                  <div className="mt-2 max-w-[42rem] text-[13px] leading-5 text-white/66">
                     {vm.hero.decision.targetReason} {vm.hero.decision.bottleneck}
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[16px] bg-white/10 ring-1 ring-white/14 sm:hidden">
+                    {[
+                      ["Train", vm.hero.decision.train],
+                      ["Intent", vm.hero.decision.intensityIntentLabel],
+                      ["Calories", vm.hero.decision.calories],
+                      ["Protein", vm.hero.decision.protein],
+                    ].map(([label, value]) => (
+                      <div key={label} className="bg-[rgba(17,10,38,0.24)] px-3 py-2.5">
+                        <div className="text-[10px] text-white/46">{label}</div>
+                        <div className="mt-1 text-[13px] font-semibold leading-4 text-white/88">
+                          {value}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] bg-white/10 ring-1 ring-white/10">
+                <div className="hidden grid-cols-2 gap-px overflow-hidden rounded-[18px] bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/14 sm:grid">
                   {[
                     ["Train", vm.hero.decision.train],
                     ["Intensity", vm.hero.decision.intensityIntentLabel],
@@ -406,9 +423,9 @@ export async function MasterDashboard({
                     ["Anchors", vm.hero.decision.sessionAnchorsLabel],
                     ["Latest", `${vm.hero.workoutLabel} / ${vm.hero.latestSessionAgeLabel}`],
                   ].map(([label, value]) => (
-                    <div key={label} className="bg-[rgba(19,13,34,0.18)] px-3 py-3">
+                    <div key={label} className="bg-[rgba(17,10,38,0.24)] px-3 py-2.5 backdrop-blur-md">
                       <div className="text-[11px] text-white/48">{label}</div>
-                      <div className="mt-1 text-[14px] font-semibold leading-5 text-white/88">
+                      <div className="mt-1 text-[13px] font-semibold leading-5 text-white/88">
                         {value}
                       </div>
                     </div>
@@ -416,11 +433,16 @@ export async function MasterDashboard({
                 </div>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
-                <div className="rounded-[12px] bg-[radial-gradient(circle_at_50%_20%,_rgba(255,255,255,0.10),_transparent_18%),radial-gradient(circle_at_78%_85%,_rgba(255,146,118,0.16),_transparent_24%),radial-gradient(circle_at_50%_100%,_rgba(67,66,154,0.36),_transparent_42%)] px-4 py-4">
-                  <div className="mb-4 flex items-center justify-between gap-4 text-[13px] text-white/68">
-                    <span>This week&apos;s training map</span>
-                    <div className="flex items-center gap-3.5 text-[12px]">
+              <BodyAssemblyStage>
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
+                <div className="biomech-map-stage relative overflow-hidden rounded-[24px] border border-white/12 bg-[radial-gradient(circle_at_50%_16%,_rgba(255,255,255,0.13),_transparent_16%),radial-gradient(circle_at_78%_84%,_rgba(255,146,118,0.20),_transparent_26%),radial-gradient(circle_at_50%_100%,_rgba(67,66,154,0.44),_transparent_42%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]">
+                  <div className="pointer-events-none absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:42px_42px]" />
+                  <div className="relative z-10 mb-4 flex flex-col items-start gap-3 text-[13px] text-white/68 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div>
+                      <span>This week&apos;s training map</span>
+                      <div className="mt-1 text-[11px] text-white/42">weekly exposure, latest edge</div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12px]">
                       <span className="inline-flex items-center gap-1.5">
                         <span className="h-3 w-3 rounded-full bg-[#b5abff]" />
                         1x
@@ -440,12 +462,15 @@ export async function MasterDashboard({
                     </div>
                   </div>
 
-                  <div className="flex min-h-[34rem] items-center justify-center">
-                    <div className="w-full max-w-[38rem]">
+                  <div className="biomech-body-bay relative z-10 flex min-h-[35rem] items-center justify-center xl:min-h-[40rem]">
+                    <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#72fff2]/18 bg-[radial-gradient(circle,_rgba(114,255,242,0.11),_transparent_58%)] shadow-[0_0_80px_rgba(114,255,242,0.12)]" />
+                    <div className="biomech-scanline" />
+                    <div className="relative w-full max-w-[48rem]">
                       <AnatomyFigure
                         weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
                         latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
-                        className="h-[29rem] w-full lg:h-[36rem]"
+                        mode="instrument"
+                        className="h-[31rem] w-full lg:h-[39rem] xl:h-[44rem]"
                       />
                     </div>
                   </div>
@@ -457,7 +482,7 @@ export async function MasterDashboard({
                   ) : null}
                 </div>
 
-                <aside className="rounded-[12px] bg-[rgba(19,13,34,0.18)] px-4 py-4 ring-1 ring-white/10">
+                <aside className="rounded-[20px] border border-white/12 bg-[linear-gradient(180deg,_rgba(18,11,39,0.32),_rgba(18,11,39,0.14))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] ring-1 ring-white/8 backdrop-blur-md">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[13px] text-white/60">Weekly muscle volume</div>
                     <div className="text-[11px] text-white/44">Mon-Sun</div>
@@ -469,7 +494,7 @@ export async function MasterDashboard({
                         return (
                           <div
                             key={item.label}
-                            className="flex items-center justify-between gap-3 border-b border-white/8 pb-2 last:border-b-0 last:pb-0"
+                            className="flex items-center justify-between gap-3 border-b border-white/8 pb-2 transition-colors hover:border-white/16 hover:bg-white/[0.025] last:border-b-0 last:pb-0"
                           >
                             <div className={`flex items-center gap-2 text-[14px] ${tone.text}`}>
                               <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
@@ -503,11 +528,12 @@ export async function MasterDashboard({
                   )}
                 </aside>
               </div>
+              </BodyAssemblyStage>
             </div>
           </section>
 
           <div className="order-3 grid gap-4 lg:order-none lg:col-start-2">
-            <div className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] px-5 py-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[18px]">
+            <div className="giga-reveal giga-reveal-delay-2 rounded-[20px] border border-white/24 bg-[linear-gradient(180deg,_rgba(248,245,255,0.9)_0%,_rgba(255,255,255,0.78)_100%)] px-5 py-5 shadow-[0_22px_70px_rgba(18,11,42,0.16)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[22px]">
               <div className="text-[14px] text-[#6d6785]">What changed</div>
               <div className="mt-4 space-y-3">
                 {vm.contextBand.whyChanged.map((item) => (
@@ -518,7 +544,7 @@ export async function MasterDashboard({
               </div>
             </div>
 
-            <div className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(245,241,255,0.9)_0%,_rgba(255,249,246,0.78)_100%)] px-5 py-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[18px]">
+            <div className="giga-reveal giga-reveal-delay-3 rounded-[20px] border border-white/24 bg-[linear-gradient(180deg,_rgba(245,241,255,0.9)_0%,_rgba(255,249,246,0.78)_100%)] px-5 py-5 shadow-[0_22px_70px_rgba(18,11,42,0.16)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[22px]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[14px] text-[#6d6785]">Activity context</div>
@@ -620,7 +646,7 @@ export async function MasterDashboard({
               </p>
             </div>
 
-            <div className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(247,243,255,0.84)_0%,_rgba(255,255,255,0.8)_100%)] px-5 py-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[18px]">
+            <div className="giga-reveal giga-reveal-delay-3 rounded-[20px] border border-white/24 bg-[linear-gradient(180deg,_rgba(247,243,255,0.84)_0%,_rgba(255,255,255,0.78)_100%)] px-5 py-5 shadow-[0_22px_70px_rgba(18,11,42,0.16)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[22px]">
               <div className="text-[14px] text-[#6d6785]">Weekly scorecard</div>
               <div className="mt-4 space-y-2">
                 {vm.scorecard.map((item) => (
@@ -656,7 +682,7 @@ export async function MasterDashboard({
           ))}
         </section>
 
-        <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.84)_0%,_rgba(255,255,255,0.8)_100%)] px-5 py-4 shadow-[0_10px_28px_rgba(22,20,35,0.06)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[18px]">
+        <section className="giga-reveal rounded-[20px] border border-white/24 bg-[linear-gradient(180deg,_rgba(248,245,255,0.84)_0%,_rgba(255,255,255,0.76)_100%)] px-5 py-4 shadow-[0_22px_70px_rgba(18,11,42,0.14)] ring-1 ring-[rgba(77,67,119,0.12)] backdrop-blur-[22px]">
           <div className="grid gap-4 lg:grid-cols-4">
             {vm.trendBand.map((item) => (
               <div
