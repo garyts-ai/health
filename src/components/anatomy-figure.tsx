@@ -342,24 +342,30 @@ export async function AnatomyFigure({
   });
 
   return (
-    <div aria-hidden="true" className="relative">
-      <div dangerouslySetInnerHTML={{ __html: baseSvg }} />
+    <div aria-hidden="true" className="cinematic-anatomy relative">
+      <div className="anatomy-layer anatomy-layer-base" dangerouslySetInnerHTML={{ __html: baseSvg }} />
       <div
-        className="absolute inset-0 opacity-90"
+        className="anatomy-layer anatomy-layer-weekly anatomy-layer-weekly-low absolute inset-0 opacity-90"
         dangerouslySetInnerHTML={{ __html: lowSvg }}
       />
-      <div className="absolute inset-0 opacity-94" dangerouslySetInnerHTML={{ __html: secondarySvg }} />
-      <div className="absolute inset-0 opacity-98" dangerouslySetInnerHTML={{ __html: primarySvg }} />
       <div
-        className="absolute inset-0 opacity-72 drop-shadow-[0_0_3px_rgba(114,255,242,0.52)] drop-shadow-[0_0_10px_rgba(114,255,242,0.24)]"
+        className="anatomy-layer anatomy-layer-weekly anatomy-layer-weekly-mid absolute inset-0 opacity-94"
+        dangerouslySetInnerHTML={{ __html: secondarySvg }}
+      />
+      <div
+        className="anatomy-layer anatomy-layer-weekly anatomy-layer-weekly-high absolute inset-0 opacity-98"
+        dangerouslySetInnerHTML={{ __html: primarySvg }}
+      />
+      <div
+        className="anatomy-layer anatomy-layer-latest anatomy-layer-latest-glow absolute inset-0 opacity-72 drop-shadow-[0_0_3px_rgba(114,255,242,0.52)] drop-shadow-[0_0_10px_rgba(114,255,242,0.24)]"
         dangerouslySetInnerHTML={{ __html: latestGlowOutlineSvg }}
       />
       <div
-        className="absolute inset-0 opacity-72"
+        className="anatomy-layer anatomy-layer-latest anatomy-layer-latest-separator absolute inset-0 opacity-72"
         dangerouslySetInnerHTML={{ __html: latestSeparatorOutlineSvg }}
       />
       <div
-        className="absolute inset-0 opacity-100 drop-shadow-[0_0_3px_rgba(233,255,253,0.3)]"
+        className="anatomy-layer anatomy-layer-latest anatomy-layer-latest-edge absolute inset-0 opacity-100 drop-shadow-[0_0_3px_rgba(233,255,253,0.3)]"
         dangerouslySetInnerHTML={{ __html: latestEdgeOutlineSvg }}
       />
     </div>
