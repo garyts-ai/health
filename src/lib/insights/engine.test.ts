@@ -26,6 +26,13 @@ function makeReadiness(overrides: Partial<DailyReadiness> = {}): DailyReadiness 
     awakeHours: 0.4,
     latestSleepStart: "2026-04-05T03:00:00.000Z",
     latestSleepEnd: "2026-04-05T11:00:00.000Z",
+    sleepStageSummary: {
+      inBedHours: 8.4,
+      awakeHours: 0.4,
+      lightHours: 4.2,
+      deepHours: 1.4,
+      remHours: 2.4,
+    },
     restingHeartRate: 50,
     restingHeartRateVs7d: 0,
     hrvRmssd: 70,

@@ -24,6 +24,8 @@ const ACTIVE_SIGNAL_LABELS: Array<{
   { key: "localFatigueLower", label: "Lower body is still carrying load" },
 ];
 
+const APP_TIME_ZONE = "America/New_York";
+
 function formatHours(value: number | null) {
   return value === null ? "--" : `${value.toFixed(1)}h`;
 }
@@ -68,6 +70,7 @@ function sanitizeTrend(values: Array<number | null>) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -76,6 +79,7 @@ function formatDate(value: string) {
 
 function formatShortDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
     month: "short",
     day: "numeric",
   }).format(new Date(value));
@@ -87,6 +91,7 @@ function formatClockTime(value: string | null) {
   }
 
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
@@ -98,6 +103,7 @@ function formatSyncTime(value: string | null) {
   }
 
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -162,6 +168,40 @@ function formatLatestSessionAge(value: string | null, summaryDate: string) {
   }
 
   return `${daysAgo} days ago`;
+}
+
+function buildSleepStageSegments(summary: DailySummary) {
+  const stages = summary.readiness.sleepStageSummary;
+  if (!stages) {
+    return [];
+  }
+
+  return [
+    {
+      key: "deep",
+      label: "Deep",
+      hours: stages.deepHours,
+      color: "#3f3a8f",
+    },
+    {
+      key: "rem",
+      label: "REM",
+      hours: stages.remHours,
+      color: "#746fe0",
+    },
+    {
+      key: "light",
+      label: "Light",
+      hours: stages.lightHours,
+      color: "#b4aef6",
+    },
+    {
+      key: "awake",
+      label: "Awake",
+      hours: stages.awakeHours,
+      color: "#ff9d7e",
+    },
+  ].filter((stage) => typeof stage.hours === "number" && stage.hours > 0);
 }
 
 function buildReadinessQualifier(summary: DailySummary) {
@@ -305,6 +345,11 @@ export function buildTodayViewModel(
           sleepWindow: {
             startLabel: formatClockTime(summary.readiness.latestSleepStart),
             endLabel: formatClockTime(summary.readiness.latestSleepEnd),
+            stages: buildSleepStageSegments(summary),
+            inBedLabel:
+              typeof summary.readiness.sleepStageSummary?.inBedHours === "number"
+                ? formatHours(summary.readiness.sleepStageSummary.inBedHours)
+                : null,
           },
         },
         {
