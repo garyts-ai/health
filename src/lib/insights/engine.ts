@@ -44,6 +44,9 @@ type WhoopSleepRow = {
   sleep_efficiency_percentage: number | null;
   total_in_bed_time_milli: number | null;
   total_awake_time_milli: number | null;
+  total_light_sleep_time_milli: number | null;
+  total_slow_wave_sleep_time_milli: number | null;
+  total_rem_sleep_time_milli: number | null;
   sleep_needed_baseline_milli: number | null;
   sleep_needed_debt_milli: number | null;
   sleep_needed_strain_milli: number | null;
@@ -165,6 +168,16 @@ function getActualSleepHours(row: WhoopSleepRow | null) {
     return null;
   }
 
+  const stageSleepMillis = sum([
+    row.total_light_sleep_time_milli,
+    row.total_slow_wave_sleep_time_milli,
+    row.total_rem_sleep_time_milli,
+  ]);
+
+  if (stageSleepMillis > 0) {
+    return stageSleepMillis / 3_600_000;
+  }
+
   if (
     typeof row.total_in_bed_time_milli === "number" &&
     typeof row.total_awake_time_milli === "number"
@@ -173,6 +186,33 @@ function getActualSleepHours(row: WhoopSleepRow | null) {
   }
 
   return hoursFromMillis(row.total_in_bed_time_milli);
+}
+
+function buildSleepStageSummary(row: WhoopSleepRow | null): DailyReadiness["sleepStageSummary"] {
+  if (!row) {
+    return null;
+  }
+
+  const values = [
+    row.total_in_bed_time_milli,
+    row.total_awake_time_milli,
+    row.total_light_sleep_time_milli,
+    row.total_slow_wave_sleep_time_milli,
+    row.total_rem_sleep_time_milli,
+  ];
+  const hasAnyStageValue = values.some((value) => typeof value === "number" && value > 0);
+
+  if (!hasAnyStageValue) {
+    return null;
+  }
+
+  return {
+    inBedHours: round(hoursFromMillis(row.total_in_bed_time_milli)),
+    awakeHours: round(hoursFromMillis(row.total_awake_time_milli)),
+    lightHours: round(hoursFromMillis(row.total_light_sleep_time_milli)),
+    deepHours: round(hoursFromMillis(row.total_slow_wave_sleep_time_milli)),
+    remHours: round(hoursFromMillis(row.total_rem_sleep_time_milli)),
+  };
 }
 
 function daysSince(isoDate: string | null) {
@@ -818,7 +858,9 @@ async function buildReadiness(): Promise<DailyReadiness> {
     dbAll<WhoopSleepRow>(
       `
       SELECT start, "end", sleep_performance_percentage, sleep_consistency_percentage,
-             sleep_efficiency_percentage, total_in_bed_time_milli, total_awake_time_milli, sleep_needed_baseline_milli,
+             sleep_efficiency_percentage, total_in_bed_time_milli, total_awake_time_milli,
+             total_light_sleep_time_milli, total_slow_wave_sleep_time_milli, total_rem_sleep_time_milli,
+             sleep_needed_baseline_milli,
              sleep_needed_debt_milli, sleep_needed_strain_milli, sleep_needed_nap_milli
       FROM whoop_sleep_summaries
       WHERE start >= ?
@@ -914,6 +956,7 @@ async function buildReadiness(): Promise<DailyReadiness> {
     awakeHours: round(hoursFromMillis(latestSleep?.total_awake_time_milli ?? null)),
     latestSleepStart: latestSleep?.start ?? null,
     latestSleepEnd: latestSleep?.end ?? null,
+    sleepStageSummary: buildSleepStageSummary(latestSleep),
     restingHeartRate: latestRecovery?.resting_heart_rate ?? null,
     restingHeartRateVs7d:
       latestRecovery?.resting_heart_rate !== null && restingHr7d !== null
@@ -964,9 +1007,14 @@ async function buildMiniTrends() {
       end: string;
       total_in_bed_time_milli: number | null;
       total_awake_time_milli: number | null;
+      total_light_sleep_time_milli: number | null;
+      total_slow_wave_sleep_time_milli: number | null;
+      total_rem_sleep_time_milli: number | null;
     }>(
       `
-      SELECT start, total_in_bed_time_milli, total_awake_time_milli
+      SELECT start, total_in_bed_time_milli, total_awake_time_milli,
+             total_light_sleep_time_milli, total_slow_wave_sleep_time_milli,
+             total_rem_sleep_time_milli
              , "end"
       FROM whoop_sleep_summaries
       WHERE start >= ?
@@ -1014,6 +1062,9 @@ async function buildMiniTrends() {
               sleep_efficiency_percentage: null,
               total_in_bed_time_milli: row.total_in_bed_time_milli,
               total_awake_time_milli: row.total_awake_time_milli,
+              total_light_sleep_time_milli: row.total_light_sleep_time_milli,
+              total_slow_wave_sleep_time_milli: row.total_slow_wave_sleep_time_milli,
+              total_rem_sleep_time_milli: row.total_rem_sleep_time_milli,
               sleep_needed_baseline_milli: null,
               sleep_needed_debt_milli: null,
               sleep_needed_strain_milli: null,
@@ -1054,9 +1105,14 @@ async function buildTrendSeries() {
       end: string;
       total_in_bed_time_milli: number | null;
       total_awake_time_milli: number | null;
+      total_light_sleep_time_milli: number | null;
+      total_slow_wave_sleep_time_milli: number | null;
+      total_rem_sleep_time_milli: number | null;
     }>(
       `
-      SELECT start, total_in_bed_time_milli, total_awake_time_milli
+      SELECT start, total_in_bed_time_milli, total_awake_time_milli,
+             total_light_sleep_time_milli, total_slow_wave_sleep_time_milli,
+             total_rem_sleep_time_milli
              , "end"
       FROM whoop_sleep_summaries
       WHERE start >= ?
@@ -1119,6 +1175,9 @@ async function buildTrendSeries() {
             sleep_efficiency_percentage: null,
             total_in_bed_time_milli: row.total_in_bed_time_milli,
             total_awake_time_milli: row.total_awake_time_milli,
+            total_light_sleep_time_milli: row.total_light_sleep_time_milli,
+            total_slow_wave_sleep_time_milli: row.total_slow_wave_sleep_time_milli,
+            total_rem_sleep_time_milli: row.total_rem_sleep_time_milli,
             sleep_needed_baseline_milli: null,
             sleep_needed_debt_milli: null,
             sleep_needed_strain_milli: null,
@@ -1446,6 +1505,21 @@ function formatSignedPounds(value: number | null) {
   }
 
   return `${value > 0 ? "+" : ""}${value.toFixed(1)} lb`;
+}
+
+function formatSleepStagePrompt(readiness: DailyReadiness) {
+  const stages = readiness.sleepStageSummary;
+  if (!stages) {
+    return "unavailable";
+  }
+
+  return [
+    `Deep ${stages.deepHours ?? "--"}h`,
+    `REM ${stages.remHours ?? "--"}h`,
+    `Light ${stages.lightHours ?? "--"}h`,
+    `Awake ${stages.awakeHours ?? "--"}h`,
+    `In bed ${stages.inBedHours ?? "--"}h`,
+  ].join(", ");
 }
 
 function roundToNearest(value: number, step: number) {
@@ -2279,6 +2353,7 @@ function buildPromptText(summary: DailySummary) {
     "Metrics",
     `- Recovery: ${summary.readiness.recoveryScore ?? "--"}%`,
     `- Sleep: ${summary.readiness.sleepHours ?? "--"}h (${summary.readiness.sleepVsNeedHours ?? "--"}h vs need)`,
+    `- Sleep composition: ${formatSleepStagePrompt(summary.readiness)}`,
     `- Strain: ${summary.strainSummary.score ?? "--"}`,
     `- Overnight: ${summary.overnightRead.label}. ${summary.overnightRead.detail}`,
     `- Weight: ${summary.physiqueDecision.weightTrend.currentLb ?? "--"} lb (${formatSignedPounds(summary.physiqueDecision.weightTrend.weeklyDeltaLb)} vs 7d avg)`,

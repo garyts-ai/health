@@ -30,6 +30,13 @@ const summary: DailySummary = {
     awakeHours: 0.8,
     latestSleepStart: "2026-04-04T03:00:00.000Z",
     latestSleepEnd: "2026-04-04T10:30:00.000Z",
+    sleepStageSummary: {
+      inBedHours: 8.3,
+      awakeHours: 0.8,
+      lightHours: 4.1,
+      deepHours: 1.3,
+      remHours: 2.1,
+    },
     restingHeartRate: 49,
     restingHeartRateVs7d: 1.2,
     hrvRmssd: 78,

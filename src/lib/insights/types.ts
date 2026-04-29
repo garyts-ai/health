@@ -72,6 +72,13 @@ export type DailyReadiness = {
   awakeHours: number | null;
   latestSleepStart: string | null;
   latestSleepEnd: string | null;
+  sleepStageSummary: {
+    inBedHours: number | null;
+    awakeHours: number | null;
+    lightHours: number | null;
+    deepHours: number | null;
+    remHours: number | null;
+  } | null;
   restingHeartRate: number | null;
   restingHeartRateVs7d: number | null;
   hrvRmssd: number | null;

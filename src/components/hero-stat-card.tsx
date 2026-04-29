@@ -12,6 +12,13 @@ type HeroStatCardProps = {
   sleepWindow?: {
     startLabel: string | null;
     endLabel: string | null;
+    inBedLabel?: string | null;
+    stages?: Array<{
+      key: string;
+      label: string;
+      hours: number | null;
+      color: string;
+    }>;
   };
 };
 
@@ -60,6 +67,21 @@ function formatTrendValue(label: string, point: number | null) {
   }
 
   return point.toFixed(1);
+}
+
+function formatStageDuration(hours: number | null | undefined) {
+  if (typeof hours !== "number" || !Number.isFinite(hours)) {
+    return "--";
+  }
+
+  const wholeHours = Math.floor(hours);
+  const minutes = Math.round((hours - wholeHours) * 60);
+
+  if (wholeHours <= 0) {
+    return `${minutes}m`;
+  }
+
+  return minutes === 0 ? `${wholeHours}h` : `${wholeHours}h ${minutes}m`;
 }
 
 function getInterpretation(label: string, point: number | null, index: number, trend: Array<number | null>) {
@@ -155,6 +177,10 @@ export function HeroStatCard({
       ? trend[trend.length - 1]!.toFixed(1)
       : value;
   const sleepCoordinates = buildSleepCoordinates(sleepWindow);
+  const sleepStageSegments = sleepWindow?.stages?.filter(
+    (stage) => typeof stage.hours === "number" && stage.hours > 0,
+  ) ?? [];
+  const sleepStageTotal = sleepStageSegments.reduce((total, stage) => total + (stage.hours ?? 0), 0);
   const bars = trend.map((point) => {
     if (point === null) {
       return { height: 10 };
@@ -210,29 +236,67 @@ export function HeroStatCard({
               </text>
             </svg>
           ) : chartMode === "timeline" ? (
-            <svg aria-hidden="true" viewBox="0 0 320 92" className="h-[96px] w-full max-w-[300px] overflow-visible">
-              <text x="160" y="25" textAnchor="middle" className="fill-[#2f285f] text-[28px] font-semibold">
-                {sleepDurationLabel}
-              </text>
-              <line x1="24" y1="54" x2="296" y2="54" stroke={tone.track} strokeWidth="7" strokeLinecap="round" />
-              <line
-                x1={sleepCoordinates.startX}
-                y1="54"
-                x2={sleepCoordinates.endX}
-                y2="54"
-                stroke={tone.accent}
-                strokeWidth="7"
-                strokeLinecap="round"
-              />
-              <circle cx={sleepCoordinates.startX} cy="54" r="5" fill={tone.accent} />
-              <circle cx={sleepCoordinates.endX} cy="54" r="5" fill="#8d86db" />
-              <text x="24" y="82" className="fill-[#655d85] text-[11px] font-medium">
-                {sleepWindow?.startLabel ?? "--"}
-              </text>
-              <text x="296" y="82" textAnchor="end" className="fill-[#655d85] text-[11px] font-medium">
-                {sleepWindow?.endLabel ?? "--"}
-              </text>
-            </svg>
+            sleepStageSegments.length ? (
+              <div className="w-full max-w-[300px]">
+                <div className="text-center text-[28px] font-semibold leading-none tracking-[-0.04em] text-[#2f285f]">
+                  {sleepDurationLabel}
+                </div>
+                <div className="mt-3 overflow-hidden rounded-full bg-[rgba(95,88,167,0.13)] p-[3px]">
+                  <div className="flex h-3 overflow-hidden rounded-full">
+                    {sleepStageSegments.map((stage) => (
+                      <span
+                        aria-hidden="true"
+                        key={stage.key}
+                        className="block min-w-[3px]"
+                        style={{
+                          width: `${((stage.hours ?? 0) / sleepStageTotal) * 100}%`,
+                          backgroundColor: stage.color,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#655d85]">
+                  <span>{sleepWindow?.startLabel ?? "--"}</span>
+                  <span>{sleepWindow?.endLabel ?? "--"}</span>
+                </div>
+                <div className="mt-2 grid grid-cols-4 gap-1">
+                  {sleepStageSegments.map((stage) => (
+                    <div key={`${stage.key}-stage`} className="min-w-0 rounded-[7px] bg-white/40 px-1.5 py-1 text-center">
+                      <div className="mx-auto mb-0.5 h-1 w-5 rounded-full" style={{ backgroundColor: stage.color }} />
+                      <div className="truncate text-[9px] font-medium text-[#756e8f]">{stage.label}</div>
+                      <div className="text-[10px] font-semibold text-[#332b64]">
+                        {formatStageDuration(stage.hours)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <svg aria-hidden="true" viewBox="0 0 320 92" className="h-[96px] w-full max-w-[300px] overflow-visible">
+                <text x="160" y="25" textAnchor="middle" className="fill-[#2f285f] text-[28px] font-semibold">
+                  {sleepDurationLabel}
+                </text>
+                <line x1="24" y1="54" x2="296" y2="54" stroke={tone.track} strokeWidth="7" strokeLinecap="round" />
+                <line
+                  x1={sleepCoordinates.startX}
+                  y1="54"
+                  x2={sleepCoordinates.endX}
+                  y2="54"
+                  stroke={tone.accent}
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                />
+                <circle cx={sleepCoordinates.startX} cy="54" r="5" fill={tone.accent} />
+                <circle cx={sleepCoordinates.endX} cy="54" r="5" fill="#8d86db" />
+                <text x="24" y="82" className="fill-[#655d85] text-[11px] font-medium">
+                  {sleepWindow?.startLabel ?? "--"}
+                </text>
+                <text x="296" y="82" textAnchor="end" className="fill-[#655d85] text-[11px] font-medium">
+                  {sleepWindow?.endLabel ?? "--"}
+                </text>
+              </svg>
+            )
           ) : (
             <svg aria-hidden="true" viewBox="0 0 260 104" className="h-[96px] w-full max-w-[260px] overflow-visible">
               <text x="130" y="25" textAnchor="middle" className="fill-[#2f285f] text-[28px] font-semibold">
@@ -273,6 +337,15 @@ export function HeroStatCard({
 
           {expanded ? (
             <div className="mt-3 rounded-[9px] border border-[rgba(116,108,152,0.1)] bg-[rgba(255,255,255,0.32)] p-2.5">
+              {label === "Sleep" && sleepWindow?.inBedLabel ? (
+                <div className="mb-2 flex items-center justify-between gap-3 text-[12px]">
+                  <span className="text-[#746d8e]">In-bed window</span>
+                  <span className="font-semibold text-[#2f285f]">{sleepWindow.inBedLabel}</span>
+                  <span className="min-w-[74px] text-right text-[#6b6484]">
+                    {sleepWindow.startLabel ?? "--"} to {sleepWindow.endLabel ?? "--"}
+                  </span>
+                </div>
+              ) : null}
               <div className="grid gap-1.5">
                 {trend.map((point, index) => (
                   <div

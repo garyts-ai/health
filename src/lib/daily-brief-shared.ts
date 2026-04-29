@@ -39,10 +39,26 @@ export function truncateHandoff(value: string, maxLength: number) {
 
 export function formatHandoffDate(isoDate: string) {
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
     weekday: "short",
     month: "short",
     day: "numeric",
   }).format(new Date(isoDate));
+}
+
+function sleepCompositionLine(summary: DailySummary) {
+  const stages = summary.readiness.sleepStageSummary;
+  if (!stages) {
+    return "unavailable";
+  }
+
+  return [
+    `deep ${handoffMetric(stages.deepHours, "h", 1)}`,
+    `REM ${handoffMetric(stages.remHours, "h", 1)}`,
+    `light ${handoffMetric(stages.lightHours, "h", 1)}`,
+    `awake ${handoffMetric(stages.awakeHours, "h", 1)}`,
+    `in bed ${handoffMetric(stages.inBedHours, "h", 1)}`,
+  ].join(", ");
 }
 
 function formatDaysSince(value: number | null) {
@@ -249,6 +265,7 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Recovery 3-day trend: ${handoffMetric(summary.readiness.recoveryTrend3d, "%")}`,
     `- Actual sleep: ${handoffMetric(summary.readiness.sleepHours, "h", 1)}`,
     `- Sleep vs need: ${handoffMetric(summary.readiness.sleepVsNeedHours, "h", 1)}`,
+    `- Sleep composition: ${sleepCompositionLine(summary)}`,
     `- WHOOP day strain: ${handoffMetric(summary.strainSummary.score, "", 1)}`,
     `- Activity context (${summary.activityContext.displayWindowLabel}): ${summary.activityContext.summaryLine}`,
     `- Latest non-lifting activity: ${activityDetail(summary)}`,
