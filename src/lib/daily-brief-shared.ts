@@ -122,9 +122,12 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
       : summary.physiqueDecision.trainingIntent;
   const metricCards: LlmHandoffCard[] = [
     {
-      label: "Train",
-      value: summary.physiqueDecision.trainingTarget,
-      detail: `${intensityDisplay}: ${summary.physiqueDecision.intensityLabel}`,
+      label: "Decision",
+      value:
+        summary.physiqueDecision.trainingAvailability === "Rest"
+          ? "Rest"
+          : summary.physiqueDecision.trainingTarget,
+      detail: `${intensityDisplay}: ${summary.physiqueDecision.primaryDecisionReason}`,
     },
     {
       label: "Recovery",
@@ -234,8 +237,16 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     "- Infer fresh priorities from the data.",
     "",
     "Snapshot",
+    `- Training availability: ${summary.physiqueDecision.trainingAvailability}`,
     `- Training target: ${summary.physiqueDecision.trainingTarget}`,
+    `- Next training target: ${summary.physiqueDecision.nextTrainingTarget}`,
     `- Training target reason: ${summary.physiqueDecision.trainingTargetReason}`,
+    `- Decision reason: ${summary.physiqueDecision.primaryDecisionReason}`,
+    `- Weekly pace: ${summary.physiqueDecision.weeklyPaceLabel}`,
+    `- Days left in week: ${summary.physiqueDecision.daysLeftInWeek}`,
+    `- Lifts needed for 4x: ${summary.physiqueDecision.liftsNeededForGoal}`,
+    `- Can still hit 4x if resting today: ${summary.physiqueDecision.canStillHitWeeklyGoalIfRestToday ? "yes" : "no"}`,
+    `- Decision factors: ${summary.physiqueDecision.decisionFactors.map((factor) => `${factor.label} (${factor.tone}): ${factor.detail}`).join("; ")}`,
     `- Intensity intent: ${intensityDisplay}`,
     `- Intensity cue: ${summary.physiqueDecision.intensityLabel}`,
     `- Session anchors: ${

@@ -7,6 +7,8 @@ type SyncState = "idle" | "pulling" | "syncing" | "success" | "failed";
 
 const PULL_THRESHOLD = 92;
 const MAX_PULL = 132;
+const AUTO_SYNC_COOLDOWN_MS = 60_000;
+const AUTO_SYNC_STORAGE_KEY = "health-os:auto-sync:last-run";
 
 async function syncSource(path: string) {
   const response = await fetch(path, {
@@ -19,12 +21,60 @@ async function syncSource(path: string) {
   }
 }
 
+async function syncAllSources() {
+  const results = await Promise.allSettled([
+    syncSource("/api/whoop/sync"),
+    syncSource("/api/hevy/sync"),
+  ]);
+
+  return results.some((result) => result.status === "fulfilled");
+}
+
 export function MobilePullSync() {
   const router = useRouter();
   const startYRef = useRef<number | null>(null);
   const pullRef = useRef(0);
+  const autoSyncStartedRef = useRef(false);
   const [pull, setPull] = useState(0);
   const [state, setState] = useState<SyncState>("idle");
+
+  useEffect(() => {
+    if (autoSyncStartedRef.current) {
+      return;
+    }
+
+    autoSyncStartedRef.current = true;
+    const lastRun = Number(window.sessionStorage.getItem(AUTO_SYNC_STORAGE_KEY) ?? 0);
+    const now = Date.now();
+
+    if (Number.isFinite(lastRun) && now - lastRun < AUTO_SYNC_COOLDOWN_MS) {
+      return;
+    }
+
+    window.sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(now));
+
+    const runAutoSync = async () => {
+      setState("syncing");
+
+      try {
+        const hadSuccess = await syncAllSources();
+        setState(hadSuccess ? "success" : "failed");
+        if (hadSuccess) {
+          router.refresh();
+        }
+        window.setTimeout(() => setState("idle"), hadSuccess ? 1800 : 2400);
+      } catch {
+        setState("failed");
+        window.setTimeout(() => setState("idle"), 2400);
+      }
+    };
+
+    const timer = window.setTimeout(() => {
+      void runAutoSync();
+    }, 850);
+
+    return () => window.clearTimeout(timer);
+  }, [router]);
 
   useEffect(() => {
     if (!window.matchMedia("(pointer: coarse)").matches) {
@@ -42,10 +92,13 @@ export function MobilePullSync() {
       setState("syncing");
 
       try {
-        await Promise.all([syncSource("/api/whoop/sync"), syncSource("/api/hevy/sync")]);
-        setState("success");
-        router.refresh();
-        window.setTimeout(() => setState("idle"), 1800);
+        const hadSuccess = await syncAllSources();
+        setState(hadSuccess ? "success" : "failed");
+        if (hadSuccess) {
+          window.sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
+          router.refresh();
+        }
+        window.setTimeout(() => setState("idle"), hadSuccess ? 1800 : 2400);
       } catch {
         setState("failed");
         window.setTimeout(() => setState("idle"), 2400);

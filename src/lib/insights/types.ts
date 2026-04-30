@@ -199,7 +199,9 @@ export type DailyStrengthProgression = {
 };
 
 export type DailyPhysiqueDecision = {
+  trainingAvailability: "Train" | "Rest";
   trainingTarget: "Upper" | "Lower" | "Either";
+  nextTrainingTarget: "Upper" | "Lower" | "Either";
   trainingTargetReason: string;
   trainingIntent: "Push" | "Maintain" | "Back off";
   intensityLabel: string;
@@ -208,6 +210,16 @@ export type DailyPhysiqueDecision = {
   calorieTargetLabel: string;
   proteinTargetLabel: string;
   mainBottleneck: string;
+  primaryDecisionReason: string;
+  daysLeftInWeek: number;
+  liftsNeededForGoal: number;
+  canStillHitWeeklyGoalIfRestToday: boolean;
+  weeklyPaceLabel: string;
+  decisionFactors: Array<{
+    label: string;
+    tone: "positive" | "caution" | "neutral";
+    detail: string;
+  }>;
   weightTrend: DailyWeightTrend;
   strengthProgression: DailyStrengthProgression[];
   weeklyScorecard: Array<{

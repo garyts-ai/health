@@ -152,7 +152,9 @@ const summary: DailySummary = {
     ],
   },
   physiqueDecision: {
+    trainingAvailability: "Train",
     trainingTarget: "Lower",
+    nextTrainingTarget: "Lower",
     trainingTargetReason: "Lower is due based on split recency: upper 1d, lower 2d.",
     trainingIntent: "Maintain",
     intensityLabel: "Keep normal volume, no forced PRs",
@@ -161,6 +163,23 @@ const summary: DailySummary = {
     calorieTargetLabel: "2500 cal",
     proteinTargetLabel: "150g",
     mainBottleneck: "Consistency is the main lever: hit volume, protein, and a stable calorie target.",
+    primaryDecisionReason: "Train lower if you want the session today, but there is no need to force a PR.",
+    daysLeftInWeek: 3,
+    liftsNeededForGoal: 0,
+    canStillHitWeeklyGoalIfRestToday: true,
+    weeklyPaceLabel: "Weekly lift target already met",
+    decisionFactors: [
+      {
+        label: "Schedule flexible",
+        tone: "positive",
+        detail: "Weekly lift target already met",
+      },
+      {
+        label: "Split recency",
+        tone: "neutral",
+        detail: "Upper 1d / Lower 2d",
+      },
+    ],
     weightTrend: {
       currentLb: 162,
       average7dLb: 161.8,

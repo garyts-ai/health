@@ -23,7 +23,8 @@ export function buildDiscordSummaryText(summary: DailySummary) {
 
   return [
     `**Daily Health Brief - ${formatHandoffDate(summary.date)}**`,
-    `Decision: Train ${summary.physiqueDecision.trainingTarget} | ${summary.physiqueDecision.trainingIntent === "Push" ? "Progress" : summary.physiqueDecision.trainingIntent} intensity | ${summary.physiqueDecision.intensityLabel}`,
+    `Decision: ${summary.physiqueDecision.trainingAvailability === "Rest" ? "Rest today" : `Train ${summary.physiqueDecision.trainingTarget}`} | ${summary.physiqueDecision.trainingIntent === "Push" ? "Progress" : summary.physiqueDecision.trainingIntent} | ${summary.physiqueDecision.primaryDecisionReason}`,
+    `Schedule: ${summary.physiqueDecision.weeklyPaceLabel} | ${summary.physiqueDecision.liftsNeededForGoal} lifts needed | ${summary.physiqueDecision.daysLeftInWeek} days left`,
     `Session anchors: ${summary.physiqueDecision.sessionAnchors.length > 0 ? summary.physiqueDecision.sessionAnchors.slice(0, 4).join(", ") : "Use planned main lifts"}`,
     `Nutrition: ${summary.nutritionActuals.hasLoggedIntake ? `${summary.nutritionActuals.calories}/${summary.nutritionActuals.calorieTarget ?? "--"} cal | ${summary.nutritionActuals.proteinG}/${summary.nutritionActuals.proteinTargetG ?? "--"}g protein` : `${summary.physiqueDecision.calorieTargetLabel} (${summary.physiqueDecision.calorieRecommendation}) | Protein ${summary.physiqueDecision.proteinTargetLabel}`}`,
     `Recovery ${handoffMetric(summary.readiness.recoveryScore, "%")} | Sleep ${handoffMetric(summary.readiness.sleepHours, "h", 1)} (${handoffMetric(summary.readiness.sleepVsNeedHours, "h", 1)} vs need) | Strain ${handoffMetric(summary.strainSummary.score, "", 1)}`,

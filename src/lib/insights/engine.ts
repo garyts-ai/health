@@ -20,6 +20,7 @@ import type {
   DailyFreshness,
   DailyLateNightDisruption,
   DailyReadiness,
+  DailyPhysiqueDecision,
   DailyRecommendation,
   RecommendationActionTile,
   DailyStressFlags,
@@ -27,7 +28,6 @@ import type {
   DailyTrainingLoad,
   DailyNutritionTargets,
   DailyNutritionActuals,
-  DailyPhysiqueDecision,
   DailyStrengthProgression,
   DailyWeightTrend,
   TrendPoint,
@@ -1507,6 +1507,158 @@ function formatSignedPounds(value: number | null) {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)} lb`;
 }
 
+const WEEKLY_LIFT_GOAL = 4;
+
+function getNewYorkWeekdayIndex(date = new Date()) {
+  const weekday = NEW_YORK_WEEKDAY.format(date);
+  const index = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday);
+  return index === -1 ? 0 : index;
+}
+
+function formatSplitRecency(trainingLoad: DailyTrainingLoad) {
+  return `upper ${
+    trainingLoad.upperBodyDaysSince === null ? "not recent" : `${trainingLoad.upperBodyDaysSince}d`
+  }, lower ${
+    trainingLoad.lowerBodyDaysSince === null ? "not recent" : `${trainingLoad.lowerBodyDaysSince}d`
+  }`;
+}
+
+function chooseTrainingTarget(trainingLoad: DailyTrainingLoad): DailyPhysiqueDecision["trainingTarget"] {
+  const upperDays = trainingLoad.upperBodyDaysSince ?? 99;
+  const lowerDays = trainingLoad.lowerBodyDaysSince ?? 99;
+
+  if (upperDays === 99 && lowerDays === 99) {
+    return "Either";
+  }
+
+  if (lowerDays > upperDays) {
+    return "Lower";
+  }
+
+  if (upperDays > lowerDays) {
+    return "Upper";
+  }
+
+  return trainingLoad.hevyLastWorkoutTitle?.toLowerCase().includes("upper") ? "Lower" : "Upper";
+}
+
+function buildScheduleEvidence(
+  trainingLoad: DailyTrainingLoad,
+  now = new Date(),
+) {
+  const weekdayIndex = getNewYorkWeekdayIndex(now);
+  const daysLeftInWeek = 7 - weekdayIndex;
+  const daysAfterToday = Math.max(0, daysLeftInWeek - 1);
+  const liftsCompleted = trainingLoad.hevyWorkoutCountThisWeek;
+  const liftsNeededForGoal = Math.max(0, WEEKLY_LIFT_GOAL - liftsCompleted);
+  const canStillHitWeeklyGoalIfRestToday =
+    liftsCompleted >= WEEKLY_LIFT_GOAL || liftsCompleted + daysAfterToday >= WEEKLY_LIFT_GOAL;
+  const isBehindPace = liftsNeededForGoal > daysLeftInWeek - 1;
+  const isOnPace = liftsNeededForGoal <= daysLeftInWeek;
+  const weeklyPaceLabel =
+    liftsCompleted >= WEEKLY_LIFT_GOAL
+      ? "Weekly lift target already met"
+      : canStillHitWeeklyGoalIfRestToday
+        ? `${liftsNeededForGoal} lifts needed with ${daysAfterToday} days after today`
+        : `Behind pace: ${liftsNeededForGoal} lifts needed and schedule pressure is high`;
+
+  return {
+    daysLeftInWeek,
+    daysAfterToday,
+    liftsNeededForGoal,
+    canStillHitWeeklyGoalIfRestToday,
+    isBehindPace,
+    isOnPace,
+    weeklyPaceLabel,
+  };
+}
+
+function buildDecisionFactors(
+  readiness: DailyReadiness,
+  trainingLoad: DailyTrainingLoad,
+  activityContext: DailyActivityContext,
+  stressFlags: DailyStressFlags,
+  lateNightDisruption: DailyLateNightDisruption,
+  schedule: ReturnType<typeof buildScheduleEvidence>,
+): DailyPhysiqueDecision["decisionFactors"] {
+  const factors: DailyPhysiqueDecision["decisionFactors"] = [];
+
+  factors.push({
+    label: schedule.canStillHitWeeklyGoalIfRestToday ? "Schedule flexible" : "Schedule pressure",
+    tone: schedule.canStillHitWeeklyGoalIfRestToday ? "positive" : "caution",
+    detail: schedule.weeklyPaceLabel,
+  });
+
+  if (lateNightDisruption.likelyLane === "illness_like") {
+    factors.push({
+      label: "Illness-like physiology",
+      tone: "caution",
+      detail: lateNightDisruption.blurb,
+    });
+  } else if (stressFlags.illnessRisk) {
+    factors.push({
+      label: "Physiology caution",
+      tone: "caution",
+      detail: lateNightDisruption.active
+        ? lateNightDisruption.blurb
+        : "Recovery markers are off enough to treat today conservatively.",
+    });
+  } else if (stressFlags.lowRecovery) {
+    factors.push({
+      label: "Recovery suppressed",
+      tone: "caution",
+      detail: `Recovery ${readiness.recoveryScore ?? "--"}%`,
+    });
+  }
+
+  if (stressFlags.poorSleepTrend) {
+    factors.push({
+      label: "Sleep gap",
+      tone: "caution",
+      detail: `${readiness.sleepVsNeedHours ?? "--"}h vs need, awake ${readiness.awakeHours ?? "--"}h`,
+    });
+  }
+
+  if (stressFlags.highTrainingLoad) {
+    factors.push({
+      label: "Lifting load stacked",
+      tone: "caution",
+      detail: `${trainingLoad.hevyWorkoutCount7d} lifts / ${trainingLoad.hevySetCount7d} sets in 7d`,
+    });
+  }
+
+  if (activityContext.hasActivity && !activityContext.fallbackUsed && activityContext.totalStrain >= 8) {
+    const latest = activityContext.latestSession;
+    factors.push({
+      label: latest?.kind === "tennis" ? "Tennis load" : "Conditioning load",
+      tone: "caution",
+      detail: `${activityContext.displayWindowLabel}: strain ${activityContext.totalStrain.toFixed(1)}`,
+    });
+  }
+
+  if (trainingLoad.hevyWorkoutCountThisWeek < WEEKLY_LIFT_GOAL) {
+    factors.push({
+      label: "Weekly lift goal",
+      tone: schedule.isBehindPace ? "caution" : "neutral",
+      detail: `${trainingLoad.hevyWorkoutCountThisWeek}/${WEEKLY_LIFT_GOAL} lifts Mon-Sun`,
+    });
+  } else {
+    factors.push({
+      label: "Weekly lift goal",
+      tone: "positive",
+      detail: `${trainingLoad.hevyWorkoutCountThisWeek}/${WEEKLY_LIFT_GOAL} lifts complete`,
+    });
+  }
+
+  factors.push({
+    label: "Split recency",
+    tone: "neutral",
+    detail: formatSplitRecency(trainingLoad),
+  });
+
+  return factors.slice(0, 6);
+}
+
 function formatSleepStagePrompt(readiness: DailyReadiness) {
   const stages = readiness.sleepStageSummary;
   if (!stages) {
@@ -1621,21 +1773,42 @@ async function buildNutritionActuals(
   };
 }
 
-function buildPhysiqueDecision(
+export function buildPhysiqueDecision(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
   stressFlags: DailyStressFlags,
+  lateNightDisruption: DailyLateNightDisruption,
+  activityContext: DailyActivityContext,
   nutritionTargets: DailyNutritionTargets,
   nutritionActuals: DailyNutritionActuals,
   strengthProgression: DailyStrengthProgression[],
+  now = new Date(),
 ): DailyPhysiqueDecision {
   const weightTrend = buildWeightTrend(readiness);
+  const schedule = buildScheduleEvidence(trainingLoad, now);
+  const nextTrainingTarget = chooseTrainingTarget(trainingLoad);
+  const latestCurrentWeekActivity =
+    activityContext.hasActivity && !activityContext.fallbackUsed ? activityContext.latestSession : null;
+  const currentWeekActivityLoad =
+    activityContext.hasActivity && !activityContext.fallbackUsed ? activityContext.totalStrain : 0;
   const poorSystemicReadiness =
-    stressFlags.illnessRisk ||
     stressFlags.lowRecovery ||
-    ((readiness.sleepVsNeedHours ?? 0) <= -1.25 && (readiness.recoveryScore ?? 100) < 55);
+    lateNightDisruption.active ||
+    ((readiness.sleepVsNeedHours ?? 0) <= -1.25 && (readiness.recoveryScore ?? 100) < 55) ||
+    ((readiness.restingHeartRateVs7d ?? 0) >= 4 && (readiness.sleepVsNeedHours ?? 0) <= -0.75);
+  const clearIllnessSignal = lateNightDisruption.likelyLane === "illness_like";
+  const physiologyRisk = stressFlags.illnessRisk || clearIllnessSignal;
+  const conditioningFatigue =
+    currentWeekActivityLoad >= 10 ||
+    ((latestCurrentWeekActivity?.kind === "tennis" || latestCurrentWeekActivity?.kind === "other_conditioning") &&
+      (latestCurrentWeekActivity?.strain ?? 0) >= 8);
+  const highLoadPressure =
+    stressFlags.highTrainingLoad ||
+    trainingLoad.hevyConsecutiveDays >= 3 ||
+    trainingLoad.recentLoadSpike ||
+    (readiness.whoopDayStrainVs7d ?? 0) >= 4;
   const trainedRecently = trainingLoad.upperBodyDaysSince === 0 || trainingLoad.lowerBodyDaysSince === 0;
-  const lowWeeklyFrequency = trainingLoad.hevyWorkoutCount7d < 3;
+  const lowWeeklyFrequency = trainingLoad.hevyWorkoutCountThisWeek < WEEKLY_LIFT_GOAL;
   const strengthDown = strengthProgression.some((item) => item.trend === "down");
   const strengthUp = strengthProgression.some((item) => item.trend === "up");
   const proteinGap =
@@ -1646,44 +1819,61 @@ function buildPhysiqueDecision(
     nutritionActuals.hasLoggedIntake &&
     nutritionActuals.remainingCalories !== null &&
     nutritionActuals.remainingCalories >= 900;
-  const upperDays = trainingLoad.upperBodyDaysSince ?? 99;
-  const lowerDays = trainingLoad.lowerBodyDaysSince ?? 99;
+  const shouldRest =
+    physiologyRisk ||
+    ((poorSystemicReadiness || (conditioningFatigue && stressFlags.poorSleepTrend)) &&
+      schedule.canStillHitWeeklyGoalIfRestToday);
+  const trainingAvailability: DailyPhysiqueDecision["trainingAvailability"] = shouldRest ? "Rest" : "Train";
   const trainingTarget: DailyPhysiqueDecision["trainingTarget"] =
-    upperDays === 99 && lowerDays === 99
-      ? "Either"
-      : lowerDays > upperDays
-        ? "Lower"
-        : upperDays > lowerDays
-          ? "Upper"
-          : trainingLoad.hevyLastWorkoutTitle?.toLowerCase().includes("upper")
-            ? "Lower"
-            : "Upper";
+    trainingAvailability === "Rest" ? "Either" : nextTrainingTarget;
   const sessionAnchors =
-    trainingTarget === "Lower"
+    nextTrainingTarget === "Lower"
       ? trainingLoad.lowerSessionAnchors
-      : trainingTarget === "Upper"
+      : nextTrainingTarget === "Upper"
         ? trainingLoad.upperSessionAnchors
         : [];
   const trainingTargetReason =
-    trainingTarget === "Either"
+    nextTrainingTarget === "Either"
       ? "No clear upper/lower recency exists yet, so use warm-up feel and the planned split."
-      : `${trainingTarget} is due based on split recency: upper ${
-          trainingLoad.upperBodyDaysSince === null ? "not recent" : `${trainingLoad.upperBodyDaysSince}d`
-        }, lower ${
-          trainingLoad.lowerBodyDaysSince === null ? "not recent" : `${trainingLoad.lowerBodyDaysSince}d`
-        }.`;
+      : `${nextTrainingTarget} is due based on split recency: ${formatSplitRecency(trainingLoad)}.`;
 
-  const trainingIntent: DailyPhysiqueDecision["trainingIntent"] = poorSystemicReadiness
-    ? "Back off"
-    : lowWeeklyFrequency && !trainedRecently
-      ? "Push"
-      : "Maintain";
+  const trainingIntent: DailyPhysiqueDecision["trainingIntent"] =
+    trainingAvailability === "Rest" || poorSystemicReadiness || conditioningFatigue || highLoadPressure
+      ? "Back off"
+      : lowWeeklyFrequency && !trainedRecently && schedule.isBehindPace
+        ? "Push"
+        : "Maintain";
   const intensityLabel =
+    trainingAvailability === "Rest"
+      ? schedule.canStillHitWeeklyGoalIfRestToday
+        ? "Save the lift for a better recovery window"
+        : "Rest if symptoms are obvious; otherwise keep it very easy"
+      :
     trainingIntent === "Push"
       ? "Add load or reps if warm-up is normal"
       : trainingIntent === "Back off"
         ? "Cap hard sets; preserve the week"
         : "Keep normal volume, no forced PRs";
+  const decisionFactors = buildDecisionFactors(
+    readiness,
+    trainingLoad,
+    activityContext,
+    stressFlags,
+    lateNightDisruption,
+    schedule,
+  );
+  const primaryDecisionReason =
+    clearIllnessSignal
+      ? "Rest today: physiology looks illness-like, so preserving recovery beats chasing volume."
+      : stressFlags.illnessRisk
+        ? "Rest today: physiology is sharply off, so preserving recovery beats chasing volume."
+      : trainingAvailability === "Rest"
+        ? `Rest today: recovery is compromised and ${schedule.weeklyPaceLabel.toLowerCase()}, so you can preserve a better lift.`
+        : poorSystemicReadiness
+          ? `Train only if needed: recovery is compromised, but ${schedule.weeklyPaceLabel.toLowerCase()}.`
+          : schedule.isBehindPace
+            ? `Train ${nextTrainingTarget.toLowerCase()} today: the week is behind pace and readiness is acceptable.`
+            : `Train ${nextTrainingTarget.toLowerCase()} if you want, but the week does not require a forced push.`;
 
   const calorieRecommendation: DailyPhysiqueDecision["calorieRecommendation"] =
     nutritionTargets.effectiveCalorieTarget === null
@@ -1697,6 +1887,8 @@ function buildPhysiqueDecision(
   const mainBottleneck =
     nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
       ? "Body weight is missing, so nutrition targets still need a manual baseline."
+      : trainingAvailability === "Rest"
+        ? primaryDecisionReason
       : poorSystemicReadiness
         ? "Systemic recovery is the limiter; keep training productive but not heroic."
       : proteinGap
@@ -1704,7 +1896,7 @@ function buildPhysiqueDecision(
       : calorieGap
         ? "Calories are still light today; keep the meal plan aligned with the session."
       : lowWeeklyFrequency
-          ? `${trainingTarget} is the split target; recent training frequency is behind the physique goal.`
+          ? `${nextTrainingTarget} is the split target; recent training frequency is behind the physique goal.`
           : strengthDown
             ? "Progression is soft on at least one key lift; check food, sleep, and exercise selection."
             : strengthUp
@@ -1715,8 +1907,8 @@ function buildPhysiqueDecision(
     {
       label: "Lifts",
       value: `${trainingLoad.hevyWorkoutCountThisWeek}/4`,
-      detail: `${trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
-      status: trainingLoad.hevyWorkoutCountThisWeek >= 3 ? "good" : "watch",
+      detail: `${schedule.liftsNeededForGoal} needed / ${schedule.daysLeftInWeek} days left`,
+      status: trainingLoad.hevyWorkoutCountThisWeek >= WEEKLY_LIFT_GOAL ? "good" : "watch",
     },
     {
       label: "Weight trend",
@@ -1773,7 +1965,9 @@ function buildPhysiqueDecision(
   ];
 
   return {
+    trainingAvailability,
     trainingTarget,
+    nextTrainingTarget,
     trainingTargetReason,
     trainingIntent,
     intensityLabel,
@@ -1788,6 +1982,12 @@ function buildPhysiqueDecision(
         ? "Set target"
         : `${nutritionTargets.effectiveProteinTargetG}g`,
     mainBottleneck,
+    primaryDecisionReason,
+    daysLeftInWeek: schedule.daysLeftInWeek,
+    liftsNeededForGoal: schedule.liftsNeededForGoal,
+    canStillHitWeeklyGoalIfRestToday: schedule.canStillHitWeeklyGoalIfRestToday,
+    weeklyPaceLabel: schedule.weeklyPaceLabel,
+    decisionFactors,
     weightTrend,
     strengthProgression,
     weeklyScorecard,
@@ -1858,16 +2058,20 @@ function buildRecommendations(
   const stalePenalty = Number(freshness.whoop.isStale) + Number(freshness.hevy.isStale);
   const items: DailyRecommendation[] = [];
 
-  if (stressFlags.illnessRisk || stressFlags.lowRecovery) {
+  if (physiqueDecision.trainingAvailability === "Rest") {
+    const nextTarget =
+      physiqueDecision.nextTrainingTarget === "Either"
+        ? "planned split"
+        : `${physiqueDecision.nextTrainingTarget.toLowerCase()} day`;
     items.push(
       recommendation(
         "training",
-        "Keep training easy or rest today",
-        "Favor a recovery day, easy walk, mobility, or a light technique session instead of a hard lift.",
+        "Rest today and preserve the next lift",
+        `Use today as a recovery day so the next ${nextTarget} can be higher quality.`,
         [
-          "Favor a recovery day or full rest",
+          "Save the lift for a better recovery window",
           "Use an easy walk or mobility session if you want movement",
-          "Only do light technique work if your warm-up feels clearly better",
+          "Only do light technique if symptoms and warm-up clearly improve",
         ],
         [
           { label: "Rest", icon: "rest" },
@@ -1875,11 +2079,11 @@ function buildRecommendations(
           { label: "Technique", icon: "technique" },
         ],
         undefined,
-        "Your recovery signals and recent stress do not support a hard session today.",
+        physiqueDecision.primaryDecisionReason,
         [
-          `Recovery ${readiness.recoveryScore ?? "--"}`,
-          `Sleep gap ${readiness.sleepVsNeedHours ?? "--"}h`,
-          `RHR delta ${readiness.restingHeartRateVs7d ?? "--"}`,
+          `Week ${trainingLoad.hevyWorkoutCountThisWeek}/4 lifts`,
+          `${physiqueDecision.liftsNeededForGoal} needed`,
+          `${physiqueDecision.daysLeftInWeek} days left`,
         ],
         3 - stalePenalty,
         "high",
@@ -2323,8 +2527,16 @@ function buildPromptText(summary: DailySummary) {
     "- Physique progression without ignoring recovery.",
     "",
     "Decision layer",
+    `- Training availability: ${summary.physiqueDecision.trainingAvailability}`,
     `- Training target: ${summary.physiqueDecision.trainingTarget}`,
+    `- Next training target: ${summary.physiqueDecision.nextTrainingTarget}`,
     `- Training target reason: ${summary.physiqueDecision.trainingTargetReason}`,
+    `- Decision reason: ${summary.physiqueDecision.primaryDecisionReason}`,
+    `- Weekly pace: ${summary.physiqueDecision.weeklyPaceLabel}`,
+    `- Lifts needed for 4x: ${summary.physiqueDecision.liftsNeededForGoal}`,
+    `- Days left in week: ${summary.physiqueDecision.daysLeftInWeek}`,
+    `- Can still hit 4x if resting today: ${summary.physiqueDecision.canStillHitWeeklyGoalIfRestToday ? "yes" : "no"}`,
+    `- Decision factors: ${summary.physiqueDecision.decisionFactors.map((factor) => `${factor.label} (${factor.tone}): ${factor.detail}`).join("; ")}`,
     `- Intensity intent: ${intensityDisplay}`,
     `- Intensity cue: ${summary.physiqueDecision.intensityLabel}`,
     `- Session anchors: ${
@@ -2402,14 +2614,6 @@ export async function getDailySummary(): Promise<DailySummary> {
   const nutritionTargets = buildNutritionTargets(await getNutritionTargets(), readiness, trainingLoad);
   const nutritionActuals = await buildNutritionActuals(dateKey, nutritionTargets);
   const strengthProgression = buildStrengthProgression(await getRecentHevyWorkouts(90));
-  const physiqueDecision = buildPhysiqueDecision(
-    readiness,
-    trainingLoad,
-    stressFlags,
-    nutritionTargets,
-    nutritionActuals,
-    strengthProgression,
-  );
   const lateNightDisruption = deriveLateNightDisruption(readiness, stressFlags);
   const overnightRead = buildOvernightRead(lateNightDisruption, readiness);
   const [strainSummary, bodyCard, activityContext] = await Promise.all([
@@ -2417,6 +2621,17 @@ export async function getDailySummary(): Promise<DailySummary> {
     buildBodyCard(readiness),
     buildActivityContext(now),
   ]);
+  const physiqueDecision = buildPhysiqueDecision(
+    readiness,
+    trainingLoad,
+    stressFlags,
+    lateNightDisruption,
+    activityContext,
+    nutritionTargets,
+    nutritionActuals,
+    strengthProgression,
+    now,
+  );
   const recommendations = buildRecommendations(
     readiness,
     trainingLoad,
