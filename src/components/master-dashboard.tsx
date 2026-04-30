@@ -393,14 +393,24 @@ export async function MasterDashboard({
                     {vm.hero.decision.intensityIntentLabel}: {vm.hero.decision.intensity}
                   </div>
                   <div className="mt-2 max-w-[42rem] text-[13px] leading-5 text-white/66">
-                    {vm.hero.decision.targetReason} {vm.hero.decision.bottleneck}
+                    {vm.hero.decision.targetReason}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {vm.hero.decision.decisionFactors.slice(0, 3).map((factor) => (
+                      <span
+                        key={factor.label}
+                        className="rounded-[9px] border border-white/12 bg-[rgba(17,10,38,0.20)] px-2.5 py-1 text-[11px] text-white/70"
+                      >
+                        {factor.label}: {factor.detail}
+                      </span>
+                    ))}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[16px] bg-white/10 ring-1 ring-white/14 sm:hidden">
                     {[
-                      ["Train", vm.hero.decision.train],
+                      ["Call", vm.hero.decision.train],
                       ["Intent", vm.hero.decision.intensityIntentLabel],
-                      ["Calories", vm.hero.decision.calories],
-                      ["Protein", vm.hero.decision.protein],
+                      ["Next", vm.hero.decision.nextTrainingTarget],
+                      ["Pace", vm.hero.decision.scheduleLabel],
                     ].map(([label, value]) => (
                       <div key={label} className="bg-[rgba(17,10,38,0.24)] px-3 py-2.5">
                         <div className="text-[10px] text-white/46">{label}</div>
@@ -414,13 +424,15 @@ export async function MasterDashboard({
 
                 <div className="hidden grid-cols-2 gap-px overflow-hidden rounded-[18px] bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/14 sm:grid">
                   {[
-                    ["Train", vm.hero.decision.train],
+                    ["Call", vm.hero.decision.train],
                     ["Intensity", vm.hero.decision.intensityIntentLabel],
+                    ["Pace", vm.hero.decision.scheduleLabel],
+                    ["Next split", vm.hero.decision.nextTrainingTarget],
                     ["Calories", vm.hero.decision.calories],
                     ["Protein", vm.hero.decision.protein],
                     ["Intake", vm.hero.decision.intake],
                     ["Remaining", vm.hero.decision.remaining],
-                    ["Anchors", vm.hero.decision.sessionAnchorsLabel],
+                    [vm.hero.decision.availability === "Rest" ? "Next lift" : "Anchors", vm.hero.decision.sessionAnchorsLabel],
                     ["Latest", `${vm.hero.workoutLabel} / ${vm.hero.latestSessionAgeLabel}`],
                   ].map(([label, value]) => (
                     <div key={label} className="bg-[rgba(17,10,38,0.24)] px-3 py-2.5 backdrop-blur-md">

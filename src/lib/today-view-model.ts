@@ -293,7 +293,12 @@ export function buildTodayViewModel(
     },
     hero: {
       decision: {
-        train: summary.physiqueDecision.trainingTarget,
+        availability: summary.physiqueDecision.trainingAvailability,
+        train:
+          summary.physiqueDecision.trainingAvailability === "Rest"
+            ? "Rest"
+            : summary.physiqueDecision.trainingTarget,
+        nextTrainingTarget: summary.physiqueDecision.nextTrainingTarget,
         intensity: summary.physiqueDecision.intensityLabel,
         intensityIntent: summary.physiqueDecision.trainingIntent,
         intensityIntentLabel:
@@ -314,10 +319,15 @@ export function buildTodayViewModel(
             ? `${summary.nutritionActuals.remainingCalories ?? "--"} cal / ${summary.nutritionActuals.remainingProteinG ?? "--"}g protein`
             : "No meals logged",
         bottleneck: summary.physiqueDecision.mainBottleneck,
-        targetReason: summary.physiqueDecision.trainingTargetReason,
+        targetReason: summary.physiqueDecision.primaryDecisionReason,
+        splitReason: summary.physiqueDecision.trainingTargetReason,
+        scheduleLabel: summary.physiqueDecision.weeklyPaceLabel,
+        decisionFactors: summary.physiqueDecision.decisionFactors,
         sessionAnchors: summary.physiqueDecision.sessionAnchors,
         sessionAnchorsLabel:
-          summary.physiqueDecision.sessionAnchors.length > 0
+          summary.physiqueDecision.trainingAvailability === "Rest"
+            ? `Next: ${summary.physiqueDecision.nextTrainingTarget}`
+            : summary.physiqueDecision.sessionAnchors.length > 0
             ? summary.physiqueDecision.sessionAnchors.slice(0, 3).join(" / ")
             : "Use planned main lifts",
       },
@@ -389,7 +399,9 @@ export function buildTodayViewModel(
           : "Weekly training map will populate after the first logged session.",
       weeklyFocusEmptyMessage: "No lifts logged yet this week",
       todayCall:
-        summary.physiqueDecision.trainingTarget === "Either"
+        summary.physiqueDecision.trainingAvailability === "Rest"
+          ? "Rest today"
+          : summary.physiqueDecision.trainingTarget === "Either"
           ? "Upper or lower"
           : `${summary.physiqueDecision.trainingTarget} day`,
     },

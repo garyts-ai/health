@@ -4,10 +4,19 @@ import test from "node:test";
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
 import {
   buildActivityContextFromRows,
+  buildPhysiqueDecision,
   classifyWhoopActivity,
   inferBuckets,
 } from "@/lib/insights/engine";
-import type { DailyReadiness, DailyStressFlags, DailyTrainingLoad } from "@/lib/insights/types";
+import type {
+  DailyActivityContext,
+  DailyLateNightDisruption,
+  DailyNutritionActuals,
+  DailyNutritionTargets,
+  DailyReadiness,
+  DailyStressFlags,
+  DailyTrainingLoad,
+} from "@/lib/insights/types";
 
 function makeReadiness(overrides: Partial<DailyReadiness> = {}): DailyReadiness {
   return {
@@ -89,6 +98,66 @@ function makeStressFlags(overrides: Partial<DailyStressFlags> = {}): DailyStress
     ...overrides,
   };
 }
+
+function makeLateNight(
+  overrides: Partial<DailyLateNightDisruption> = {},
+): DailyLateNightDisruption {
+  return {
+    active: false,
+    severity: "low",
+    confidence: "low",
+    likelyLane: "none",
+    headline: "No late-night disruption",
+    blurb: "Sleep and physiology do not suggest a major overnight disruption.",
+    supportingMetrics: [],
+    ...overrides,
+  };
+}
+
+function makeActivityContext(overrides: Partial<DailyActivityContext> = {}): DailyActivityContext {
+  return {
+    displayWindowLabel: "This week",
+    currentWeekHasActivity: false,
+    fallbackUsed: false,
+    hasActivity: false,
+    summaryLine: "No walks, tennis, or conditioning logged this week.",
+    interpretation: "No extra conditioning load is affecting today.",
+    latestSession: null,
+    buckets: [],
+    days: [],
+    totalSessions: 0,
+    totalDurationMinutes: 0,
+    totalStrain: 0,
+    totalDistanceMeter: null,
+    ...overrides,
+  };
+}
+
+const nutritionTargets: DailyNutritionTargets = {
+  calorieTarget: 2450,
+  proteinTargetG: 160,
+  effectiveCalorieTarget: 2450,
+  effectiveProteinTargetG: 160,
+  smartCalorieTarget: 2450,
+  smartProteinTargetG: 160,
+  targetSource: "smart",
+  smartReason: "Smart target from body weight and training goal.",
+  updatedAt: null,
+};
+
+const nutritionActuals: DailyNutritionActuals = {
+  dateKey: "2026-04-27",
+  calories: 0,
+  proteinG: 0,
+  carbsG: 0,
+  fatG: 0,
+  remainingCalories: 2450,
+  remainingProteinG: 160,
+  calorieTarget: 2450,
+  proteinTargetG: 160,
+  hasLoggedIntake: false,
+  entries: [],
+};
 
 test("readiness fixture defaults to supportive recovery", () => {
   const readiness = makeReadiness();
@@ -247,6 +316,181 @@ test("activity context exposes a quiet empty state when no non-lifting activity 
   assert.equal(context.hasActivity, false);
   assert.equal(context.latestSession, null);
   assert.match(context.summaryLine, /No walks, tennis, or conditioning logged/);
+});
+
+test("physique decision rests on poor recovery when the weekly goal is still reachable", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness({ recoveryScore: 28, sleepVsNeedHours: -1.6, restingHeartRateVs7d: 5 }),
+    makeTraining({
+      hevyWorkoutCountThisWeek: 1,
+      upperBodyDaysSince: 1,
+      lowerBodyDaysSince: 3,
+    }),
+    makeStressFlags({ lowRecovery: true, poorSleepTrend: true, elevatedRestingHeartRate: true }),
+    makeLateNight({ active: true, severity: "medium", confidence: "medium", likelyLane: "hangover_like" }),
+    makeActivityContext(),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-04-27T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Rest");
+  assert.equal(decision.nextTrainingTarget, "Lower");
+  assert.equal(decision.canStillHitWeeklyGoalIfRestToday, true);
+  assert.match(decision.primaryDecisionReason, /Rest today/);
+});
+
+test("physique decision trains with a back-off intent when poor recovery meets schedule pressure", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness({ recoveryScore: 30, sleepVsNeedHours: -1.4 }),
+    makeTraining({
+      hevyWorkoutCountThisWeek: 1,
+      upperBodyDaysSince: 3,
+      lowerBodyDaysSince: 1,
+    }),
+    makeStressFlags({ lowRecovery: true, poorSleepTrend: true }),
+    makeLateNight({ active: true, severity: "medium", confidence: "medium", likelyLane: "hangover_like" }),
+    makeActivityContext(),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-05-02T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Train");
+  assert.equal(decision.trainingTarget, "Upper");
+  assert.equal(decision.trainingIntent, "Back off");
+  assert.equal(decision.canStillHitWeeklyGoalIfRestToday, false);
+});
+
+test("physique decision rests for illness-like physiology regardless of weekly pace", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness({ recoveryScore: 62, sleepVsNeedHours: 0 }),
+    makeTraining({ hevyWorkoutCountThisWeek: 1 }),
+    makeStressFlags({ illnessRisk: true }),
+    makeLateNight({ active: true, severity: "high", confidence: "high", likelyLane: "illness_like" }),
+    makeActivityContext(),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-05-02T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Rest");
+  assert.match(decision.primaryDecisionReason, /illness-like/);
+});
+
+test("physique decision pushes when readiness is good and the 4x target is behind pace", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness(),
+    makeTraining({
+      hevyWorkoutCountThisWeek: 2,
+      upperBodyDaysSince: 4,
+      lowerBodyDaysSince: 2,
+    }),
+    makeStressFlags(),
+    makeLateNight(),
+    makeActivityContext(),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-05-02T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Train");
+  assert.equal(decision.trainingTarget, "Upper");
+  assert.equal(decision.trainingIntent, "Push");
+  assert.match(decision.weeklyPaceLabel, /Behind pace/);
+});
+
+test("physique decision maintains when readiness is good and the week is on pace", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness(),
+    makeTraining({
+      hevyWorkoutCountThisWeek: 2,
+      upperBodyDaysSince: 2,
+      lowerBodyDaysSince: 2,
+    }),
+    makeStressFlags(),
+    makeLateNight(),
+    makeActivityContext(),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-04-29T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Train");
+  assert.equal(decision.trainingIntent, "Maintain");
+  assert.match(decision.weeklyPaceLabel, /needed/);
+});
+
+test("physique decision rests when high current-week tennis load combines with poor sleep", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness({ recoveryScore: 54, sleepVsNeedHours: -1.6 }),
+    makeTraining({ hevyWorkoutCountThisWeek: 1, upperBodyDaysSince: 1, lowerBodyDaysSince: 3 }),
+    makeStressFlags({ poorSleepTrend: true }),
+    makeLateNight(),
+    makeActivityContext({
+      hasActivity: true,
+      currentWeekHasActivity: true,
+      totalStrain: 11,
+      latestSession: {
+        id: "tennis-current",
+        kind: "tennis",
+        sportName: "tennis",
+        start: "2026-04-26T16:00:00.000Z",
+        end: "2026-04-26T17:00:00.000Z",
+        durationMinutes: 60,
+        strain: 8.5,
+        averageHeartRate: 125,
+        maxHeartRate: 154,
+        distanceMeter: null,
+      },
+    }),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-04-27T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Rest");
+  assert.equal(decision.decisionFactors.some((factor) => factor.label === "Tennis load"), true);
+});
+
+test("physique decision ignores previous-week fallback activity for today's fatigue", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness(),
+    makeTraining({ hevyWorkoutCountThisWeek: 2 }),
+    makeStressFlags({ poorSleepTrend: true }),
+    makeLateNight(),
+    makeActivityContext({
+      displayWindowLabel: "Last week",
+      fallbackUsed: true,
+      hasActivity: true,
+      totalStrain: 22,
+      latestSession: {
+        id: "tennis-fallback",
+        kind: "tennis",
+        sportName: "tennis",
+        start: "2026-04-19T16:00:00.000Z",
+        end: "2026-04-19T17:00:00.000Z",
+        durationMinutes: 60,
+        strain: 9,
+        averageHeartRate: 125,
+        maxHeartRate: 154,
+        distanceMeter: null,
+      },
+    }),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-04-27T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Train");
+  assert.equal(decision.decisionFactors.some((factor) => factor.label === "Tennis load"), false);
 });
 
 test("late-night disruption infers a hangover-like lane from a rough night without illness markers", () => {
