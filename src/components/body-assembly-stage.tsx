@@ -56,12 +56,19 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const replayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progress, setProgress] = useState(0);
+  const [isBooting, setIsBooting] = useState(true);
   const [isReplaying, setIsReplaying] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updateReducedMotion = () => setPrefersReducedMotion(media.matches);
+    const updateReducedMotion = () => {
+      setPrefersReducedMotion(media.matches);
+      if (media.matches) {
+        setProgress(1);
+        setIsBooting(false);
+      }
+    };
     updateReducedMotion();
     media.addEventListener("change", updateReducedMotion);
 
@@ -69,7 +76,23 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
   }, []);
 
   useEffect(() => {
-    if (prefersReducedMotion) {
+    if (prefersReducedMotion || !isBooting) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (stageRef.current) {
+        syncRegionPlateProgress(stageRef.current, 1);
+      }
+      setProgress(1);
+      setIsBooting(false);
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [isBooting, prefersReducedMotion]);
+
+  useEffect(() => {
+    if (prefersReducedMotion || isBooting) {
       return undefined;
     }
 
@@ -91,7 +114,7 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
       const viewport = window.innerHeight;
       const startLine = viewport * 0.18;
       const travel = Math.max(1, stage.offsetHeight - viewport);
-      const nextProgress = clamp((startLine - rect.top) / travel);
+      const nextProgress = window.scrollY < 40 ? 1 : clamp((startLine - rect.top) / travel);
       syncRegionPlateProgress(stage, nextProgress);
       setProgress(nextProgress);
     };
@@ -115,10 +138,10 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
       window.removeEventListener("scroll", requestUpdate);
       window.removeEventListener("resize", requestUpdate);
     };
-  }, [prefersReducedMotion]);
+  }, [isBooting, prefersReducedMotion]);
 
   useEffect(() => {
-    if (prefersReducedMotion) {
+    if (prefersReducedMotion || isBooting) {
       return undefined;
     }
 
@@ -144,7 +167,7 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
         clearTimeout(replayTimerRef.current);
       }
     };
-  }, [prefersReducedMotion]);
+  }, [isBooting, prefersReducedMotion]);
 
   const style = useMemo<AssemblyStyle>(() => {
     const effectiveProgress = prefersReducedMotion ? 1 : progress;
@@ -190,12 +213,16 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
     }
 
     setIsReplaying(false);
+    setIsBooting(false);
     window.requestAnimationFrame(() => {
       if (stageRef.current) {
         syncRegionPlateProgress(stageRef.current, 1);
       }
       setIsReplaying(true);
-      replayTimerRef.current = setTimeout(() => setIsReplaying(false), 2300);
+      replayTimerRef.current = setTimeout(() => {
+        setIsReplaying(false);
+        setProgress(1);
+      }, 2300);
     });
   };
 
@@ -203,7 +230,11 @@ export function BodyAssemblyStage({ children }: BodyAssemblyStageProps) {
     <div
       ref={stageRef}
       className={`body-assembly-stage ${
-        isReplaying && !prefersReducedMotion ? "is-replaying" : "is-scroll-scrubbed"
+        isBooting && !prefersReducedMotion
+          ? "is-booting"
+          : isReplaying && !prefersReducedMotion
+            ? "is-replaying"
+            : "is-scroll-scrubbed"
       }`}
       data-assembly-progress={progress.toFixed(2)}
       style={style}
