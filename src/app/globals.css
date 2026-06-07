@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f2fb;
+  --background: #0d091a;
   --foreground: #171329;
   --giga-ink: #130f24;
   --giga-violet: #4f3b93;
@@ -51,12 +51,12 @@ body {
 @keyframes giga-panel-reveal {
   from {
     opacity: 0;
-    transform: translateY(18px) scale(0.985);
-    filter: blur(10px);
+    transform: translateY(12px);
+    filter: blur(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
     filter: blur(0);
   }
 }
@@ -152,7 +152,7 @@ body {
 }
 
 .giga-reveal {
-  animation: giga-panel-reveal 620ms var(--ease-precision) both;
+  animation: giga-panel-reveal 520ms var(--ease-precision) both;
 }
 
 .giga-reveal-delay-1 {
@@ -200,10 +200,11 @@ body {
   z-index: 1;
   opacity: 0.96;
   filter:
-    saturate(0.92)
-    contrast(1.08)
-    drop-shadow(0 18px 34px rgba(7, 5, 20, 0.22))
-    drop-shadow(0 0 24px rgba(181, 171, 255, 0.14));
+    saturate(0.82)
+    contrast(1.18)
+    brightness(0.94)
+    drop-shadow(0 20px 32px rgba(5, 3, 16, 0.34))
+    drop-shadow(0 0 16px rgba(114, 255, 242, 0.08));
 }
 
 .instrument-muscle-map .anatomy-layer-weekly {
@@ -218,6 +219,7 @@ body {
   opacity: 1;
   transform: translate3d(0, 0, 0) scale(1);
   transform-origin: center;
+  mix-blend-mode: normal;
 }
 
 .instrument-muscle-map .anatomy-layer-weekly-low {
@@ -245,25 +247,65 @@ body {
 }
 
 .instrument-muscle-map .anatomy-region-low {
-  opacity: 0.78;
-  filter: saturate(1.08) drop-shadow(0 0 5px rgba(181, 171, 255, 0.2))
-    drop-shadow(0 10px 18px rgba(45, 34, 91, 0.14));
+  opacity: 0.86;
+  filter:
+    saturate(1.02)
+    contrast(1.1)
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.16))
+    drop-shadow(0 0 9px rgba(181, 171, 255, 0.22))
+    drop-shadow(0 12px 18px rgba(15, 10, 35, 0.22));
 }
 
 .instrument-muscle-map .anatomy-region-medium {
-  opacity: 0.9;
-  filter: saturate(1.12) drop-shadow(0 0 7px rgba(255, 142, 122, 0.28))
-    drop-shadow(0 12px 22px rgba(95, 39, 47, 0.16));
+  opacity: 0.94;
+  filter:
+    saturate(1.04)
+    contrast(1.12)
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.16))
+    drop-shadow(0 0 10px rgba(255, 142, 122, 0.28))
+    drop-shadow(0 14px 20px rgba(55, 21, 29, 0.24));
 }
 
 .instrument-muscle-map .anatomy-region-high {
   opacity: 0.98;
-  filter: saturate(1.18) drop-shadow(0 0 8px rgba(255, 94, 134, 0.36))
-    drop-shadow(0 14px 24px rgba(120, 36, 70, 0.18));
+  filter:
+    saturate(1.08)
+    contrast(1.14)
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.18))
+    drop-shadow(0 0 12px rgba(255, 94, 134, 0.36))
+    drop-shadow(0 16px 22px rgba(74, 18, 45, 0.26));
 }
 
 .instrument-muscle-map .anatomy-layer-latest {
   z-index: 3;
+}
+
+.instrument-muscle-map::before,
+.instrument-muscle-map::after {
+  content: "";
+  position: absolute;
+  inset: 6% 8%;
+  pointer-events: none;
+  border-radius: 999px;
+  z-index: 0;
+}
+
+.instrument-muscle-map::before {
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.11), transparent 18%),
+    radial-gradient(circle at 64% 42%, rgba(114, 255, 242, 0.12), transparent 22%),
+    radial-gradient(circle at 50% 80%, rgba(255, 142, 122, 0.08), transparent 30%);
+  filter: blur(12px);
+  opacity: 0.82;
+}
+
+.instrument-muscle-map::after {
+  inset: 12% 18%;
+  border: 1px solid rgba(114, 255, 242, 0.16);
+  box-shadow:
+    inset 0 0 42px rgba(114, 255, 242, 0.05),
+    0 0 34px rgba(114, 255, 242, 0.08);
+  opacity: calc(0.32 + var(--assembly-latest, 0) * 0.22);
 }
 
 .cinematic-anatomy .anatomy-layer-base {
@@ -310,16 +352,15 @@ body {
   top: 1rem;
   z-index: 30;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(14, 8, 32, 0.56);
+  border-radius: 10px;
+  background: rgba(12, 8, 28, 0.74);
   color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
   padding: 0.68rem 0.86rem;
-  box-shadow: 0 14px 34px rgba(6, 4, 18, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 22px rgba(6, 4, 18, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transition:
     border-color var(--motion-base) var(--ease-product),
     background var(--motion-base) var(--ease-product),
@@ -352,13 +393,14 @@ body {
 }
 
 .body-assembly-stage.is-scroll-scrubbed .instrument-muscle-map .anatomy-layer-base {
-  opacity: calc(0.34 + var(--assembly-base) * 0.6);
+  opacity: calc(0.62 + var(--assembly-base) * 0.34);
   transform: translateY(var(--base-y)) scale(var(--base-scale));
   filter:
-    saturate(0.92)
-    contrast(1.08)
-    drop-shadow(0 18px 34px rgba(7, 5, 20, 0.22))
-    drop-shadow(0 0 24px rgba(181, 171, 255, 0.14));
+    saturate(0.82)
+    contrast(1.18)
+    brightness(0.94)
+    drop-shadow(0 20px 32px rgba(5, 3, 16, 0.34))
+    drop-shadow(0 0 16px rgba(114, 255, 242, 0.08));
 }
 
 .body-assembly-stage.is-scroll-scrubbed .cinematic-anatomy .anatomy-layer-weekly-low {
@@ -427,23 +469,50 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(114, 255, 242, 0.16), transparent 22%, transparent 78%, rgba(255, 142, 122, 0.12)),
-    radial-gradient(circle at 50% 46%, rgba(15, 10, 34, 0) 0 32%, rgba(12, 8, 29, 0.34) 72%);
+    linear-gradient(90deg, rgba(114, 255, 242, 0.12), transparent 22%, transparent 78%, rgba(255, 142, 122, 0.1)),
+    radial-gradient(circle at 50% 46%, rgba(15, 10, 34, 0) 0 32%, rgba(12, 8, 29, 0.38) 72%);
   mix-blend-mode: screen;
-  opacity: calc(0.3 + var(--assembly-latest, 0) * 0.32);
+  opacity: calc(0.22 + var(--assembly-latest, 0) * 0.28);
 }
 
 .biomech-map-stage::after {
   content: "";
   position: absolute;
-  inset: 1rem;
+  inset: 0.95rem;
   pointer-events: none;
-  border: 1px solid rgba(114, 255, 242, 0.08);
+  border: 1px solid rgba(114, 255, 242, 0.1);
   background:
-    linear-gradient(90deg, transparent 0 44%, rgba(114, 255, 242, 0.08) 50%, transparent 56%),
+    linear-gradient(90deg, transparent 0 44%, rgba(114, 255, 242, 0.06) 50%, transparent 56%),
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   background-size: 100% 100%, 100% 22px;
   opacity: calc(0.16 + var(--assembly-base, 0) * 0.14);
+}
+
+.premium-cockpit {
+  color-scheme: dark;
+}
+
+.premium-cockpit h1,
+.premium-cockpit h2 {
+  text-wrap: balance;
+}
+
+.premium-cockpit article,
+.premium-cockpit section,
+.premium-cockpit aside {
+  backface-visibility: hidden;
+}
+
+.premium-cockpit button:focus-visible,
+.premium-cockpit a:focus-visible {
+  outline: 2px solid rgba(113, 255, 241, 0.72);
+  outline-offset: 2px;
+}
+
+.premium-cockpit .biomech-map-stage {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    inset 0 -1px 0 rgba(8, 5, 22, 0.24);
 }
 
 .biomech-body-bay {

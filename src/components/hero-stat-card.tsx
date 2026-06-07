@@ -192,8 +192,9 @@ export function HeroStatCard({
 
   return (
     <section
-      className="@container group rounded-[10px] border border-[rgba(79,70,127,0.14)] bg-[linear-gradient(180deg,_rgba(247,244,252,0.96)_0%,_rgba(239,234,247,0.88)_100%)] p-3.5 text-[#171329] shadow-[0_8px_22px_rgba(22,20,35,0.07)] transition-colors hover:border-[rgba(95,88,167,0.25)]"
+      className="@container group relative overflow-hidden rounded-[12px] border border-[#d7d1e5] bg-[#f8f5ff] p-3.5 text-[#171329] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(28,20,62,0.08)] transition-colors hover:border-[#bdb4d9]"
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,_transparent,_rgba(98,91,176,0.42),_transparent)]" />
       <button
         aria-expanded={expanded}
         className="block w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-[#6d68bd]/35"
@@ -212,7 +213,7 @@ export function HeroStatCard({
         <button
           aria-label={`${expanded ? "Hide" : "Show"} ${label} trend details`}
           aria-expanded={expanded}
-          className="flex min-h-[104px] w-full items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-[#6d68bd]/35"
+          className="flex min-h-[104px] w-full items-center justify-center rounded-[10px] bg-[linear-gradient(180deg,_rgba(255,255,255,0.48),_rgba(238,233,247,0.36))] outline-none ring-1 ring-[#e5e0ef] transition-colors group-hover:ring-[#cec5e4] focus-visible:ring-2 focus-visible:ring-[#6d68bd]/35"
           onClick={() => setExpanded((value) => !value)}
           type="button"
         >
@@ -321,7 +322,7 @@ export function HeroStatCard({
         <div className="@lg:min-w-0">
           <div className="text-center text-[13px] leading-5 text-[#625b7c] @lg:text-left">{detail}</div>
 
-          <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[9px] border border-[rgba(116,108,152,0.09)] bg-[rgba(255,255,255,0.34)]">
+          <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[8px] border border-[#e1dcec] bg-[#f0ecf7]">
             {trend.map((point, index) => (
               <div
                 key={`${label}-trend-${index}`}
