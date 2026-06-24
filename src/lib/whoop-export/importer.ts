@@ -4,7 +4,8 @@ import path from "node:path";
 
 import JSZip from "jszip";
 
-import { getDb } from "@/lib/db";
+import { getDb, shouldUsePostgres } from "@/lib/db";
+import { persistPostgresWhoopExport } from "@/lib/whoop-export/postgres-import";
 
 export type CsvRow = Record<string, string>;
 
@@ -15,6 +16,18 @@ export type WhoopExportArchive = {
   sleeps: CsvRow[];
   workouts: CsvRow[];
   journals: CsvRow[];
+};
+
+export type NormalizedWhoopExport = {
+  fingerprint: string;
+  sourceName: string;
+  importedAt: string;
+  dateStart: string | null;
+  dateEnd: string | null;
+  cycles: Array<Array<string | number | null>>;
+  sleeps: Array<Array<string | number | null>>;
+  workouts: Array<Array<string | number | null>>;
+  journals: Array<Array<string | number | null>>;
 };
 
 export function parseCsv(text: string): CsvRow[] {
@@ -106,8 +119,131 @@ export async function readWhoopExport(zipPath: string): Promise<WhoopExportArchi
   };
 }
 
+export function normalizeWhoopArchive(
+  archive: WhoopExportArchive,
+  importedAt = new Date().toISOString(),
+): NormalizedWhoopExport {
+  const cycles = archive.cycles.flatMap((row) => {
+    const timezone = row["Cycle timezone"];
+    const cycleStart = normalizeWhoopTimestamp(row["Cycle start time"], timezone);
+    if (!cycleStart) return [];
+    return [[
+      cycleStart,
+      normalizeWhoopTimestamp(row["Cycle end time"], timezone),
+      timezone || null,
+      numberValue(row, "Recovery score %"),
+      numberValue(row, "Resting heart rate (bpm)"),
+      numberValue(row, "Heart rate variability (ms)"),
+      numberValue(row, "Skin temp (celsius)"),
+      numberValue(row, "Blood oxygen %"),
+      numberValue(row, "Day Strain"),
+      numberValue(row, "Energy burned (cal)"),
+      numberValue(row, "Max HR (bpm)"),
+      numberValue(row, "Average HR (bpm)"),
+      normalizeWhoopTimestamp(row["Sleep onset"], timezone),
+      normalizeWhoopTimestamp(row["Wake onset"], timezone),
+      numberValue(row, "Sleep performance %"),
+      numberValue(row, "Respiratory rate (rpm)"),
+      numberValue(row, "Asleep duration (min)"),
+      numberValue(row, "In bed duration (min)"),
+      numberValue(row, "Light sleep duration (min)"),
+      numberValue(row, "Deep (SWS) duration (min)"),
+      numberValue(row, "REM duration (min)"),
+      numberValue(row, "Awake duration (min)"),
+      numberValue(row, "Sleep need (min)"),
+      numberValue(row, "Sleep debt (min)"),
+      numberValue(row, "Sleep efficiency %"),
+      numberValue(row, "Sleep consistency %"),
+    ]];
+  });
+
+  const sleeps = archive.sleeps.flatMap((row) => {
+    const timezone = row["Cycle timezone"];
+    const sleepOnset = normalizeWhoopTimestamp(row["Sleep onset"], timezone);
+    if (!sleepOnset) return [];
+    return [[
+      sleepOnset,
+      normalizeWhoopTimestamp(row["Cycle start time"], timezone),
+      normalizeWhoopTimestamp(row["Cycle end time"], timezone),
+      timezone || null,
+      normalizeWhoopTimestamp(row["Wake onset"], timezone),
+      numberValue(row, "Sleep performance %"),
+      numberValue(row, "Respiratory rate (rpm)"),
+      numberValue(row, "Asleep duration (min)"),
+      numberValue(row, "In bed duration (min)"),
+      numberValue(row, "Light sleep duration (min)"),
+      numberValue(row, "Deep (SWS) duration (min)"),
+      numberValue(row, "REM duration (min)"),
+      numberValue(row, "Awake duration (min)"),
+      numberValue(row, "Sleep need (min)"),
+      numberValue(row, "Sleep debt (min)"),
+      numberValue(row, "Sleep efficiency %"),
+      numberValue(row, "Sleep consistency %"),
+      booleanValue(row, "Nap"),
+    ]];
+  });
+
+  const workouts = archive.workouts.flatMap((row) => {
+    const timezone = row["Cycle timezone"];
+    const workoutStart = normalizeWhoopTimestamp(row["Workout start time"], timezone);
+    if (!workoutStart) return [];
+    return [[
+      workoutStart,
+      normalizeWhoopTimestamp(row["Cycle start time"], timezone),
+      normalizeWhoopTimestamp(row["Workout end time"], timezone),
+      timezone || null,
+      numberValue(row, "Duration (min)"),
+      row["Activity name"] || null,
+      numberValue(row, "Activity Strain"),
+      numberValue(row, "Energy burned (cal)"),
+      numberValue(row, "Max HR (bpm)"),
+      numberValue(row, "Average HR (bpm)"),
+      numberValue(row, "HR Zone 1 %"),
+      numberValue(row, "HR Zone 2 %"),
+      numberValue(row, "HR Zone 3 %"),
+      numberValue(row, "HR Zone 4 %"),
+      numberValue(row, "HR Zone 5 %"),
+      booleanValue(row, "GPS enabled"),
+    ]];
+  });
+
+  const journals = archive.journals.map((row, index) => {
+    const timezone = row["Cycle timezone"];
+    return [
+      createHash("sha256")
+        .update(`${archive.fingerprint}:${index}:${row["Question text"]}`)
+        .digest("hex"),
+      normalizeWhoopTimestamp(row["Cycle start time"], timezone),
+      normalizeWhoopTimestamp(row["Cycle end time"], timezone),
+      timezone || null,
+      row["Question text"],
+      booleanValue(row, "Answered yes"),
+    ];
+  });
+
+  const starts = cycles.map((row) => String(row[0])).sort();
+  return {
+    fingerprint: archive.fingerprint,
+    sourceName: archive.sourceName,
+    importedAt,
+    dateStart: starts[0] ?? null,
+    dateEnd: starts.at(-1) ?? null,
+    cycles,
+    sleeps,
+    workouts,
+    journals,
+  };
+}
+
 export async function importWhoopExport(zipPath: string) {
   const archive = await readWhoopExport(zipPath);
+  const normalized = normalizeWhoopArchive(archive);
+
+  if (shouldUsePostgres()) {
+    const imported = await persistPostgresWhoopExport(normalized);
+    return { imported, ...archive };
+  }
+
   const db = getDb();
   const existing = db
     .prepare("SELECT fingerprint FROM whoop_export_imports WHERE fingerprint = ?")
@@ -138,120 +274,22 @@ export async function importWhoopExport(zipPath: string) {
 
   db.exec("BEGIN");
   try {
-    for (const row of archive.cycles) {
-      const timezone = row["Cycle timezone"];
-      const cycleStart = normalizeWhoopTimestamp(row["Cycle start time"], timezone);
-      if (!cycleStart) continue;
-      insertCycle.run(
-        cycleStart,
-        normalizeWhoopTimestamp(row["Cycle end time"], timezone),
-        timezone || null,
-        numberValue(row, "Recovery score %"),
-        numberValue(row, "Resting heart rate (bpm)"),
-        numberValue(row, "Heart rate variability (ms)"),
-        numberValue(row, "Skin temp (celsius)"),
-        numberValue(row, "Blood oxygen %"),
-        numberValue(row, "Day Strain"),
-        numberValue(row, "Energy burned (cal)"),
-        numberValue(row, "Max HR (bpm)"),
-        numberValue(row, "Average HR (bpm)"),
-        normalizeWhoopTimestamp(row["Sleep onset"], timezone),
-        normalizeWhoopTimestamp(row["Wake onset"], timezone),
-        numberValue(row, "Sleep performance %"),
-        numberValue(row, "Respiratory rate (rpm)"),
-        numberValue(row, "Asleep duration (min)"),
-        numberValue(row, "In bed duration (min)"),
-        numberValue(row, "Light sleep duration (min)"),
-        numberValue(row, "Deep (SWS) duration (min)"),
-        numberValue(row, "REM duration (min)"),
-        numberValue(row, "Awake duration (min)"),
-        numberValue(row, "Sleep need (min)"),
-        numberValue(row, "Sleep debt (min)"),
-        numberValue(row, "Sleep efficiency %"),
-        numberValue(row, "Sleep consistency %"),
-      );
-    }
-
-    for (const row of archive.sleeps) {
-      const timezone = row["Cycle timezone"];
-      const sleepOnset = normalizeWhoopTimestamp(row["Sleep onset"], timezone);
-      if (!sleepOnset) continue;
-      insertSleep.run(
-        sleepOnset,
-        normalizeWhoopTimestamp(row["Cycle start time"], timezone),
-        normalizeWhoopTimestamp(row["Cycle end time"], timezone),
-        timezone || null,
-        normalizeWhoopTimestamp(row["Wake onset"], timezone),
-        numberValue(row, "Sleep performance %"),
-        numberValue(row, "Respiratory rate (rpm)"),
-        numberValue(row, "Asleep duration (min)"),
-        numberValue(row, "In bed duration (min)"),
-        numberValue(row, "Light sleep duration (min)"),
-        numberValue(row, "Deep (SWS) duration (min)"),
-        numberValue(row, "REM duration (min)"),
-        numberValue(row, "Awake duration (min)"),
-        numberValue(row, "Sleep need (min)"),
-        numberValue(row, "Sleep debt (min)"),
-        numberValue(row, "Sleep efficiency %"),
-        numberValue(row, "Sleep consistency %"),
-        booleanValue(row, "Nap"),
-      );
-    }
-
-    for (const row of archive.workouts) {
-      const timezone = row["Cycle timezone"];
-      const workoutStart = normalizeWhoopTimestamp(row["Workout start time"], timezone);
-      if (!workoutStart) continue;
-      insertWorkout.run(
-        workoutStart,
-        normalizeWhoopTimestamp(row["Cycle start time"], timezone),
-        normalizeWhoopTimestamp(row["Workout end time"], timezone),
-        timezone || null,
-        numberValue(row, "Duration (min)"),
-        row["Activity name"] || null,
-        numberValue(row, "Activity Strain"),
-        numberValue(row, "Energy burned (cal)"),
-        numberValue(row, "Max HR (bpm)"),
-        numberValue(row, "Average HR (bpm)"),
-        numberValue(row, "HR Zone 1 %"),
-        numberValue(row, "HR Zone 2 %"),
-        numberValue(row, "HR Zone 3 %"),
-        numberValue(row, "HR Zone 4 %"),
-        numberValue(row, "HR Zone 5 %"),
-        booleanValue(row, "GPS enabled"),
-      );
-    }
-
-    archive.journals.forEach((row, index) => {
-      const timezone = row["Cycle timezone"];
-      insertJournal.run(
-        createHash("sha256")
-          .update(`${archive.fingerprint}:${index}:${row["Question text"]}`)
-          .digest("hex"),
-        normalizeWhoopTimestamp(row["Cycle start time"], timezone),
-        normalizeWhoopTimestamp(row["Cycle end time"], timezone),
-        timezone || null,
-        row["Question text"],
-        booleanValue(row, "Answered yes"),
-      );
-    });
-
-    const starts = archive.cycles
-      .map((row) => normalizeWhoopTimestamp(row["Cycle start time"], row["Cycle timezone"]))
-      .filter((value): value is string => Boolean(value))
-      .sort();
+    normalized.cycles.forEach((row) => insertCycle.run(...row));
+    normalized.sleeps.forEach((row) => insertSleep.run(...row));
+    normalized.workouts.forEach((row) => insertWorkout.run(...row));
+    normalized.journals.forEach((row) => insertJournal.run(...row));
     db.prepare(`
       INSERT INTO whoop_export_imports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      archive.fingerprint,
-      archive.sourceName,
-      new Date().toISOString(),
-      starts[0] ?? null,
-      starts.at(-1) ?? null,
-      archive.cycles.length,
-      archive.sleeps.length,
-      archive.workouts.length,
-      archive.journals.length,
+      normalized.fingerprint,
+      normalized.sourceName,
+      normalized.importedAt,
+      normalized.dateStart,
+      normalized.dateEnd,
+      normalized.cycles.length,
+      normalized.sleeps.length,
+      normalized.workouts.length,
+      normalized.journals.length,
     );
     db.exec("COMMIT");
   } catch (error) {
