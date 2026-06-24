@@ -1,4 +1,4 @@
-import { AnatomyFigure } from "@/components/anatomy-figure";
+import { TrainingMap } from "@/components/training-map";
 import { buildTodayViewModel } from "@/lib/today-view-model";
 import type { DailySummary, DiscordDeliveryStatus } from "@/lib/insights/types";
 
@@ -66,7 +66,7 @@ export async function DailyBriefPreviewCard({
           </div>
 
           <div className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(74,56,144,0.46)_0%,_rgba(93,67,145,0.34)_52%,_rgba(252,149,127,0.3)_100%)] p-4 shadow-[0_14px_36px_rgba(22,20,35,0.12)] ring-1 ring-white/10">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_226px]">
+            <div className="grid gap-4">
               <div>
                 <div className="rounded-[10px] bg-[rgba(17,13,31,0.18)] p-4 text-white/92 ring-1 ring-white/8">
                   <p className="text-[11px] text-white/58">Today&apos;s split call</p>
@@ -90,72 +90,26 @@ export async function DailyBriefPreviewCard({
                   </p>
                 </div>
 
-                <div className="mt-3 rounded-[10px] bg-[rgba(17,13,31,0.12)] p-4 ring-1 ring-white/8">
-                  <div className="mb-3 flex items-center justify-between gap-4 text-white">
-                    <p className="text-[12px] text-white/68">This week&apos;s training map</p>
-                    <div className="flex items-center gap-3 text-[11px] text-white/74">
-                      <LegendDot className="bg-[#bfb7ff]" label="1x" />
-                      <LegendDot className="bg-[#ff9b84]" label="2x" />
-                      <LegendDot className="bg-[#ff6f93]" label="3x+" />
-                      <LegendDot className="bg-[#49fff2]" label="Latest" />
-                    </div>
-                  </div>
-
-                  <div className="flex min-h-[268px] items-center justify-center rounded-[10px] bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.1),_transparent_36%),linear-gradient(180deg,_rgba(44,34,88,0.4)_0%,_rgba(49,38,98,0.24)_100%)] px-4 py-4">
-                    <AnatomyFigure
-                      className="max-h-[248px] w-full max-w-[348px]"
-                      weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
-                      latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
-                    />
-                  </div>
-
-                  {dashboard.hero.weeklyMapNote ? (
-                    <div className="mt-3 rounded-[10px] border border-white/8 bg-[rgba(17,13,31,0.14)] px-3 py-2 text-[11px] leading-5 text-white/72">
-                      {dashboard.hero.weeklyMapNote}
-                    </div>
-                  ) : null}
+                <div className="mt-3">
+                  <TrainingMap
+                    variant="preview"
+                    weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
+                    latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
+                    weeklyVolume={dashboard.hero.weeklyFocus}
+                    latestWorkout={dashboard.hero.workoutLabel}
+                    latestSessionAge={dashboard.hero.latestSessionAgeLabel}
+                    workoutCount={summary.trainingLoad.hevyWorkoutCountThisWeek}
+                    emptyMessage={dashboard.hero.weeklyFocusEmptyMessage}
+                    note={dashboard.hero.weeklyMapNote}
+                  />
                 </div>
               </div>
 
               <div className="rounded-[10px] bg-[rgba(17,13,31,0.16)] p-4 text-white ring-1 ring-white/8">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[12px] text-white/68">Weekly muscle volume</p>
-                    <p className="mt-1 text-[11px] text-white/46">Mon-Sun</p>
-                  </div>
-                  <p className="text-[11px] text-white/56">{summary.trainingLoad.hevyWorkoutCountThisWeek} lifts</p>
-                </div>
-
-                {dashboard.hero.weeklyFocus.length > 0 ? (
-                  <div className="mt-4 space-y-2.5">
-                    {dashboard.hero.weeklyFocus.slice(0, 10).map((item) => (
-                      <div
-                        key={`${item.label}-${item.hits}`}
-                        className="flex items-center justify-between gap-3 border-b border-white/8 pb-2 last:border-b-0 last:pb-0"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`h-2.5 w-2.5 rounded-full ${
-                              item.hits >= 3
-                                ? "bg-[#ff6f93]"
-                                : item.hits >= 2
-                                  ? "bg-[#ff9b84]"
-                                  : "bg-[#bfb7ff]"
-                            }`}
-                          />
-                          <span className="text-[13px] text-white/88">{item.label}</span>
-                        </div>
-                        <span className="text-[13px] font-medium text-white/78">
-                          {item.effectiveSets} / {item.hits}x
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-[10px] border border-dashed border-white/12 bg-[rgba(17,13,31,0.1)] px-3 py-3 text-[12px] leading-5 text-white/62">
-                    {dashboard.hero.weeklyFocusEmptyMessage}
-                  </div>
-                )}
+                <p className="text-[12px] text-white/68">Training context</p>
+                <p className="mt-2 text-[13px] leading-5 text-white/78">
+                  {dashboard.hero.focusLabel}
+                </p>
               </div>
             </div>
 
@@ -178,15 +132,6 @@ export async function DailyBriefPreviewCard({
         </div>
       </div>
     </div>
-  );
-}
-
-function LegendDot({ className, label }: { className: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={`h-2.5 w-2.5 rounded-full ${className}`} />
-      <span>{label}</span>
-    </span>
   );
 }
 

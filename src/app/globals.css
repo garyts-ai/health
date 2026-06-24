@@ -337,6 +337,18 @@ body {
   animation: latest-edge-charge 620ms var(--ease-precision) 1520ms both;
 }
 
+.training-map-compact .cinematic-anatomy .anatomy-layer {
+  animation: none;
+  will-change: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinematic-anatomy .anatomy-layer {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 .body-assembly-stage {
   position: relative;
   isolation: isolate;

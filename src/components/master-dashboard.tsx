@@ -1,5 +1,4 @@
-import { AnatomyFigure } from "@/components/anatomy-figure";
-import { BodyAssemblyStage } from "@/components/body-assembly-stage";
+import { TrainingMap } from "@/components/training-map";
 import { DailyBriefPreviewCard } from "@/components/daily-brief-preview-card";
 import { SummaryBanner } from "@/components/dashboard-sections";
 import { HeroStatCard } from "@/components/hero-stat-card";
@@ -263,29 +262,6 @@ export async function MasterDashboard({
   whoop,
 }: MasterDashboardProps) {
   const vm = buildTodayViewModel(summary, whoop, hevy, deliveryStatus);
-  const getTierTone = (hits: number) => {
-    if (hits >= 3) {
-      return {
-        dot: "bg-[#ff5e86]",
-        text: "text-white/86",
-        hits: "text-[#ffd4df]",
-      };
-    }
-
-    if (hits === 2) {
-      return {
-        dot: "bg-[#ff8e7a]",
-        text: "text-white/82",
-        hits: "text-[#ffd5ca]",
-      };
-    }
-
-    return {
-      dot: "bg-[#b5abff]",
-      text: "text-white/78",
-      hits: "text-[#d9d4ff]",
-    };
-  };
 
   return (
     <main className="giga-shell premium-cockpit relative min-h-screen overflow-x-clip bg-[#0d091a] text-[#171329]">
@@ -405,102 +381,16 @@ export async function MasterDashboard({
 
               </div>
 
-              <BodyAssemblyStage>
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
-                <div className="biomech-map-stage relative overflow-hidden rounded-[14px] border border-white/12 bg-[radial-gradient(circle_at_50%_16%,_rgba(255,255,255,0.10),_transparent_16%),radial-gradient(circle_at_78%_84%,_rgba(255,146,118,0.14),_transparent_26%),radial-gradient(circle_at_50%_100%,_rgba(48,47,116,0.40),_transparent_42%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]">
-                  <div className="pointer-events-none absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:42px_42px]" />
-                  <div className="relative z-10 mb-4 flex flex-col items-start gap-3 text-[13px] text-white/68 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div>
-                      <span>This week&apos;s training map</span>
-                      <div className="mt-1 text-[11px] text-white/42">weekly exposure, latest edge</div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12px]">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-3 w-3 rounded-full bg-[#b5abff]" />
-                        1x
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-3 w-3 rounded-full bg-[#ff8e7a]" />
-                        2x
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-3 w-3 rounded-full bg-[#ff5e86]" />
-                        3x+
-                      </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="h-3 w-3 rounded-full bg-[#72fff2] shadow-[0_0_12px_rgba(114,255,242,0.95)]" />
-                          Latest
-                        </span>
-                    </div>
-                  </div>
-
-                  <div className="biomech-body-bay relative z-10 flex min-h-[35rem] items-center justify-center xl:min-h-[40rem]">
-                    <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#72fff2]/18 bg-[radial-gradient(circle,_rgba(114,255,242,0.11),_transparent_58%)] shadow-[0_0_80px_rgba(114,255,242,0.12)]" />
-                    <div className="biomech-scanline" />
-                    <div className="relative w-full max-w-[48rem]">
-                      <AnatomyFigure
-                        weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
-                        latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
-                        mode="instrument"
-                        className="h-[31rem] w-full lg:h-[39rem] xl:h-[44rem]"
-                      />
-                    </div>
-                  </div>
-
-                  {vm.hero.weeklyMapNote ? (
-                    <div className="mt-3 rounded-[10px] border border-white/10 bg-[rgba(18,13,35,0.14)] px-3 py-2 text-[12px] leading-5 text-white/72">
-                      {vm.hero.weeklyMapNote}
-                    </div>
-                  ) : null}
-                </div>
-
-                <aside className="rounded-[14px] border border-white/12 bg-[linear-gradient(180deg,_rgba(12,8,30,0.46),_rgba(18,11,39,0.20))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] ring-1 ring-white/8">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[13px] text-white/60">Weekly muscle volume</div>
-                    <div className="text-[11px] text-white/44">Mon-Sun</div>
-                  </div>
-                  {vm.hero.weeklyFocus.length > 0 ? (
-                    <div className="mt-4 space-y-2.5">
-                      {vm.hero.weeklyFocus.map((item) => {
-                        const tone = getTierTone(item.hits);
-                        return (
-                          <div
-                            key={item.label}
-                            className="flex items-center justify-between gap-3 border-b border-white/8 pb-2 transition-colors hover:border-white/16 hover:bg-white/[0.025] last:border-b-0 last:pb-0"
-                          >
-                            <div className={`flex items-center gap-2 text-[14px] ${tone.text}`}>
-                              <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                              <span>{item.label}</span>
-                            </div>
-                            <span className={`text-[13px] ${tone.hits}`}>
-                              {item.effectiveSets} sets / {item.hits}x
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="mt-4 space-y-3">
-                      <div className="rounded-[10px] border border-dashed border-white/12 bg-[rgba(17,13,31,0.1)] px-3 py-3 text-[13px] leading-5 text-white/68">
-                        {vm.hero.weeklyFocusEmptyMessage}
-                      </div>
-                      <div className="rounded-[10px] bg-[rgba(17,13,31,0.14)] px-3 py-3 text-[12px] leading-5 text-white/58">
-                        Weekly set volume starts after your first logged lift. The neon outline can still show the most recent weekend session.
-                      </div>
-                      <div className="rounded-[10px] bg-[rgba(255,255,255,0.06)] px-3 py-3">
-                        <div className="text-[11px] text-white/42">Latest outline</div>
-                        <div className="mt-1 text-[13px] font-semibold leading-5 text-white/78">
-                          {vm.hero.workoutLabel}
-                        </div>
-                        <div className="mt-1 text-[12px] text-white/50">
-                          {vm.hero.latestSessionAgeLabel}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </aside>
-              </div>
-              </BodyAssemblyStage>
+              <TrainingMap
+                weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
+                latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
+                weeklyVolume={vm.hero.weeklyFocus}
+                latestWorkout={vm.hero.workoutLabel}
+                latestSessionAge={vm.hero.latestSessionAgeLabel}
+                workoutCount={summary.trainingLoad.hevyWorkoutCountThisWeek}
+                emptyMessage={vm.hero.weeklyFocusEmptyMessage}
+                note={vm.hero.weeklyMapNote}
+              />
 
               <div className="hidden grid-cols-4 gap-px overflow-hidden rounded-[12px] bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] ring-1 ring-white/14 sm:grid">
                 {[
