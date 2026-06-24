@@ -386,6 +386,7 @@ export function buildTodayViewModel(
         summary.date,
       ),
       readinessQualifier: buildReadinessQualifier(summary),
+      historicalQualifier: summary.historicalContext?.qualifier ?? null,
       weeklyFocus: summary.trainingLoad.weeklyMuscleVolume.length
         ? summary.trainingLoad.weeklyMuscleVolume.slice(0, 12)
         : summary.trainingLoad.weeklyMuscleFocus.slice(0, 12).map((item) => ({

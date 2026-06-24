@@ -172,28 +172,36 @@ async function fetchWhoopCollection<T extends Record<string, unknown>>(
   accessToken: string,
   retryOnUnauthorized = true,
 ) {
-  const url = new URL(`${WHOOP_API_BASE_URL}${path}`);
-  url.searchParams.set("limit", "10");
-  url.searchParams.set("start", new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString());
+  const records: T[] = [];
+  let nextToken: string | null = null;
+  let page = 0;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: "no-store",
-  });
+  do {
+    const url = new URL(`${WHOOP_API_BASE_URL}${path}`);
+    url.searchParams.set("limit", "25");
+    url.searchParams.set("start", new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString());
+    if (nextToken) url.searchParams.set("nextToken", nextToken);
 
-  if (response.status === 401 && retryOnUnauthorized) {
-    const refreshedToken = await ensureValidAccessToken(true);
-    return fetchWhoopCollection<T>(path, refreshedToken, false);
-  }
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    throw new Error(`WHOOP request failed for ${path} with status ${response.status}`);
-  }
+    if (response.status === 401 && retryOnUnauthorized) {
+      const refreshedToken = await ensureValidAccessToken(true);
+      return fetchWhoopCollection<T>(path, refreshedToken, false);
+    }
+    if (!response.ok) {
+      throw new Error(`WHOOP request failed for ${path} with status ${response.status}`);
+    }
 
-  const payload = (await response.json()) as { records?: T[] };
-  return payload.records ?? [];
+    const payload = (await response.json()) as { records?: T[]; next_token?: string | null };
+    records.push(...(payload.records ?? []));
+    nextToken = payload.next_token ?? null;
+    page += 1;
+  } while (nextToken && page < 20);
+
+  return records;
 }
 
 async function fetchWhoopProfile(accessToken: string, retryOnUnauthorized = true) {

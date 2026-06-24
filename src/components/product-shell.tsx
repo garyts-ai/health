@@ -1,30 +1,20 @@
-import Link from "next/link";
-
-type ProductRoute = "today" | "trends" | "body";
+import { ProductNav, type ProductRoute } from "@/components/product-nav";
 
 type ProductShellProps = {
   current: ProductRoute;
   eyebrow: string;
   title: string;
   description: string;
+  utility?: React.ReactNode;
   children: React.ReactNode;
 };
-
-const NAV_ITEMS: Array<{
-  key: ProductRoute;
-  label: string;
-  href: string;
-}> = [
-  { key: "today", label: "Today", href: "/" },
-  { key: "trends", label: "Trends", href: "/trends" },
-  { key: "body", label: "Body", href: "/body" },
-];
 
 export function ProductShell({
   current,
   eyebrow,
   title,
   description,
+  utility,
   children,
 }: ProductShellProps) {
   return (
@@ -44,24 +34,10 @@ export function ProductShell({
                 </p>
               </div>
 
-              <nav className="flex flex-wrap gap-1 self-start rounded-[10px] border border-white/10 bg-[rgba(17,12,34,0.18)] p-1">
-                {NAV_ITEMS.map((item) => {
-                  const active = item.key === current;
-                  return (
-                    <Link
-                      key={item.key}
-                      href={item.href}
-                      className={`inline-flex h-10 items-center justify-center rounded-[8px] px-4 text-sm font-medium transition ${
-                        active
-                          ? "bg-white text-[#171329]"
-                          : "text-white/68 hover:bg-white/8 hover:text-white"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
+              <div className="flex flex-col items-end gap-3">
+                <ProductNav current={current} dark />
+                {utility}
+              </div>
             </div>
           </div>
         </header>

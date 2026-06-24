@@ -248,6 +248,39 @@ export type DailyWhyChanged = {
   deltas: string[];
 };
 
+export type DailyHistoricalContext = {
+  available: boolean;
+  importAgeTier: "current" | "aging" | "legacy" | "missing";
+  coverageEnd: string | null;
+  confidence: "high" | "medium" | "low";
+  qualifier: string | null;
+  strongestDeviation: string | null;
+  behaviorCue: string | null;
+};
+
+export type WeeklyPlanDay = {
+  date: string;
+  label: string;
+  state: "completed" | "today" | "planned" | "recovery";
+  workoutType: "Upper" | "Lower" | "Rest" | "Recovery";
+  intent: "Push" | "Maintain" | "Back off" | "Recover";
+  anchors: string[];
+  calorieTarget: number | null;
+  proteinTargetG: number | null;
+  recoveryPriority: string;
+  rationale: string;
+  guardrail: string | null;
+  actualWorkout: string | null;
+};
+
+export type WeeklyPlan = {
+  weekStart: string;
+  weekEnd: string;
+  targetLifts: number;
+  completedLifts: number;
+  days: WeeklyPlanDay[];
+};
+
 export type BodyRegionId =
   | "chest"
   | "frontDelts"
@@ -383,6 +416,8 @@ export type DailySummary = {
   recommendations: DailyRecommendation[];
   freshness: DailyFreshness;
   whyChangedToday: DailyWhyChanged;
+  historicalContext?: DailyHistoricalContext;
+  weeklyPlan?: WeeklyPlan;
   llmPromptText: string;
 };
 

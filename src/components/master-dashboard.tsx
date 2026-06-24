@@ -4,11 +4,11 @@ import { DailyBriefPreviewCard } from "@/components/daily-brief-preview-card";
 import { SummaryBanner } from "@/components/dashboard-sections";
 import { HeroStatCard } from "@/components/hero-stat-card";
 import { MobilePullSync } from "@/components/mobile-pull-sync";
+import { ProductNav } from "@/components/product-nav";
 import { UtilityDrawer } from "@/components/utility-drawer";
 import { buildTodayViewModel } from "@/lib/today-view-model";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
 import type {
-  DailyActivityKind,
   DailyRecommendation,
   DailySummary,
   DiscordDeliveryStatus,
@@ -25,34 +25,6 @@ type MasterDashboardProps = {
   utilityBannerMessage?: string | null;
   whoop: WhoopConnectionStatus;
 };
-
-function getActivityDotClass(kind: DailyActivityKind) {
-  if (kind === "walking") {
-    return "bg-[#beb2ff] shadow-[0_0_0_1px_rgba(64,54,116,0.1)]";
-  }
-
-  if (kind === "tennis") {
-    return "bg-[#ff8d73] shadow-[0_0_0_1px_rgba(143,76,63,0.12)]";
-  }
-
-  return "bg-[#d8d1df] shadow-[0_0_0_1px_rgba(68,61,80,0.1)]";
-}
-
-function getActivityTextClass(kind: DailyActivityKind) {
-  if (kind === "tennis") {
-    return "text-[#874838]";
-  }
-
-  if (kind === "walking") {
-    return "text-[#4f4796]";
-  }
-
-  return "text-[#665f78]";
-}
-
-function getActivityMarkHeight(strain: number) {
-  return `${Math.min(36, Math.max(10, 8 + strain * 3))}px`;
-}
 
 function RecommendationGlyph({ category }: { category: DailyRecommendation["category"] }) {
   const className = "h-4 w-4";
@@ -332,7 +304,9 @@ export async function MasterDashboard({
             <p className="mt-4 text-[15px] text-white/68">{vm.header.dateLabel}</p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end gap-4">
+            <ProductNav current="today" dark />
+            <div className="flex items-center gap-4">
             <div className="hidden text-right text-[14px] leading-5 text-white/66 lg:block">
               <div>{vm.header.utilityLabel}</div>
             </div>
@@ -345,6 +319,7 @@ export async function MasterDashboard({
               utilityLabel={vm.header.utilityLabel}
               whoop={whoop}
             />
+            </div>
           </div>
         </header>
 
@@ -379,6 +354,11 @@ export async function MasterDashboard({
                 ))}
               </div>
             </div>
+            {vm.hero.historicalQualifier ? (
+              <div className="border-l-2 border-[#71fff1] bg-[#120d24]/86 px-4 py-3 text-[13px] leading-5 text-white/72">
+                Personal baseline: {vm.hero.historicalQualifier}
+              </div>
+            ) : null}
           </div>
 
           <section className="relative order-1 overflow-hidden rounded-[18px] border border-white/14 bg-[radial-gradient(circle_at_54%_42%,_rgba(114,255,242,0.12),_transparent_18%),radial-gradient(circle_at_30%_18%,_rgba(255,139,114,0.18),_transparent_24%),linear-gradient(135deg,_rgba(16,10,37,0.99)_0%,_rgba(52,36,104,0.98)_48%,_rgba(210,114,101,0.94)_100%)] px-5 py-5 text-white shadow-[0_30px_90px_rgba(6,4,18,0.46)] sm:px-6 sm:py-6 xl:order-none">
@@ -557,136 +537,6 @@ export async function MasterDashboard({
                 ))}
               </div>
             </div>
-
-            <div className="giga-reveal giga-reveal-delay-3 rounded-[14px] border border-[#ded7ee] bg-[#f8f5ff] px-5 py-5 shadow-[0_12px_30px_rgba(18,11,42,0.10)] ring-1 ring-white/55">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-[14px] text-[#6d6785]">Activity context</div>
-                  <div className="mt-1 text-[13px] leading-5 text-[#847c9b]">
-                    {vm.activityContext.windowLabel}
-                    {vm.activityContext.fallbackUsed ? " reference" : ""}
-                  </div>
-                </div>
-                <div className="text-right text-[13px] font-semibold text-[#312c49]">
-                  {vm.activityContext.totalLine}
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px]">
-                <div className="rounded-[10px] bg-[rgba(255,255,255,0.42)] p-3 ring-1 ring-[rgba(77,67,119,0.1)]">
-                  <div className="grid grid-cols-7 gap-1.5">
-                    {vm.activityContext.days.map((day) => (
-                      <div key={day.label} className="min-w-0">
-                        <div className="mb-2 text-center text-[11px] text-[#8a82a1]">
-                          {day.label}
-                        </div>
-                        <div className="flex h-12 items-end justify-center gap-0.5 rounded-[8px] bg-[rgba(54,45,91,0.06)] px-1 pb-1">
-                          {day.hasActivity ? (
-                            day.buckets.slice(0, 3).map((bucket) => (
-                              <span
-                                key={`${day.label}-${bucket.kind}`}
-                                className={`w-1.5 rounded-full ${getActivityDotClass(bucket.kind)}`}
-                                style={{ height: getActivityMarkHeight(bucket.strain) }}
-                                title={`${bucket.count} ${bucket.kind}, strain ${bucket.strain.toFixed(1)}`}
-                              />
-                            ))
-                          ) : (
-                            <span className="mb-1 h-1 w-1 rounded-full bg-[#cac2d8]" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#726b8c]">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-[#beb2ff]" />
-                      Walk
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-[#ff8d73]" />
-                      Tennis
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-[#d8d1df]" />
-                      Other
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-[10px] bg-[rgba(255,255,255,0.36)] p-3 ring-1 ring-[rgba(77,67,119,0.1)]">
-                  <div className="text-[12px] text-[#857d99]">Latest non-lift</div>
-                  {vm.activityContext.latest ? (
-                    <>
-                      <div
-                        className={`mt-2 text-[20px] font-semibold leading-6 tracking-[-0.03em] ${getActivityTextClass(vm.activityContext.latest.kind)}`}
-                      >
-                        {vm.activityContext.latest.label}
-                      </div>
-                      <div className="mt-2 text-[13px] leading-5 text-[#6f6886]">
-                        {vm.activityContext.latest.detail}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-2 text-[14px] leading-5 text-[#6f6886]">
-                      No walks, tennis, or conditioning in this window.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px]">
-                <p className="text-[14px] leading-5 text-[#312c49]">
-                  {vm.activityContext.summaryLine}
-                </p>
-                <div className="space-y-1">
-                  {vm.activityContext.buckets.slice(0, 3).map((bucket) => (
-                    <div
-                      key={bucket.kind}
-                      className="flex items-center justify-between gap-3 border-b border-[rgba(121,110,159,0.12)] pb-1 text-[12px] last:border-b-0"
-                    >
-                      <span className="flex items-center gap-2 text-[#6f6886]">
-                        <span className={`h-2 w-2 rounded-full ${getActivityDotClass(bucket.kind)}`} />
-                        {bucket.label}
-                      </span>
-                      <span className="font-semibold text-[#312c49]">{bucket.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <p className="mt-3 text-[13px] leading-5 text-[#6f6886]">
-                {vm.activityContext.interpretation}
-              </p>
-            </div>
-
-            <div className="giga-reveal giga-reveal-delay-3 rounded-[14px] border border-[#ded7ee] bg-[#f8f5ff] px-5 py-5 shadow-[0_12px_30px_rgba(18,11,42,0.10)] ring-1 ring-white/55">
-              <div className="text-[14px] text-[#6d6785]">Weekly scorecard</div>
-              <div className="mt-4 space-y-2">
-                {vm.scorecard.map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex items-start justify-between gap-3 border-b border-[rgba(121,110,159,0.12)] pb-2 last:border-b-0 last:pb-0"
-                  >
-                    <div>
-                      <div className="text-[14px] text-[#312c49]">{item.label}</div>
-                      <div className="mt-0.5 text-[12px] text-[#7b7492]">{item.detail}</div>
-                    </div>
-                    <div
-                      className={
-                        item.status === "good"
-                          ? "text-[14px] font-semibold text-[#4f4796]"
-                          : item.status === "watch"
-                            ? "text-[14px] font-semibold text-[#9a5946]"
-                            : "text-[14px] font-semibold text-[#7b7492]"
-                      }
-                    >
-                      {item.value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </section>
 
@@ -696,22 +546,6 @@ export async function MasterDashboard({
           ))}
         </section>
 
-        <section className="giga-reveal rounded-[14px] border border-[#ded7ee] bg-[#f8f5ff] px-5 py-4 shadow-[0_12px_30px_rgba(18,11,42,0.10)] ring-1 ring-white/55">
-          <div className="grid gap-4 lg:grid-cols-4">
-            {vm.trendBand.map((item) => (
-              <div
-                key={item.label}
-                className="min-w-0 border-l border-[rgba(121,110,159,0.12)] pl-4 first:border-l-0 first:pl-0"
-              >
-                <div className="text-[13px] text-[#726b8c]">{item.label}</div>
-                <div className="mt-2 truncate text-[24px] font-semibold tracking-[-0.03em] text-[#171329]">
-                  {item.value}
-                </div>
-                <div className="mt-1 text-[13px] leading-5 text-[#6f6886]">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </section>
       </div>
     </main>
   );

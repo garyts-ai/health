@@ -33,6 +33,7 @@ yarn-error.log*
 /tmp-ux-dev*.log
 /tmp-pull-sync*.log
 /tmp-activity-context*.log
+/tmp-whoop-dev*.log
 
 # env files
 .env
@@ -46,6 +47,7 @@ data/
 exports/
 logs/
 tmp/
+my_whoop_data_*.zip
 
 # vercel
 .vercel
