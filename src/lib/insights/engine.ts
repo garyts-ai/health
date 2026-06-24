@@ -8,6 +8,8 @@ import {
   summarizeWorkoutMuscleGroups,
 } from "@/lib/insights/body-map";
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
+import { applyHistoricalModifier, buildHistoricalContext } from "@/lib/insights/historical-context";
+import { buildWeeklyPlan } from "@/lib/insights/weekly-plan";
 import { getNutritionIntakeSummary } from "@/lib/nutrition-intake";
 import { getNutritionTargets } from "@/lib/nutrition-targets";
 import { kilogramsToPounds } from "@/lib/units";
@@ -2621,7 +2623,8 @@ export async function getDailySummary(): Promise<DailySummary> {
     buildBodyCard(readiness),
     buildActivityContext(now),
   ]);
-  const physiqueDecision = buildPhysiqueDecision(
+  const historicalContext = await buildHistoricalContext(readiness, now);
+  const basePhysiqueDecision = buildPhysiqueDecision(
     readiness,
     trainingLoad,
     stressFlags,
@@ -2631,6 +2634,15 @@ export async function getDailySummary(): Promise<DailySummary> {
     nutritionActuals,
     strengthProgression,
     now,
+  );
+  const physiqueDecision = applyHistoricalModifier(basePhysiqueDecision, historicalContext);
+  const weeklyPlan = await buildWeeklyPlan(
+    now,
+    physiqueDecision,
+    readiness,
+    trainingLoad,
+    nutritionTargets.effectiveCalorieTarget,
+    nutritionTargets.effectiveProteinTargetG,
   );
   const recommendations = buildRecommendations(
     readiness,
@@ -2668,6 +2680,8 @@ export async function getDailySummary(): Promise<DailySummary> {
     recommendations,
     freshness,
     whyChangedToday,
+    historicalContext,
+    weeklyPlan,
     llmPromptText: "",
   };
 

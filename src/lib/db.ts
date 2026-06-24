@@ -177,6 +177,96 @@ export function applySchema(db: DatabaseSync) {
       synced_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS whoop_export_imports (
+      fingerprint TEXT PRIMARY KEY,
+      source_name TEXT NOT NULL,
+      imported_at TEXT NOT NULL,
+      date_start TEXT,
+      date_end TEXT,
+      cycle_count INTEGER NOT NULL,
+      sleep_count INTEGER NOT NULL,
+      workout_count INTEGER NOT NULL,
+      journal_count INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS whoop_export_cycles (
+      cycle_start TEXT PRIMARY KEY,
+      cycle_end TEXT,
+      timezone_offset TEXT,
+      recovery_score REAL,
+      resting_heart_rate REAL,
+      hrv_rmssd_milli REAL,
+      skin_temp_celsius REAL,
+      spo2_percentage REAL,
+      day_strain REAL,
+      energy_burned_cal REAL,
+      max_heart_rate REAL,
+      average_heart_rate REAL,
+      sleep_onset TEXT,
+      wake_onset TEXT,
+      sleep_performance REAL,
+      respiratory_rate REAL,
+      asleep_minutes REAL,
+      in_bed_minutes REAL,
+      light_minutes REAL,
+      deep_minutes REAL,
+      rem_minutes REAL,
+      awake_minutes REAL,
+      sleep_need_minutes REAL,
+      sleep_debt_minutes REAL,
+      sleep_efficiency REAL,
+      sleep_consistency REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS whoop_export_sleeps (
+      sleep_onset TEXT PRIMARY KEY,
+      cycle_start TEXT,
+      cycle_end TEXT,
+      timezone_offset TEXT,
+      wake_onset TEXT,
+      sleep_performance REAL,
+      respiratory_rate REAL,
+      asleep_minutes REAL,
+      in_bed_minutes REAL,
+      light_minutes REAL,
+      deep_minutes REAL,
+      rem_minutes REAL,
+      awake_minutes REAL,
+      sleep_need_minutes REAL,
+      sleep_debt_minutes REAL,
+      sleep_efficiency REAL,
+      sleep_consistency REAL,
+      nap INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS whoop_export_workouts (
+      workout_start TEXT PRIMARY KEY,
+      cycle_start TEXT,
+      workout_end TEXT,
+      timezone_offset TEXT,
+      duration_minutes REAL,
+      activity_name TEXT,
+      activity_strain REAL,
+      energy_burned_cal REAL,
+      max_heart_rate REAL,
+      average_heart_rate REAL,
+      zone_1_percentage REAL,
+      zone_2_percentage REAL,
+      zone_3_percentage REAL,
+      zone_4_percentage REAL,
+      zone_5_percentage REAL,
+      gps_enabled INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS whoop_export_journal_answers (
+      id TEXT PRIMARY KEY,
+      cycle_start TEXT,
+      cycle_end TEXT,
+      timezone_offset TEXT,
+      question_text TEXT NOT NULL,
+      answered_yes INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS hevy_sync_runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       started_at TEXT NOT NULL,
@@ -357,6 +447,96 @@ const POSTGRES_SCHEMA = `
     zone_five_milli INTEGER,
     raw_json TEXT NOT NULL,
     synced_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS whoop_export_imports (
+    fingerprint TEXT PRIMARY KEY,
+    source_name TEXT NOT NULL,
+    imported_at TEXT NOT NULL,
+    date_start TEXT,
+    date_end TEXT,
+    cycle_count INTEGER NOT NULL,
+    sleep_count INTEGER NOT NULL,
+    workout_count INTEGER NOT NULL,
+    journal_count INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS whoop_export_cycles (
+    cycle_start TEXT PRIMARY KEY,
+    cycle_end TEXT,
+    timezone_offset TEXT,
+    recovery_score DOUBLE PRECISION,
+    resting_heart_rate DOUBLE PRECISION,
+    hrv_rmssd_milli DOUBLE PRECISION,
+    skin_temp_celsius DOUBLE PRECISION,
+    spo2_percentage DOUBLE PRECISION,
+    day_strain DOUBLE PRECISION,
+    energy_burned_cal DOUBLE PRECISION,
+    max_heart_rate DOUBLE PRECISION,
+    average_heart_rate DOUBLE PRECISION,
+    sleep_onset TEXT,
+    wake_onset TEXT,
+    sleep_performance DOUBLE PRECISION,
+    respiratory_rate DOUBLE PRECISION,
+    asleep_minutes DOUBLE PRECISION,
+    in_bed_minutes DOUBLE PRECISION,
+    light_minutes DOUBLE PRECISION,
+    deep_minutes DOUBLE PRECISION,
+    rem_minutes DOUBLE PRECISION,
+    awake_minutes DOUBLE PRECISION,
+    sleep_need_minutes DOUBLE PRECISION,
+    sleep_debt_minutes DOUBLE PRECISION,
+    sleep_efficiency DOUBLE PRECISION,
+    sleep_consistency DOUBLE PRECISION
+  );
+
+  CREATE TABLE IF NOT EXISTS whoop_export_sleeps (
+    sleep_onset TEXT PRIMARY KEY,
+    cycle_start TEXT,
+    cycle_end TEXT,
+    timezone_offset TEXT,
+    wake_onset TEXT,
+    sleep_performance DOUBLE PRECISION,
+    respiratory_rate DOUBLE PRECISION,
+    asleep_minutes DOUBLE PRECISION,
+    in_bed_minutes DOUBLE PRECISION,
+    light_minutes DOUBLE PRECISION,
+    deep_minutes DOUBLE PRECISION,
+    rem_minutes DOUBLE PRECISION,
+    awake_minutes DOUBLE PRECISION,
+    sleep_need_minutes DOUBLE PRECISION,
+    sleep_debt_minutes DOUBLE PRECISION,
+    sleep_efficiency DOUBLE PRECISION,
+    sleep_consistency DOUBLE PRECISION,
+    nap INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS whoop_export_workouts (
+    workout_start TEXT PRIMARY KEY,
+    cycle_start TEXT,
+    workout_end TEXT,
+    timezone_offset TEXT,
+    duration_minutes DOUBLE PRECISION,
+    activity_name TEXT,
+    activity_strain DOUBLE PRECISION,
+    energy_burned_cal DOUBLE PRECISION,
+    max_heart_rate DOUBLE PRECISION,
+    average_heart_rate DOUBLE PRECISION,
+    zone_1_percentage DOUBLE PRECISION,
+    zone_2_percentage DOUBLE PRECISION,
+    zone_3_percentage DOUBLE PRECISION,
+    zone_4_percentage DOUBLE PRECISION,
+    zone_5_percentage DOUBLE PRECISION,
+    gps_enabled INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS whoop_export_journal_answers (
+    id TEXT PRIMARY KEY,
+    cycle_start TEXT,
+    cycle_end TEXT,
+    timezone_offset TEXT,
+    question_text TEXT NOT NULL,
+    answered_yes INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS hevy_sync_runs (
