@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   comparisonDirection,
   gapCount,
+  healthImpactDirection,
   journalFindings,
+  rankWhoopFindings,
   selectOverviewFinding,
   standardDeviation,
 } from "@/lib/whoop-export/analysis";
@@ -31,6 +33,36 @@ test("comparisonDirection handles up, down, flat, and missing values", () => {
   assert.equal(comparisonDirection(null, 50), "missing");
 });
 
+test("health impact respects favorable metric direction", () => {
+  assert.equal(healthImpactDirection("up", "up"), "favorable");
+  assert.equal(healthImpactDirection("down", "down"), "favorable");
+  assert.equal(healthImpactDirection("up", "down"), "unfavorable");
+  assert.equal(healthImpactDirection("flat", "up"), "neutral");
+  assert.equal(healthImpactDirection("missing", "up"), "unknown");
+});
+
+test("findings rank by confidence before effect severity", () => {
+  const ranked = rankWhoopFindings([
+    {
+      title: "Large suggestive effect",
+      evidence: "",
+      interpretation: "",
+      confidence: "Suggestive",
+      severity: 999,
+      visualization: { kind: "variability", value: 99, threshold: 45, unit: "min" },
+    },
+    {
+      title: "Supported effect",
+      evidence: "",
+      interpretation: "",
+      confidence: "High",
+      severity: 1,
+      visualization: { kind: "autonomic", hrvDelta: 1, rhrDelta: 0 },
+    },
+  ]);
+  assert.equal(ranked[0].title, "Supported effect");
+});
+
 test("selectOverviewFinding prioritizes the supported sleep constraint", () => {
   const selected = selectOverviewFinding([
     {
@@ -38,12 +70,16 @@ test("selectOverviewFinding prioritizes the supported sleep constraint", () => {
       evidence: "HRV is stable.",
       interpretation: "No adverse shift.",
       confidence: "High",
+      severity: 10,
+      visualization: { kind: "autonomic", hrvDelta: 0, rhrDelta: 0 },
     },
     {
       title: "Sleep is running below calculated need",
       evidence: "Sleep trails need by 90 minutes.",
       interpretation: "Duration is limiting recovery.",
       confidence: "High",
+      severity: 90,
+      visualization: { kind: "gap", actual: 6.5, target: 8, unit: "h" },
     },
   ]);
 
