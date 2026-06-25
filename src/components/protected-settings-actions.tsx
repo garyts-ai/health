@@ -167,7 +167,7 @@ export function ProtectedSettingsActions({
 
   return (
     <>
-      <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+      <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-[#19162a]">Manual controls</h2>
@@ -200,6 +200,9 @@ export function ProtectedSettingsActions({
           return (
             <article
               key={card.name}
+              data-premium-surface
+              data-premium-tone={card.connected ? "recovery" : card.isConfigured ? "light" : "caution"}
+              data-premium-enter
               className={`rounded-[12px] p-5 shadow-[0_10px_28px_rgba(22,20,35,0.08)] ring-1 ${tone.cardClass}`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -249,7 +252,7 @@ export function ProtectedSettingsActions({
         })}
       </section>
 
-      <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+      <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">
@@ -416,7 +419,7 @@ export function ProtectedSettingsActions({
         </div>
       </section>
 
-      <section className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+      <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">

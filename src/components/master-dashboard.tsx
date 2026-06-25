@@ -201,7 +201,12 @@ function ActionCard({ item }: { item: DailyRecommendation }) {
           };
 
   return (
-    <article className={`giga-reveal rounded-[14px] border p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_14px_34px_rgba(18,11,42,0.12)] ring-1 ${theme.shell}`}>
+    <article
+      data-premium-surface
+      data-premium-tone={item.category === "recovery" ? "recovery" : item.category === "training" ? "light" : "caution"}
+      data-premium-enter
+      className={`rounded-[14px] border p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_14px_34px_rgba(18,11,42,0.12)] ring-1 ${theme.shell}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-[10px] ${theme.icon}`}>
@@ -304,7 +309,12 @@ export async function MasterDashboard({
 
         <section className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="giga-reveal giga-reveal-delay-2 order-2 flex flex-col gap-4 xl:order-none">
-          <div className="rounded-[14px] border border-white/10 bg-[#120d24]/92 px-5 py-5 text-white shadow-[0_14px_44px_rgba(8,5,22,0.30)]">
+          <div
+            data-premium-surface
+            data-premium-tone="dark"
+            data-premium-enter
+            className="rounded-[14px] border border-white/10 bg-[#120d24]/92 px-5 py-5 text-white shadow-[0_14px_44px_rgba(8,5,22,0.30)]"
+          >
               <div className="text-[13px] text-white/58">Overnight read</div>
               <div className="mt-2 text-[36px] font-semibold leading-[0.98] tracking-[-0.05em]">
                 {vm.hero.overnightRead.label}
@@ -337,7 +347,12 @@ export async function MasterDashboard({
             ) : null}
           </div>
 
-          <section className="relative order-1 overflow-hidden rounded-[18px] border border-white/14 bg-[radial-gradient(circle_at_54%_42%,_rgba(114,255,242,0.12),_transparent_18%),radial-gradient(circle_at_30%_18%,_rgba(255,139,114,0.18),_transparent_24%),linear-gradient(135deg,_rgba(16,10,37,0.99)_0%,_rgba(52,36,104,0.98)_48%,_rgba(210,114,101,0.94)_100%)] px-5 py-5 text-white shadow-[0_30px_90px_rgba(6,4,18,0.46)] sm:px-6 sm:py-6 xl:order-none">
+          <section
+            data-premium-surface
+            data-premium-tone="live"
+            data-premium-enter
+            className="premium-enter-delay-1 relative order-1 overflow-hidden rounded-[18px] border border-white/14 bg-[radial-gradient(circle_at_54%_42%,_rgba(114,255,242,0.12),_transparent_18%),radial-gradient(circle_at_30%_18%,_rgba(255,139,114,0.18),_transparent_24%),linear-gradient(135deg,_rgba(16,10,37,0.99)_0%,_rgba(52,36,104,0.98)_48%,_rgba(210,114,101,0.94)_100%)] px-5 py-5 text-white shadow-[0_30px_90px_rgba(6,4,18,0.46)] sm:px-6 sm:py-6 xl:order-none"
+          >
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,_transparent,_rgba(255,255,255,0.42),_transparent)]" />
             <div className="flex flex-col gap-6">
               <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_21rem]">
@@ -417,7 +432,12 @@ export async function MasterDashboard({
           </section>
 
           <div className="order-3 grid gap-4 lg:order-none lg:col-start-2">
-            <div className="giga-reveal giga-reveal-delay-2 rounded-[14px] border border-[#ded7ee] bg-[#f8f5ff] px-5 py-5 shadow-[0_12px_30px_rgba(18,11,42,0.10)] ring-1 ring-white/55">
+            <div
+              data-premium-surface
+              data-premium-tone="light"
+              data-premium-enter
+              className="premium-enter-delay-2 rounded-[14px] border border-[#ded7ee] bg-[#f8f5ff] px-5 py-5 shadow-[0_12px_30px_rgba(18,11,42,0.10)] ring-1 ring-white/55"
+            >
               <div className="text-[14px] text-[#6d6785]">What changed</div>
               <div className="mt-4 space-y-3">
                 {vm.contextBand.whyChanged.map((item) => (

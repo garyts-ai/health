@@ -50,7 +50,11 @@ export async function TrainingMap({
   const visibleVolume = weeklyVolume.slice(0, 8);
 
   return (
-    <section className="training-map-compact overflow-hidden rounded-[12px] border border-white/12 bg-[rgba(16,10,37,0.3)]">
+    <section
+      data-premium-surface
+      data-premium-tone="live"
+      className="training-map-compact overflow-hidden rounded-[12px] border border-white/12 bg-[rgba(16,10,37,0.3)]"
+    >
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-[14px] font-semibold text-white">This week&apos;s training map</h3>

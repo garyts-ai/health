@@ -147,7 +147,7 @@ function TrendChart({
   const gradientId = `whoop-${series.key}-${range}`;
 
   return (
-    <section className="min-w-0 bg-[#171126] p-5 text-white">
+    <section data-premium-surface data-premium-tone="dark" data-premium-enter className="min-w-0 bg-[#171126] p-5 text-white">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold">{series.label}</h3>
@@ -233,7 +233,7 @@ function InstrumentRow({
   const delta = summary.average === null || series.baseline === null ? null : summary.average - series.baseline;
 
   return (
-    <section className="grid gap-5 border-t border-[#ded8e7] px-5 py-5 first:border-t-0 lg:grid-cols-[11rem_minmax(14rem,1fr)_12rem_minmax(20rem,1.4fr)] lg:items-center">
+    <section data-premium-surface data-premium-tone="light" data-premium-enter className="grid gap-5 border-t border-[#ded8e7] px-5 py-5 first:border-t-0 lg:grid-cols-[11rem_minmax(14rem,1fr)_12rem_minmax(20rem,1.4fr)] lg:items-center">
       <div>
         <h3 className="text-lg font-semibold text-[#171329]">{title}</h3>
         <div className={`mt-2 flex items-center gap-2 text-sm font-medium ${impact.text}`}>
@@ -387,7 +387,13 @@ function EvidenceLeaderboard({ findings }: { findings: WhoopFinding[] }) {
       </div>
       <div className="border-y border-[#d8d2e4] bg-[#fbf9fd]">
         {findings.map((finding, index) => (
-          <article key={`${finding.title}-${finding.evidence}`} className="grid gap-4 border-t border-[#e4dfeb] px-5 py-5 first:border-t-0 lg:grid-cols-[2.5rem_minmax(14rem,1fr)_minmax(16rem,0.9fr)_7rem] lg:items-center">
+          <article
+            key={`${finding.title}-${finding.evidence}`}
+            data-premium-surface
+            data-premium-tone={finding.confidence === "High" ? "caution" : "light"}
+            data-premium-enter
+            className="grid gap-4 border-t border-[#e4dfeb] px-5 py-5 first:border-t-0 lg:grid-cols-[2.5rem_minmax(14rem,1fr)_minmax(16rem,0.9fr)_7rem] lg:items-center"
+          >
             <div className="text-2xl font-semibold tabular-nums text-[#aaa2b7]">{String(index + 1).padStart(2, "0")}</div>
             <div>
               <h3 className="font-semibold text-[#312c49]">{finding.title}</h3>

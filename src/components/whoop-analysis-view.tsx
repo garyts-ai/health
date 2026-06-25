@@ -77,7 +77,7 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
 
   return (
     <div className="space-y-7">
-      <section className="overflow-hidden border border-white/10 bg-[#120d24] text-white shadow-[0_18px_48px_rgba(18,13,36,0.22)]">
+      <section data-premium-surface data-premium-tone="dark" data-premium-enter className="overflow-hidden border border-white/10 bg-[#120d24] text-white shadow-[0_18px_48px_rgba(18,13,36,0.22)]">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_23rem]">
           <div className="border-b border-white/10 p-6 sm:p-8 xl:border-b-0 xl:border-r">
             <div className="text-sm text-white/48">Recovery system</div>
@@ -117,7 +117,7 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
 
       <section>
         <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#171329]">Highest-leverage changes</h2>
-        <div className="mt-4 border border-[#d8d2e4] bg-[#fbf9fd]">
+        <div data-premium-surface data-premium-tone="light" data-premium-enter className="mt-4 border border-[#d8d2e4] bg-[#fbf9fd]">
           {report.leveragePoints.length ? report.leveragePoints.map((point, index) => (
             <article key={point.title} className="grid gap-4 border-t border-[#e7e1ec] px-5 py-5 first:border-t-0 lg:grid-cols-[2.5rem_15rem_1fr]">
               <div className="text-xl font-semibold text-[#5d54a3]">{index + 1}</div>
@@ -142,7 +142,7 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
         </div>
       </section>
 
-      <section className="border border-white/10 bg-[#171329] text-white">
+      <section data-premium-surface data-premium-tone="dark" data-premium-enter className="border border-white/10 bg-[#171329] text-white">
         <h2 className="border-b border-white/10 px-5 py-4 text-xl font-semibold">Protocol this week</h2>
         <div className="grid gap-px bg-white/10 md:grid-cols-3">
           {[
