@@ -45,15 +45,30 @@ export type WhoopMetric = {
   recentValue: number | null;
   delta: number | null;
   direction: "up" | "down" | "flat" | "missing";
+  healthImpact: "favorable" | "unfavorable" | "neutral" | "unknown";
   unit: string;
   note?: string;
 };
+
+export type WhoopFindingVisualization =
+  | { kind: "gap"; actual: number; target: number; unit: string }
+  | { kind: "variability"; value: number; threshold: number; unit: string }
+  | { kind: "autonomic"; hrvDelta: number | null; rhrDelta: number | null }
+  | {
+      kind: "journal";
+      yesCount: number;
+      noCount: number;
+      recoveryDelta: number;
+      hrvDelta: number | null;
+    };
 
 export type WhoopFinding = {
   title: string;
   evidence: string;
   interpretation: string;
   confidence: "High" | "Moderate" | "Suggestive";
+  severity: number;
+  visualization: WhoopFindingVisualization;
 };
 
 export type WhoopLeveragePoint = {
@@ -149,6 +164,15 @@ export function comparisonDirection(
   return delta > 0 ? "up" : "down";
 }
 
+export function healthImpactDirection(
+  direction: WhoopMetric["direction"],
+  betterDirection: "up" | "down" | "neutral" = "up",
+): WhoopMetric["healthImpact"] {
+  if (direction === "missing") return "unknown";
+  if (direction === "flat" || betterDirection === "neutral") return "neutral";
+  return direction === betterDirection ? "favorable" : "unfavorable";
+}
+
 function metric(
   label: string,
   overall: number | null,
@@ -156,7 +180,9 @@ function metric(
   suffix: string,
   digits = 1,
   note?: string,
+  betterDirection: "up" | "down" | "neutral" = "up",
 ): WhoopMetric {
+  const direction = comparisonDirection(overall, recent, digits === 0 ? 0.5 : 0.05);
   return {
     label,
     value: display(overall, suffix, digits),
@@ -164,7 +190,8 @@ function metric(
     baselineValue: overall,
     recentValue: recent,
     delta: overall === null || recent === null ? null : round(recent - overall, digits),
-    direction: comparisonDirection(overall, recent, digits === 0 ? 0.5 : 0.05),
+    direction,
+    healthImpact: healthImpactDirection(direction, betterDirection),
     unit: suffix.trim(),
     note,
   };
@@ -179,6 +206,7 @@ function textMetric(label: string, value: string, recent: string, note?: string)
     recentValue: null,
     delta: null,
     direction: "missing",
+    healthImpact: "unknown",
     unit: "",
     note,
   };
@@ -193,8 +221,19 @@ export function selectOverviewFinding(findings: WhoopFinding[]) {
       evidence: "The current export does not contain enough evidence for a leading takeaway.",
       interpretation: "",
       confidence: "Suggestive" as const,
+      severity: 0,
+      visualization: { kind: "variability" as const, value: 0, threshold: 45, unit: "min" },
     }
   );
+}
+
+function findingRank(finding: WhoopFinding) {
+  const confidence = finding.confidence === "High" ? 3 : finding.confidence === "Moderate" ? 2 : 1;
+  return confidence * 1000 + finding.severity;
+}
+
+export function rankWhoopFindings(findings: WhoopFinding[]) {
+  return [...findings].sort((a, b) => findingRank(b) - findingRank(a));
 }
 
 export function standardDeviation(input: number[]) {
@@ -343,6 +382,13 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
         ? "The recurring duration gap is a direct constraint on recovery, independent of sleep-stage mix."
         : "Duration is not the dominant recovery constraint across the full export.",
       confidence: cycles.length >= 90 ? "High" : "Moderate",
+      severity: Math.abs(sleepGap),
+      visualization: {
+        kind: "gap",
+        actual: (asleep ?? 0) / 60,
+        target: (need ?? 0) / 60,
+        unit: "h",
+      },
     });
   }
   if (bedtimeVariance !== null) {
@@ -353,6 +399,8 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
         ? "Timing variability can weaken sleep consistency even when total duration is adequate."
         : "Timing consistency is unlikely to be a major standalone limiter.",
       confidence: "High",
+      severity: bedtimeVariance,
+      visualization: { kind: "variability", value: bedtimeVariance, threshold: 45, unit: "min" },
     });
   }
   const hrvDelta = trendDelta(cycles, "hrv_rmssd_milli");
@@ -365,6 +413,8 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
         ? "The recent window shows more physiological strain than the preceding month."
         : "The recent window does not show a strong adverse autonomic shift.",
     confidence: "High",
+    severity: Math.abs(hrvDelta ?? 0) + Math.abs(rhrDelta ?? 0) * 3,
+    visualization: { kind: "autonomic", hrvDelta, rhrDelta },
   });
   for (const effect of journalEffects.slice(0, 3)) {
     const direction = effect.recoveryDelta >= 0 ? "higher" : "lower";
@@ -373,6 +423,14 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
       evidence: `${effect.yesCount} yes cycles versus ${effect.noCount} no cycles: recovery was ${Math.abs(effect.recoveryDelta).toFixed(1)} points ${direction}${effect.hrvDelta === null ? "" : ` and HRV differed by ${Math.abs(effect.hrvDelta).toFixed(1)} ms`}.`,
       interpretation: "This is a personal association, not proof of causation, but the repeated journal split makes it useful for experimentation.",
       confidence: Math.min(effect.yesCount, effect.noCount) >= 30 ? "Moderate" : "Suggestive",
+      severity: effect.magnitude,
+      visualization: {
+        kind: "journal",
+        yesCount: effect.yesCount,
+        noCount: effect.noCount,
+        recoveryDelta: effect.recoveryDelta,
+        hrvDelta: effect.hrvDelta,
+      },
     });
   }
 
@@ -435,22 +493,22 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
       metric("REM sleep share", stageTotal ? ((average(values(cycles, "rem_minutes")) ?? 0) / stageTotal) * 100 : null, null, "%"),
     ],
     cardiovascular: [
-      metric("Resting heart rate", average(values(cycles, "resting_heart_rate")), average(values(recent, "resting_heart_rate")), " bpm"),
+      metric("Resting heart rate", average(values(cycles, "resting_heart_rate")), average(values(recent, "resting_heart_rate")), " bpm", 1, undefined, "down"),
       metric("HRV (RMSSD)", average(values(cycles, "hrv_rmssd_milli")), average(values(recent, "hrv_rmssd_milli")), " ms", 0),
       metric("Blood oxygen", average(values(cycles, "spo2_percentage")), average(values(recent, "spo2_percentage")), "%"),
-      metric("Respiratory rate", average(values(cycles, "respiratory_rate")), average(values(recent, "respiratory_rate")), " rpm"),
-      metric("Skin temperature", average(values(cycles, "skin_temp_celsius")), average(values(recent, "skin_temp_celsius")), "°C", 2, "WHOOP reports absolute skin temperature in this export."),
+      metric("Respiratory rate", average(values(cycles, "respiratory_rate")), average(values(recent, "respiratory_rate")), " rpm", 1, undefined, "neutral"),
+      metric("Skin temperature", average(values(cycles, "skin_temp_celsius")), average(values(recent, "skin_temp_celsius")), "°C", 2, "WHOOP reports absolute skin temperature in this export.", "neutral"),
     ],
     recovery: [
       metric("Recovery score", average(values(cycles, "recovery_score")), average(values(recent, "recovery_score")), "%"),
-      metric("Daily strain", average(values(cycles, "day_strain")), average(values(recent, "day_strain")), ""),
-      metric("Sleep need", need === null ? null : need / 60, needRecent === null ? null : needRecent / 60, "h"),
-      metric("Sleep debt", average(values(cycles, "sleep_debt_minutes")), average(values(recent, "sleep_debt_minutes")), " min", 0),
+      metric("Daily strain", average(values(cycles, "day_strain")), average(values(recent, "day_strain")), "", 1, undefined, "neutral"),
+      metric("Sleep need", need === null ? null : need / 60, needRecent === null ? null : needRecent / 60, "h", 1, undefined, "neutral"),
+      metric("Sleep debt", average(values(cycles, "sleep_debt_minutes")), average(values(recent, "sleep_debt_minutes")), " min", 0, undefined, "down"),
     ],
     activity: [
-      metric("Workout frequency", weeklyWorkoutFrequency, workouts.filter((row) => new Date(row.workout_start) >= new Date(cycles.at(-28)?.cycle_start ?? 0)).length / 4, "/week"),
-      metric("Workout duration", workoutDuration, average(workouts.slice(-28).map((row) => row.duration_minutes).filter((value): value is number => value !== null)), " min", 0),
-      metric("Workout strain", average(workouts.map((row) => row.activity_strain).filter((value): value is number => value !== null)), average(workouts.slice(-28).map((row) => row.activity_strain).filter((value): value is number => value !== null)), ""),
+      metric("Workout frequency", weeklyWorkoutFrequency, workouts.filter((row) => new Date(row.workout_start) >= new Date(cycles.at(-28)?.cycle_start ?? 0)).length / 4, "/week", 1, undefined, "neutral"),
+      metric("Workout duration", workoutDuration, average(workouts.slice(-28).map((row) => row.duration_minutes).filter((value): value is number => value !== null)), " min", 0, undefined, "neutral"),
+      metric("Workout strain", average(workouts.map((row) => row.activity_strain).filter((value): value is number => value !== null)), average(workouts.slice(-28).map((row) => row.activity_strain).filter((value): value is number => value !== null)), "", 1, undefined, "neutral"),
       textMetric("Most common activity", [...new Map(workouts.map((row) => [row.activity_name ?? "Unknown", workouts.filter((item) => item.activity_name === row.activity_name).length])).entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Not available", "Full export"),
     ],
   };
@@ -527,7 +585,7 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
         })),
       };
     }),
-    findings,
+    findings: rankWhoopFindings(findings),
     leveragePoints: leverage.sort((a, b) => b.score - a.score).slice(0, 5),
     protocol: {
       nonNegotiables: leverage.slice(0, 2).flatMap((item) => item.actions.slice(0, 1)),

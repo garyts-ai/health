@@ -2,7 +2,7 @@ import type {
   WhoopAnalysisReport,
   WhoopMetric,
 } from "@/lib/whoop-export/analysis";
-import { WhoopTrends } from "@/components/whoop-trends";
+import { WhoopVisualAnalysis } from "@/components/whoop-trends";
 
 const tones = {
   green: { line: "#78e08f", fill: "#78e08f", text: "text-[#9af0ac]", bar: "bg-[#78e08f]" },
@@ -63,73 +63,6 @@ function DeltaComparison({
   );
 }
 
-function MetricDetails({
-  title,
-  rows,
-  tone,
-}: {
-  title: string;
-  rows: WhoopMetric[];
-  tone: keyof Pick<typeof tones, "green" | "violet" | "cyan" | "amber">;
-}) {
-  const summaryRows = rows.filter((row) => row.recentValue !== null).slice(0, 3);
-  return (
-    <section className="border border-[#d8d2e4] bg-[#fbf9fd]">
-      <div className="p-5">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-[#171329]">{title}</h2>
-          <div className={`h-1 w-12 ${tones[tone].bar}`} />
-        </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          {summaryRows.map((row) => (
-            <div key={row.label}>
-              <div className="text-xs text-[#746d87]">{row.label}</div>
-              <div className="mt-1 text-xl font-semibold tabular-nums text-[#171329]">{row.recent}</div>
-              <div className="mt-1 text-xs text-[#8a8498]">
-                {row.direction === "flat" ? "near baseline" : `${directionLabel(row.direction).toLowerCase()} · ${row.value}`}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <details className="border-t border-[#e4dfeb]">
-        <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-[#554d70]">
-          Full baseline detail
-        </summary>
-        <div className="overflow-x-auto border-t border-[#eeeaf3]">
-          <table className="w-full min-w-[34rem] text-left text-sm">
-            <thead className="bg-[#f2eef7] text-[#6d6785]">
-              <tr>
-                <th className="px-5 py-3 font-medium">Metric</th>
-                <th className="px-5 py-3 font-medium">Full baseline</th>
-                <th className="px-5 py-3 font-medium">Recent 28 days</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.label} className="border-t border-[#eeeaf3]">
-                  <td className="px-5 py-3 font-medium text-[#312c49]">
-                    {row.label}
-                    {row.note ? <div className="mt-1 text-xs font-normal text-[#7b7492]">{row.note}</div> : null}
-                  </td>
-                  <td className="px-5 py-3 tabular-nums text-[#171329]">{row.value}</td>
-                  <td className="px-5 py-3 tabular-nums text-[#4f4965]">{row.recent}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    </section>
-  );
-}
-
-function confidenceTone(confidence: string) {
-  if (confidence === "High") return "border-l-[#78e08f]";
-  if (confidence === "Moderate") return "border-l-[#f4c96b]";
-  return "border-l-[#b5abff]";
-}
-
 export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
   if (report.empty) {
     return (
@@ -180,36 +113,7 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
         </div>
       </section>
 
-      <WhoopTrends series={report.series} />
-
-      <section>
-        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#171329]">Baseline detail</h2>
-        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          <MetricDetails title="Sleep" rows={report.metrics.sleep} tone="violet" />
-          <MetricDetails title="Cardiovascular" rows={report.metrics.cardiovascular} tone="cyan" />
-          <MetricDetails title="Recovery" rows={report.metrics.recovery} tone="green" />
-          <MetricDetails title="Activity and strain" rows={report.metrics.activity} tone="amber" />
-        </div>
-      </section>
-
-      <section className="border border-[#d8d2e4] bg-[#fbf9fd]">
-        <h2 className="border-b border-[#e4dfeb] px-5 py-4 text-xl font-semibold text-[#171329]">Patterns worth attention</h2>
-        <div className="grid gap-px bg-[#e4dfeb] lg:grid-cols-2">
-          {report.findings.map((finding) => (
-            <article key={`${finding.title}-${finding.evidence}`} className={`border-l-4 bg-[#fbf9fd] p-5 ${confidenceTone(finding.confidence)}`}>
-              <div className="flex items-start justify-between gap-4">
-                <h3 className="font-semibold text-[#312c49]">{finding.title}</h3>
-                <div className="shrink-0 text-xs text-[#7b7492]">{finding.confidence}</div>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-[#4f4965]">{finding.evidence}</p>
-              <details className="mt-3 text-sm text-[#6d6785]">
-                <summary className="cursor-pointer font-medium">Interpretation</summary>
-                <p className="mt-2 leading-6">{finding.interpretation}</p>
-              </details>
-            </article>
-          ))}
-        </div>
-      </section>
+      <WhoopVisualAnalysis report={report} />
 
       <section>
         <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#171329]">Highest-leverage changes</h2>
