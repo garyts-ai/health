@@ -192,6 +192,9 @@ export function HeroStatCard({
 
   return (
     <section
+      data-premium-surface
+      data-premium-tone="light"
+      data-premium-enter
       className="@container group relative overflow-hidden rounded-[12px] border border-[#d7d1e5] bg-[#f8f5ff] p-3.5 text-[#171329] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(28,20,62,0.08)] transition-colors hover:border-[#bdb4d9]"
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,_transparent,_rgba(98,91,176,0.42),_transparent)]" />

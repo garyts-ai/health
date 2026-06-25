@@ -7,13 +7,20 @@ function stateTone(day: WeeklyPlanDay) {
   return "border-[#b5abff] bg-[#fbf9fd]";
 }
 
+function premiumTone(day: WeeklyPlanDay) {
+  if (day.state === "today") return "live";
+  if (day.state === "completed") return "recovery";
+  if (day.workoutType === "Rest" || day.workoutType === "Recovery") return "neutral";
+  return "light";
+}
+
 export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
   const plan = summary.weeklyPlan;
   if (!plan) return null;
 
   return (
     <div className="space-y-6">
-      <section className="border border-[#d8d2e4] bg-[#171329] text-white">
+      <section data-premium-surface data-premium-tone="dark" data-premium-enter className="border border-[#d8d2e4] bg-[#171329] text-white">
         <div className="grid gap-px bg-white/10 sm:grid-cols-4">
           {[
             ["Week", `${plan.weekStart} – ${plan.weekEnd}`],
@@ -31,7 +38,13 @@ export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
 
       <section className="grid gap-3 xl:grid-cols-7">
         {plan.days.map((day) => (
-          <article key={day.date} className={`border-t-4 p-4 ${stateTone(day)}`}>
+          <article
+            key={day.date}
+            data-premium-surface
+            data-premium-tone={premiumTone(day)}
+            data-premium-enter
+            className={`border-t-4 p-4 ${stateTone(day)}`}
+          >
             <div className="flex items-start justify-between gap-2 xl:block">
               <div>
                 <div className={`text-xs ${day.state === "today" ? "text-white/52" : "text-[#7b7492]"}`}>{day.label}</div>
@@ -71,7 +84,7 @@ export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
-        <div className="border border-[#d8d2e4] bg-[#fbf9fd] p-5">
+        <div data-premium-surface data-premium-tone="light" data-premium-enter className="border border-[#d8d2e4] bg-[#fbf9fd] p-5">
           <h2 className="font-semibold text-[#171329]">Weekly muscle volume</h2>
           <div className="mt-4 space-y-2 text-sm">
             {summary.trainingLoad.weeklyMuscleVolume.slice(0, 8).map((item) => (
@@ -81,7 +94,7 @@ export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
             ))}
           </div>
         </div>
-        <div className="border border-[#d8d2e4] bg-[#fbf9fd] p-5">
+        <div data-premium-surface data-premium-tone="light" data-premium-enter className="border border-[#d8d2e4] bg-[#fbf9fd] p-5">
           <h2 className="font-semibold text-[#171329]">Weekly scorecard</h2>
           <div className="mt-4 space-y-3 text-sm">
             {summary.physiqueDecision.weeklyScorecard.map((item) => (
@@ -92,7 +105,7 @@ export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
             ))}
           </div>
         </div>
-        <div className="border border-[#d8d2e4] bg-[#fbf9fd] p-5">
+        <div data-premium-surface data-premium-tone="neutral" data-premium-enter className="border border-[#d8d2e4] bg-[#fbf9fd] p-5">
           <h2 className="font-semibold text-[#171329]">Activity context</h2>
           <p className="mt-4 text-sm leading-6 text-[#514a66]">{summary.activityContext.summaryLine}</p>
           <p className="mt-3 text-sm leading-6 text-[#746d87]">{summary.activityContext.interpretation}</p>

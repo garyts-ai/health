@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Manrope } from "next/font/google";
+import { PremiumSurfaceController } from "@/components/premium-surface-controller";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -43,7 +44,10 @@ export default function RootLayout({
       lang="en"
       className={`${manrope.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <PremiumSurfaceController />
+        {children}
+      </body>
     </html>
   );
 }

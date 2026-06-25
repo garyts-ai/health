@@ -61,6 +61,23 @@ body {
   }
 }
 
+@property --premium-enter-y {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes premium-surface-enter {
+  from {
+    opacity: 0;
+    --premium-enter-y: 7px;
+  }
+  to {
+    opacity: 1;
+    --premium-enter-y: 0px;
+  }
+}
+
 @keyframes anatomy-base-in {
   0% {
     opacity: 0;
@@ -165,6 +182,167 @@ body {
 
 .giga-reveal-delay-3 {
   animation-delay: 360ms;
+}
+
+[data-premium-surface] {
+  --premium-rx: 0deg;
+  --premium-ry: 0deg;
+  --premium-x: 50%;
+  --premium-y: 50%;
+  --premium-intensity: 0;
+  --premium-lift: 0;
+  --premium-edge: rgba(185, 177, 223, 0.22);
+  --premium-violet: rgba(147, 128, 229, 0.16);
+  --premium-cyan: rgba(113, 255, 241, 0.12);
+  --premium-rose: rgba(226, 137, 171, 0.1);
+  position: relative;
+  isolation: isolate;
+  transform:
+    perspective(1000px)
+    translate3d(0, var(--premium-enter-y), 0)
+    rotateX(var(--premium-rx))
+    rotateY(var(--premium-ry))
+    scale(calc(1 + var(--premium-lift) * 0.006));
+  transform-style: preserve-3d;
+  transform-origin: center;
+  backface-visibility: hidden;
+  transition:
+    transform 220ms var(--ease-precision),
+    border-color 200ms var(--ease-product),
+    box-shadow 220ms var(--ease-product);
+  will-change: transform;
+}
+
+[data-premium-surface]::before,
+[data-premium-surface]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: calc(var(--premium-intensity) * 0.72);
+  transition: opacity 200ms var(--ease-product);
+}
+
+[data-premium-surface]::before {
+  border: 1px solid var(--premium-edge);
+  background:
+    radial-gradient(
+      circle at var(--premium-x) var(--premium-y),
+      rgba(255, 255, 255, 0.38) 0,
+      rgba(255, 255, 255, 0.12) 8%,
+      transparent 24%
+    ),
+    conic-gradient(
+      from 205deg at var(--premium-x) var(--premium-y),
+      transparent 0deg,
+      var(--premium-violet) 42deg,
+      transparent 88deg,
+      var(--premium-cyan) 154deg,
+      transparent 210deg,
+      var(--premium-rose) 278deg,
+      transparent 335deg
+    );
+  background-blend-mode: screen;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(74, 62, 114, 0.08);
+}
+
+[data-premium-surface]::after {
+  inset: 1px;
+  background:
+    linear-gradient(
+      112deg,
+      transparent 24%,
+      rgba(255, 255, 255, 0.03) 35%,
+      rgba(255, 255, 255, 0.34) 46%,
+      rgba(199, 221, 255, 0.14) 52%,
+      transparent 64%
+    ),
+    radial-gradient(rgba(255, 255, 255, 0.16) 0.55px, transparent 0.8px);
+  background-size: 240% 100%, 5px 5px;
+  background-position: calc(100% - var(--premium-x)) var(--premium-y), 0 0;
+  mix-blend-mode: screen;
+}
+
+[data-premium-surface][data-premium-tone="dark"],
+[data-premium-surface][data-premium-tone="live"] {
+  --premium-edge: rgba(196, 190, 236, 0.28);
+  --premium-violet: rgba(172, 150, 255, 0.2);
+  --premium-cyan: rgba(113, 255, 241, 0.16);
+  --premium-rose: rgba(235, 143, 178, 0.13);
+}
+
+[data-premium-surface][data-premium-tone="live"] {
+  --premium-edge: rgba(152, 240, 232, 0.36);
+  --premium-cyan: rgba(113, 255, 241, 0.22);
+}
+
+[data-premium-surface][data-premium-tone="recovery"] {
+  --premium-edge: rgba(150, 211, 170, 0.3);
+  --premium-violet: rgba(147, 128, 229, 0.1);
+  --premium-cyan: rgba(122, 224, 143, 0.16);
+}
+
+[data-premium-surface][data-premium-tone="caution"] {
+  --premium-edge: rgba(224, 173, 131, 0.32);
+  --premium-violet: rgba(179, 137, 221, 0.1);
+  --premium-rose: rgba(255, 139, 114, 0.18);
+}
+
+[data-premium-surface][data-premium-active],
+[data-premium-surface][data-premium-focus] {
+  --premium-intensity: 1;
+  box-shadow:
+    0 12px 28px rgba(21, 14, 45, 0.14),
+    0 2px 8px rgba(21, 14, 45, 0.08);
+  transition: transform 90ms var(--ease-precision), border-color 180ms var(--ease-product), box-shadow 180ms var(--ease-product);
+}
+
+[data-premium-surface][data-premium-active] {
+  --premium-lift: 1;
+}
+
+[data-premium-surface][data-premium-pressed] {
+  --premium-intensity: 0.78;
+  transform:
+    perspective(1000px)
+    translate3d(0, var(--premium-enter-y), 0)
+    rotateX(var(--premium-rx))
+    rotateY(var(--premium-ry))
+    scale(0.997);
+}
+
+[data-premium-enter] {
+  animation: premium-surface-enter 260ms var(--ease-precision) both;
+  animation-delay: var(--premium-enter-delay, 0ms);
+}
+
+.premium-enter-delay-1 {
+  --premium-enter-delay: 55ms;
+}
+
+.premium-enter-delay-2 {
+  --premium-enter-delay: 110ms;
+}
+
+.premium-enter-delay-3 {
+  --premium-enter-delay: 165ms;
+}
+
+@media (hover: none), (pointer: coarse) {
+  [data-premium-surface] {
+    --premium-intensity: 0.16;
+    transform: none;
+    will-change: auto;
+  }
+
+  [data-premium-surface][data-premium-pressed] {
+    --premium-intensity: 0.62;
+    transform: scale(0.997);
+  }
 }
 
 .cinematic-anatomy {
@@ -589,6 +767,17 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-premium-surface],
+  [data-premium-surface][data-premium-active],
+  [data-premium-surface][data-premium-focus],
+  [data-premium-surface][data-premium-pressed] {
+    --premium-intensity: 0.12;
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
+    will-change: auto;
+  }
+
   *,
   *::before,
   *::after {
