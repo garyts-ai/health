@@ -426,8 +426,9 @@ export function ProtectedSettingsActions({
               Nutrition targets
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[#645c7d]">
-              Smart targets come from body weight, weekly lifting, set volume, and short-term
-              weight trend. You can save them as your manual baseline or override them.
+              {summary.nutritionTargets.campaign.active
+                ? "The Cancun wedding cut temporarily overrides saved targets through July 17. Your manual targets remain saved for afterward."
+                : "Smart targets come from body weight, weekly lifting, set volume, and short-term weight trend. You can save them as your manual baseline or override them."}
             </p>
           </div>
 
@@ -450,6 +451,24 @@ export function ProtectedSettingsActions({
             <div className="mt-2 text-xs text-[#7b7492]">
               Source: {summary.nutritionTargets.targetSource}
             </div>
+            {summary.nutritionTargets.campaign.active ? (
+              <div className="mt-3 border-t border-[rgba(77,67,119,0.1)] pt-3 text-xs leading-5 text-[#645c7d]">
+                <div className="font-medium text-[#312c49]">
+                  {summary.nutritionTargets.campaign.phase.replace("_", " ")} ·{" "}
+                  {summary.nutritionTargets.campaign.daysRemaining} days remaining
+                </div>
+                <div className="mt-1">
+                  Average {summary.nutritionTargets.campaign.averageCalorieTarget} · training{" "}
+                  {summary.nutritionTargets.campaign.trainingDayCalorieTarget} · rest{" "}
+                  {summary.nutritionTargets.campaign.restDayCalorieTarget}
+                </div>
+                <div className="mt-1">
+                  Protein {summary.nutritionTargets.campaign.proteinTargetG}g target ·{" "}
+                  {summary.nutritionTargets.campaign.proteinMinimumG}g minimum
+                </div>
+                <div className="mt-1">{summary.nutritionTargets.campaign.evidence}</div>
+              </div>
+            ) : null}
           </div>
         </div>
 

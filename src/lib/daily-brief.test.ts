@@ -125,6 +125,29 @@ const summary: DailySummary = {
     targetSource: "manual",
     smartReason: "Based on 162.0 lb, 4 lifts, 54 sets, and weight trend is controlled.",
     updatedAt: "2026-04-04T11:00:00.000Z",
+    campaign: {
+      active: false,
+      name: "Cancun wedding cut",
+      phase: "inactive",
+      endDate: "2026-07-17",
+      daysRemaining: 0,
+      proteinTargetG: 160,
+      proteinMinimumG: 140,
+      averageCalorieTarget: null,
+      trainingDayCalorieTarget: null,
+      restDayCalorieTarget: null,
+      dayType: "rest",
+      qualifiedLossRateLbPerWeek: null,
+      currentAverageWeightLb: null,
+      previousAverageWeightLb: null,
+      currentWindowCount: 0,
+      previousWindowCount: 0,
+      goalRangeStableDays: 0,
+      calorieAdjustment: 0,
+      evidence: "",
+      plateauCue: null,
+      finalWeek: false,
+    },
   },
   nutritionActuals: {
     dateKey: "2026-04-04",
@@ -358,18 +381,54 @@ test("buildDiscordSummaryText stays metrics-led for fresh LLM judgment", () => {
 test("buildLlmHandoff prompt asks the model to infer priorities from metrics", () => {
   const handoff = buildLlmHandoff(summary);
 
-  assert.match(handoff.promptText, /Rules/);
-  assert.match(handoff.promptText, /Do not mirror any app-generated action cards/);
-  assert.match(handoff.promptText, /Infer fresh priorities from the data/);
+  assert.match(handoff.promptText, /My goal or follow-up question/);
+  assert.match(handoff.promptText, /Role/);
+  assert.match(handoff.promptText, /What I need from you/);
+  assert.match(handoff.promptText, /Coaching rules/);
+  assert.match(handoff.promptText, /Use the full context, not just today's metrics/);
+  assert.match(handoff.promptText, /Treat the app's deterministic decision as evidence/);
+  assert.match(handoff.promptText, /Current snapshot/);
+  assert.match(handoff.promptText, /Trend and weekly context/);
+  assert.match(handoff.promptText, /Output format/);
+  assert.match(handoff.promptText, /Action items for today/);
+  assert.match(handoff.promptText, /Next-week game plan/);
   assert.match(handoff.promptText, /Overnight read: Normal night/);
   assert.match(handoff.promptText, /Weekly muscle groups hit: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x, Lats 1x/);
+  assert.match(handoff.promptText, /Weekly effective sets: Chest 10 effective sets \/ 2x/);
+  assert.match(handoff.promptText, /Weekly scorecard: Lifts: 4\/4 - 54 sets Mon-Sun/);
   assert.match(handoff.promptText, /Intake logged today: 1780\/2500 cal, 112\/150g protein/);
   assert.match(handoff.promptText, /Activity context \(Last week\): No walks or tennis logged yet this week/);
   assert.match(handoff.promptText, /Latest non-lifting activity: Tennis: 57 min \/ strain 8\.6/);
   assert.match(handoff.promptText, /Body weight context: stable versus last week/);
   assert.match(handoff.promptText, /Latest workout muscle groups: Chest, Front delts, Biceps, Triceps/);
-  assert.match(handoff.promptText, /Output/);
-  assert.match(handoff.promptText, /For each section, give:/);
+  assert.match(handoff.promptText, /Source freshness: WHOOP: connected, fresh/);
+  assert.match(handoff.promptText, /For every recommendation, include:/);
   assert.doesNotMatch(handoff.promptText, /Keep intensity moderate/);
   assert.doesNotMatch(handoff.promptText, /Protect tonight's sleep/);
+});
+
+test("buildLlmHandoff prompt labels missing data clearly", () => {
+  const sparseSummary: DailySummary = structuredClone(summary);
+  sparseSummary.readiness.recoveryScore = null;
+  sparseSummary.readiness.sleepHours = null;
+  sparseSummary.readiness.sleepStageSummary = null;
+  sparseSummary.trainingLoad.weeklyMuscleFocus = [];
+  sparseSummary.trainingLoad.weeklyMuscleVolume = [];
+  sparseSummary.trainingLoad.latestWorkoutFocus = [];
+  sparseSummary.physiqueDecision.strengthProgression = [];
+  sparseSummary.nutritionActuals.hasLoggedIntake = false;
+  sparseSummary.nutritionActuals.remainingCalories = null;
+  sparseSummary.nutritionActuals.remainingProteinG = null;
+
+  const handoff = buildLlmHandoff(sparseSummary);
+
+  assert.match(handoff.promptText, /Recovery score: Not available/);
+  assert.match(handoff.promptText, /Actual sleep: Not available/);
+  assert.match(handoff.promptText, /Sleep composition: Not available/);
+  assert.match(handoff.promptText, /Intake logged today: No meals logged yet/);
+  assert.match(handoff.promptText, /calories remaining not available/);
+  assert.match(handoff.promptText, /Weekly muscle groups hit: No current-week lifting exposure logged/);
+  assert.match(handoff.promptText, /Weekly effective sets: No current-week lifting volume/);
+  assert.match(handoff.promptText, /Strength progression: Not enough repeat lift history/);
+  assert.match(handoff.promptText, /Latest workout muscle groups: Not available/);
 });

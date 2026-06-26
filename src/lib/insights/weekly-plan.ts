@@ -1,5 +1,5 @@
 import { dbAll } from "@/lib/db";
-import type { DailyPhysiqueDecision, DailyReadiness, DailyTrainingLoad, WeeklyPlan, WeeklyPlanDay } from "@/lib/insights/types";
+import type { DailyNutritionTargets, DailyPhysiqueDecision, DailyReadiness, DailyTrainingLoad, WeeklyPlan, WeeklyPlanDay } from "@/lib/insights/types";
 
 const TIME_ZONE = "America/New_York";
 const DAY_MS = 86_400_000;
@@ -102,8 +102,7 @@ export async function buildWeeklyPlan(
   decision: DailyPhysiqueDecision,
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
-  calorieTarget: number | null,
-  proteinTargetG: number | null,
+  nutritionTargets: DailyNutritionTargets,
 ) {
   const start = monday(now);
   const completed = await dbAll<{ date: string; title: string | null }>(
@@ -112,8 +111,13 @@ export async function buildWeeklyPlan(
   );
   const plan = buildWeeklyPlanFromInputs({ now, decision, readiness, trainingLoad, completed });
   plan.days.forEach((day) => {
-    day.calorieTarget = calorieTarget;
-    day.proteinTargetG = proteinTargetG;
+    const isLift = day.workoutType === "Upper" || day.workoutType === "Lower";
+    day.calorieTarget = nutritionTargets.campaign.active
+      ? isLift
+        ? nutritionTargets.campaign.trainingDayCalorieTarget
+        : nutritionTargets.campaign.restDayCalorieTarget
+      : nutritionTargets.effectiveCalorieTarget;
+    day.proteinTargetG = nutritionTargets.effectiveProteinTargetG;
   });
   return plan;
 }

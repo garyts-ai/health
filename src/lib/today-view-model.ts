@@ -217,7 +217,7 @@ function buildReadinessQualifier(summary: DailySummary) {
     summary.stressFlags.poorSleepTrend;
 
   if (daysAgo >= 3 && systemicHit) {
-    return "Local soreness is probably easing, but overnight recovery is the main reason not to push today.";
+    return "The last lift is at least three days old; today’s intensity cap comes from the overnight signals shown above.";
   }
 
   if (daysAgo >= 3) {
@@ -225,7 +225,7 @@ function buildReadinessQualifier(summary: DailySummary) {
   }
 
   if (daysAgo <= 1 && systemicHit) {
-    return "Recent lifting and overnight recovery are both working against a hard push today.";
+    return "A lift within the last day plus the flagged overnight signals argues against adding extra hard sets.";
   }
 
   if (daysAgo <= 1) {
@@ -233,10 +233,10 @@ function buildReadinessQualifier(summary: DailySummary) {
   }
 
   if (systemicHit) {
-    return "Muscle readiness may be improving, but systemic recovery is still the main limiter today.";
+    return "The overnight signals shown above, rather than split recency, are setting today’s intensity ceiling.";
   }
 
-  return "Local fatigue looks more relevant than systemic recovery today.";
+  return "Split recency is the main constraint detected today; no systemic rest trigger was met.";
 }
 
 function getUtilityStatusLabel(
@@ -306,7 +306,9 @@ export function buildTodayViewModel(
             ? "Progress"
             : summary.physiqueDecision.trainingIntent,
         calories:
-          summary.physiqueDecision.calorieRecommendation === "set target"
+          summary.nutritionTargets.campaign.active
+            ? `${summary.physiqueDecision.calorieTargetLabel} / ${summary.nutritionTargets.campaign.dayType}`
+            : summary.physiqueDecision.calorieRecommendation === "set target"
             ? summary.physiqueDecision.calorieTargetLabel
             : `${summary.physiqueDecision.calorieTargetLabel} / ${summary.physiqueDecision.calorieRecommendation}`,
         protein: summary.physiqueDecision.proteinTargetLabel,

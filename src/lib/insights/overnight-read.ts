@@ -179,17 +179,24 @@ export function buildOvernightRead(
   const shortSleep = (readiness.sleepHours ?? 0) < 7;
 
   if (!disruption.active) {
-    const label =
-      (readiness.sleepPerformance ?? 100) < 78 || (readiness.recoveryScore ?? 100) < 55
-        ? "Recovery hit"
-        : "Normal night";
+    const sleepWasFragmented =
+      (readiness.sleepPerformance ?? 100) < 78 ||
+      (readiness.sleepConsistency ?? 100) < 70 ||
+      (readiness.awakeHours ?? 0) >= 1.1;
+    const recoveryWasLow = (readiness.recoveryScore ?? 100) < 55;
+    const label = recoveryWasLow
+      ? "Low recovery score"
+      : sleepWasFragmented
+        ? "Fragmented sleep"
+        : "No major overnight deviation";
     return {
       label,
-      tone: label === "Normal night" ? "normal" : "caution",
-      detail:
-        label === "Normal night"
-          ? "Sleep and recovery stayed close to baseline overnight"
-          : "Last night landed below baseline, but not enough to call it a major disruption",
+      tone: recoveryWasLow || sleepWasFragmented ? "caution" : "normal",
+      detail: recoveryWasLow
+        ? `Recovery was ${readiness.recoveryScore ?? "--"}%; sleep was ${readiness.sleepHours?.toFixed(1) ?? "--"}h`
+        : sleepWasFragmented
+          ? `Recovery was ${readiness.recoveryScore ?? "--"}%, but sleep performance was ${readiness.sleepPerformance ?? "--"}% with ${readiness.awakeHours?.toFixed(1) ?? "--"}h awake`
+          : `Recovery was ${readiness.recoveryScore ?? "--"}% and sleep was ${readiness.sleepHours?.toFixed(1) ?? "--"}h`,
       lane: "normal",
     };
   }

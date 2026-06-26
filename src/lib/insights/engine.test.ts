@@ -8,6 +8,7 @@ import {
   classifyWhoopActivity,
   inferBuckets,
 } from "@/lib/insights/engine";
+import type { CancunCampaign } from "@/lib/insights/nutrition-campaign";
 import type {
   DailyActivityContext,
   DailyLateNightDisruption,
@@ -143,6 +144,29 @@ const nutritionTargets: DailyNutritionTargets = {
   targetSource: "smart",
   smartReason: "Smart target from body weight and training goal.",
   updatedAt: null,
+  campaign: {
+    active: false,
+    name: "Cancun wedding cut",
+    phase: "inactive",
+    endDate: "2026-07-17",
+    daysRemaining: 0,
+    proteinTargetG: 160,
+    proteinMinimumG: 140,
+    averageCalorieTarget: null,
+    trainingDayCalorieTarget: null,
+    restDayCalorieTarget: null,
+    dayType: "rest",
+    qualifiedLossRateLbPerWeek: null,
+    currentAverageWeightLb: null,
+    previousAverageWeightLb: null,
+    currentWindowCount: 0,
+    previousWindowCount: 0,
+    goalRangeStableDays: 0,
+    calorieAdjustment: 0,
+    evidence: "",
+    plateauCue: null,
+    finalWeek: false,
+  } satisfies CancunCampaign,
 };
 
 const nutritionActuals: DailyNutritionActuals = {
@@ -491,6 +515,68 @@ test("physique decision ignores previous-week fallback activity for today's fati
 
   assert.equal(decision.trainingAvailability, "Train");
   assert.equal(decision.decisionFactors.some((factor) => factor.label === "Tennis load"), false);
+});
+
+test("strong recovery plus walking strain does not become a systemic rest recommendation", () => {
+  const decision = buildPhysiqueDecision(
+    makeReadiness({
+      recoveryScore: 84,
+      sleepPerformance: 72,
+      sleepConsistency: 59,
+      sleepVsNeedHours: -0.7,
+      awakeHours: 2.1,
+      restingHeartRateVs7d: -6,
+      hrvVs7d: 6.4,
+    }),
+    makeTraining({
+      hevyWorkoutCountThisWeek: 2,
+      hevyWorkoutCount7d: 4,
+      hevySetCount7d: 92,
+      recentLoadSpike: true,
+      upperBodyDaysSince: 0,
+      lowerBodyDaysSince: 1,
+    }),
+    makeStressFlags({ poorSleepTrend: true, highTrainingLoad: true }),
+    makeLateNight(),
+    makeActivityContext({
+      hasActivity: true,
+      currentWeekHasActivity: true,
+      totalStrain: 10.2,
+      buckets: [
+        {
+          kind: "walking",
+          label: "Walking",
+          count: 3,
+          durationMinutes: 75,
+          strain: 10.2,
+          distanceMeter: 6000,
+        },
+      ],
+      latestSession: {
+        id: "walk-current",
+        kind: "walking",
+        sportName: "walking",
+        start: "2026-06-24T17:00:00.000Z",
+        end: "2026-06-24T17:20:00.000Z",
+        durationMinutes: 20,
+        strain: 4.6,
+        averageHeartRate: 98,
+        maxHeartRate: 116,
+        distanceMeter: 1600,
+      },
+    }),
+    nutritionTargets,
+    nutritionActuals,
+    [],
+    new Date("2026-06-25T14:00:00.000Z"),
+  );
+
+  assert.equal(decision.trainingAvailability, "Train");
+  assert.equal(decision.trainingIntent, "Back off");
+  assert.match(decision.primaryDecisionReason, /4 lifts and 92 sets/);
+  assert.doesNotMatch(decision.primaryDecisionReason, /compromised|looks good/i);
+  assert.equal(decision.decisionFactors.some((factor) => factor.label === "Conditioning load"), false);
+  assert.equal(decision.decisionFactors.some((factor) => factor.label === "Physiology supportive"), true);
 });
 
 test("late-night disruption infers a hangover-like lane from a rough night without illness markers", () => {

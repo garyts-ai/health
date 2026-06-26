@@ -148,9 +148,10 @@ export type DailyNutritionTargets = {
   effectiveProteinTargetG: number | null;
   smartCalorieTarget: number | null;
   smartProteinTargetG: number | null;
-  targetSource: "manual" | "smart" | "missing";
+  targetSource: "campaign" | "manual" | "smart" | "missing";
   smartReason: string;
   updatedAt: string | null;
+  campaign: import("@/lib/insights/nutrition-campaign").CancunCampaign;
 };
 
 export type DailyNutritionIntakeEntry = {
