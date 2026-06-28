@@ -83,6 +83,7 @@ export type DailyReadiness = {
   restingHeartRateVs7d: number | null;
   hrvRmssd: number | null;
   hrvVs7d: number | null;
+  spo2Percentage: number | null;
   respiratoryRate: number | null;
   respiratoryRateVs7d: number | null;
   skinTempCelsius: number | null;
@@ -139,6 +140,26 @@ export type DailyTrainingLoad = {
     hits: number;
   }>;
   latestWorkoutFocus: string[];
+  recentWorkoutDetails?: DailyRecentWorkoutDetail[];
+};
+
+export type DailyRecentWorkoutDetail = {
+  id: string;
+  title: string;
+  startedAt: string;
+  durationMinutes: number | null;
+  volumeKg: number | null;
+  setCount: number;
+  exerciseCount: number;
+  exercises: DailyRecentExerciseDetail[];
+};
+
+export type DailyRecentExerciseDetail = {
+  title: string;
+  setCount: number;
+  workingSetCount: number;
+  topSetLabel: string | null;
+  setSummary: string;
 };
 
 export type DailyNutritionTargets = {

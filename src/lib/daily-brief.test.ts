@@ -41,6 +41,7 @@ const summary: DailySummary = {
     restingHeartRateVs7d: 1.2,
     hrvRmssd: 78,
     hrvVs7d: 3.1,
+    spo2Percentage: 96.2,
     respiratoryRate: 14.2,
     respiratoryRateVs7d: 0.2,
     skinTempCelsius: 36.8,
@@ -82,6 +83,33 @@ const summary: DailySummary = {
       { label: "Lats", effectiveSets: 5, hits: 1 },
     ],
     latestWorkoutFocus: ["Chest", "Front delts", "Biceps", "Triceps"],
+    recentWorkoutDetails: [
+      {
+        id: "hevy-1",
+        title: "UPPER B: Chest/Arms",
+        startedAt: "2026-04-03T10:00:00.000Z",
+        durationMinutes: 45,
+        volumeKg: 8340,
+        setCount: 18,
+        exerciseCount: 5,
+        exercises: [
+          {
+            title: "Chest Press",
+            setCount: 4,
+            workingSetCount: 3,
+            topSetLabel: "180 lb x 8 reps",
+            setSummary: "160 lb x 10 reps; 170 lb x 9 reps; 180 lb x 8 reps",
+          },
+          {
+            title: "Triceps Pushdown",
+            setCount: 3,
+            workingSetCount: 3,
+            topSetLabel: "80 lb x 12 reps",
+            setSummary: "70 lb x 12 reps; 75 lb x 12 reps; 80 lb x 12 reps",
+          },
+        ],
+      },
+    ],
   },
   stressFlags: {
     illnessRisk: false,
@@ -357,6 +385,51 @@ const summary: DailySummary = {
     headline: "Recovery improved, but upper-body fatigue and weekly load still shape the day.",
     deltas: ["Recovery improved, but upper-body fatigue and weekly load still shape the day."],
   },
+  historicalContext: {
+    available: true,
+    importAgeTier: "current",
+    coverageEnd: "2026-06-24T00:00:00.000Z",
+    confidence: "high",
+    qualifier: "Recent recovery is above personal baseline.",
+    strongestDeviation: "HRV above baseline",
+    behaviorCue: "Hydration and consistent sleep timing correlate with better recovery.",
+  },
+  weeklyPlan: {
+    weekStart: "2026-03-30",
+    weekEnd: "2026-04-05",
+    targetLifts: 4,
+    completedLifts: 4,
+    days: [
+      {
+        date: "2026-03-30",
+        label: "Mon",
+        state: "completed",
+        workoutType: "Upper",
+        intent: "Maintain",
+        anchors: ["Chest Press", "Seated Row"],
+        calorieTarget: 2500,
+        proteinTargetG: 150,
+        recoveryPriority: "Normal recovery routine",
+        rationale: "UPPER A completed",
+        guardrail: null,
+        actualWorkout: "UPPER A",
+      },
+      {
+        date: "2026-04-04",
+        label: "Sat",
+        state: "today",
+        workoutType: "Lower",
+        intent: "Maintain",
+        anchors: ["Single Leg Press", "Seated Leg Curl"],
+        calorieTarget: 2500,
+        proteinTargetG: 150,
+        recoveryPriority: "Normal recovery routine",
+        rationale: "Today mirrors the live decision.",
+        guardrail: "Back off if warm-up or live recovery confirms fatigue.",
+        actualWorkout: null,
+      },
+    ],
+  },
   llmPromptText: "Prompt text",
 };
 
@@ -371,27 +444,30 @@ test("buildDiscordSummaryText stays metrics-led for fresh LLM judgment", () => {
   assert.match(text, /Nutrition: 1780\/2500 cal \| 112\/150g protein/);
   assert.match(text, /Body weight: 162\.0 lb \| stable versus last week/);
   assert.match(text, /Latest session:/);
-  assert.match(text, /Prompt:/);
+  assert.match(text, /Data packet:/);
   assert.doesNotMatch(text, /\*\*Train:\*\*/);
   assert.doesNotMatch(text, /\*\*Eat:\*\*/);
   assert.doesNotMatch(text, /\*\*Recover:\*\*/);
   assert.doesNotMatch(text, /39247/);
 });
 
-test("buildLlmHandoff prompt asks the model to infer priorities from metrics", () => {
+test("buildLlmHandoff returns a neutral data context packet", () => {
   const handoff = buildLlmHandoff(summary);
 
-  assert.match(handoff.promptText, /My goal or follow-up question/);
-  assert.match(handoff.promptText, /Role/);
-  assert.match(handoff.promptText, /What I need from you/);
-  assert.match(handoff.promptText, /Coaching rules/);
-  assert.match(handoff.promptText, /Use the full context, not just today's metrics/);
-  assert.match(handoff.promptText, /Treat the app's deterministic decision as evidence/);
-  assert.match(handoff.promptText, /Current snapshot/);
-  assert.match(handoff.promptText, /Trend and weekly context/);
-  assert.match(handoff.promptText, /Output format/);
-  assert.match(handoff.promptText, /Action items for today/);
-  assert.match(handoff.promptText, /Next-week game plan/);
+  assert.equal(handoff.copyLabel, "Copy data packet");
+  assert.equal(handoff.promptText, handoff.contextPacketText);
+  assert.match(handoff.promptText, /HealthMax LLM context packet/);
+  assert.match(handoff.promptText, /Gary will ask a separate question alongside this packet/);
+  assert.match(handoff.promptText, /HealthMax deterministic output/);
+  assert.match(handoff.promptText, /Source freshness and coverage/);
+  assert.match(handoff.promptText, /Current recovery, strain, and physiology/);
+  assert.match(handoff.promptText, /Sleep detail/);
+  assert.match(handoff.promptText, /Recent trends/);
+  assert.match(handoff.promptText, /Lifting summary/);
+  assert.match(handoff.promptText, /Recent lift details/);
+  assert.match(handoff.promptText, /Weekly plan data/);
+  assert.match(handoff.promptText, /Nutrition/);
+  assert.match(handoff.promptText, /Activity/);
   assert.match(handoff.promptText, /Overnight read: Normal night/);
   assert.match(handoff.promptText, /Weekly muscle groups hit: Chest 2x, Front delts 2x, Biceps 2x, Triceps 2x, Lats 1x/);
   assert.match(handoff.promptText, /Weekly effective sets: Chest 10 effective sets \/ 2x/);
@@ -402,7 +478,19 @@ test("buildLlmHandoff prompt asks the model to infer priorities from metrics", (
   assert.match(handoff.promptText, /Body weight context: stable versus last week/);
   assert.match(handoff.promptText, /Latest workout muscle groups: Chest, Front delts, Biceps, Triceps/);
   assert.match(handoff.promptText, /Source freshness: WHOOP: connected, fresh/);
-  assert.match(handoff.promptText, /For every recommendation, include:/);
+  assert.match(handoff.promptText, /Historical WHOOP context: coverage end/);
+  assert.match(handoff.promptText, /Workout 1: UPPER B: Chest\/Arms/);
+  assert.match(handoff.promptText, /Chest Press: 3\/4 working sets; top 180 lb x 8 reps/);
+  assert.match(handoff.promptText, /Blood oxygen SpO2: 96\.2%/);
+  assert.match(handoff.promptText, /Sat 2026-04-04: today; Lower; intent Maintain/);
+  assert.doesNotMatch(handoff.promptText, /My goal or follow-up question/);
+  assert.doesNotMatch(handoff.promptText, /What I need from you/);
+  assert.doesNotMatch(handoff.promptText, /Coaching rules/);
+  assert.doesNotMatch(handoff.promptText, /Output format/);
+  assert.doesNotMatch(handoff.promptText, /Action items/);
+  assert.doesNotMatch(handoff.promptText, /Next-week game plan/);
+  assert.doesNotMatch(handoff.promptText, /For every recommendation/);
+  assert.doesNotMatch(handoff.promptText, /Ask clarifying questions/);
   assert.doesNotMatch(handoff.promptText, /Keep intensity moderate/);
   assert.doesNotMatch(handoff.promptText, /Protect tonight's sleep/);
 });

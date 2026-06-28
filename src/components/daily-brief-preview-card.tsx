@@ -18,7 +18,7 @@ export async function DailyBriefPreviewCard({
     deliveryStatus,
   );
   const imagePrompt =
-    "Use only this snapshot to infer today's training, eating, recovery, supplements, and caution priorities. Make a fresh call from the metrics rather than echoing the app's built-in recommendations.";
+    "Use this image as compact HealthMax context only. Pair it with the copied data packet and your own specific question.";
 
   return (
     <div className="w-full max-w-[1040px] rounded-[16px] bg-[linear-gradient(155deg,_#2b2353_0%,_#6250a7_44%,_#ff9a82_100%)] p-5 text-[#19162a]">
@@ -26,7 +26,7 @@ export async function DailyBriefPreviewCard({
         <div className="rounded-[12px] bg-[rgba(17,13,31,0.34)] px-5 py-3 text-white ring-1 ring-white/8">
           <div className="flex items-center justify-between gap-6">
             <div>
-              <p className="text-[11px] font-medium text-white/58">External model handoff</p>
+              <p className="text-[11px] font-medium text-white/58">LLM context packet</p>
             </div>
             <div className="text-right">
               <p className="text-[11px] text-white/58">{dashboard.header.productName}</p>

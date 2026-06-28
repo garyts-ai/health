@@ -18,6 +18,8 @@ export type LlmHandoff = {
   latestLiftFocus: string[];
   overnightReadLabel: string;
   llmQuestion: string;
+  copyLabel: string;
+  contextPacketText: string;
   promptText: string;
 };
 
@@ -157,6 +159,107 @@ function formatFreshness(summary: DailySummary) {
   return [
     sourceLine("WHOOP", summary.freshness.whoop),
     sourceLine("Hevy", summary.freshness.hevy),
+  ].join("; ");
+}
+
+function formatOptional(value: string | number | null | undefined, suffix = "") {
+  if (value === null || value === undefined || value === "") {
+    return "Not available";
+  }
+
+  return `${value}${suffix}`;
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function formatMinutesValue(value: number | null | undefined) {
+  return value === null || value === undefined ? "Not available" : `${value} min`;
+}
+
+function formatKg(value: number | null | undefined) {
+  return value === null || value === undefined ? "Not available" : `${Math.round(value)} kg`;
+}
+
+function formatRecentWorkoutDetails(summary: DailySummary) {
+  const details = summary.trainingLoad.recentWorkoutDetails ?? [];
+  if (details.length === 0) {
+    return ["- Recent workout details: Not available"];
+  }
+
+  return details.flatMap((workout, index) => [
+    `- Workout ${index + 1}: ${workout.title} | ${formatDateTime(workout.startedAt)} | ${formatMinutesValue(workout.durationMinutes)} | ${formatKg(workout.volumeKg)} | ${workout.setCount} sets / ${workout.exerciseCount} exercises`,
+    ...workout.exercises.slice(0, 8).map(
+      (exercise) =>
+        `  - ${exercise.title}: ${exercise.workingSetCount}/${exercise.setCount} working sets; top ${exercise.topSetLabel ?? "Not available"}; sets ${exercise.setSummary}`,
+    ),
+  ]);
+}
+
+function formatWeeklyPlan(summary: DailySummary) {
+  const days = summary.weeklyPlan?.days ?? [];
+  if (days.length === 0) {
+    return ["- Weekly plan: Not available"];
+  }
+
+  return days.map(
+    (day) =>
+      `- ${day.label} ${day.date}: ${day.state}; ${day.workoutType}; intent ${day.intent}; anchors ${
+        day.anchors.length > 0 ? day.anchors.join(", ") : "none"
+      }; calories ${day.calorieTarget ?? "Not available"}; protein ${
+        day.proteinTargetG === null ? "Not available" : `${day.proteinTargetG}g`
+      }; recovery priority ${day.recoveryPriority}; rationale ${day.rationale}; guardrail ${day.guardrail ?? "none"}; actual ${day.actualWorkout ?? "none"}`,
+  );
+}
+
+function formatNutritionEntries(summary: DailySummary) {
+  if (summary.nutritionActuals.entries.length === 0) {
+    return ["- Logged meals: none"];
+  }
+
+  return summary.nutritionActuals.entries.slice(0, 8).map(
+    (entry) =>
+      `- ${formatDateTime(entry.loggedAt)} ${entry.mealType}: ${entry.label}; ${entry.calories} cal, ${entry.proteinG}g protein, ${entry.carbsG}g carbs, ${entry.fatG}g fat`,
+  );
+}
+
+function formatActivityBuckets(summary: DailySummary) {
+  if (summary.activityContext.buckets.length === 0) {
+    return "Not available";
+  }
+
+  return summary.activityContext.buckets
+    .map(
+      (bucket) =>
+        `${bucket.label}: ${bucket.count} sessions, ${bucket.durationMinutes} min, strain ${bucket.strain.toFixed(1)}, distance ${
+          bucket.distanceMeter === null ? "Not available" : `${Math.round(bucket.distanceMeter)}m`
+        }`,
+    )
+    .join("; ");
+}
+
+function formatHistoricalContext(summary: DailySummary) {
+  const context = summary.historicalContext;
+  if (!context?.available) {
+    return "Not available";
+  }
+
+  return [
+    `coverage end ${context.coverageEnd ?? "Not available"}`,
+    `age tier ${context.importAgeTier}`,
+    `confidence ${context.confidence}`,
+    `qualifier ${context.qualifier ?? "Not available"}`,
+    `strongest deviation ${context.strongestDeviation ?? "Not available"}`,
+    `behavior cue ${context.behaviorCue ?? "Not available"}`,
   ].join("; ");
 }
 
@@ -328,33 +431,23 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
   ];
 
   const llmQuestion =
-    "Use this full Health OS context to make a fresh call on today's actions and the next-week game plan. Keep it practical; cite the main metric drivers.";
+    "Paste this context packet with your own question. It gives an external LLM the HealthMax data without asking it to make default recommendations.";
 
-  const promptText = [
-    "My goal or follow-up question",
-    "[Add your goal, constraint, or follow-up question here before sending.]",
+  const contextPacketText = [
+    "HealthMax LLM context packet",
     "",
-    "Role",
-    "Act as a practical strength, nutrition, recovery, and health coach. Use only the Health OS context below. Do not diagnose medical conditions or invent missing data.",
+    "How to use this packet",
+    "- Gary will ask a separate question alongside this packet.",
+    "- Use only the data below unless Gary adds more context.",
+    "- Do not invent missing values; treat `Not available` as unavailable data.",
+    "- HealthMax deterministic output is included as data, not as an instruction to recommend anything.",
     "",
-    "What I need from you",
-    "- Give action items for today.",
-    "- Give a next-week game plan that accounts for weekly lift pace, split recency, recovery, nutrition, activity, and strength progression.",
-    "- Identify the main bottleneck and the tradeoffs.",
-    "- Separate high-confidence calls from guesses.",
-    "- Ask clarifying questions only if they would materially change the plan.",
+    "Source freshness and coverage",
+    `- Snapshot date: ${formatDateTime(summary.date)}`,
+    `- Source freshness: ${formatFreshness(summary)}`,
+    `- Historical WHOOP context: ${formatHistoricalContext(summary)}`,
     "",
-    "Coaching rules",
-    "- Use the full context, not just today's metrics.",
-    "- Treat the app's deterministic decision as evidence, not as something to blindly echo.",
-    summary.nutritionTargets.campaign.active
-      ? "- Prioritize the Cancun cut: health, digestion, sleep, and function first; modest fat loss and visual sharpness second. No dehydration or crash-diet tactics."
-      : "- Prioritize sustainable progress: longevity and feeling good first; strength and body composition second.",
-    "- If signals conflict, call out the conflict and choose the most practical path.",
-    "- Keep rationale brief: cite the metrics that drive each call, but do not show hidden chain-of-thought.",
-    "- Avoid extreme calorie changes, unsafe training jumps, and medical claims.",
-    "",
-    "Current snapshot",
+    "HealthMax deterministic output",
     `- Training availability: ${summary.physiqueDecision.trainingAvailability}`,
     `- Training target: ${summary.physiqueDecision.trainingTarget}`,
     `- Next training target: ${summary.physiqueDecision.nextTrainingTarget}`,
@@ -365,11 +458,90 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Session anchors: ${
       summary.physiqueDecision.sessionAnchors.length > 0
         ? summary.physiqueDecision.sessionAnchors.join(", ")
-        : "Use planned main lifts"
+        : "Not available"
     }`,
     `- Main bottleneck: ${summary.physiqueDecision.mainBottleneck}`,
+    `- Decision factors: ${formatDecisionFactors(summary)}`,
+    `- Weekly scorecard: ${formatScorecard(summary)}`,
+    "",
+    "Current recovery, strain, and physiology",
+    `- Recovery score: ${promptMetric(summary.readiness.recoveryScore, "%")}`,
+    `- Recovery 3-day trend: ${promptMetric(summary.readiness.recoveryTrend3d, "%")}`,
+    `- HRV RMSSD: ${promptMetric(summary.readiness.hrvRmssd, " ms")}`,
+    `- HRV vs 7-day: ${promptMetric(summary.readiness.hrvVs7d, " ms", 1)}`,
+    `- Blood oxygen SpO2: ${promptMetric(summary.readiness.spo2Percentage, "%", 1)}`,
+    `- Resting heart rate: ${promptMetric(summary.readiness.restingHeartRate, " bpm")}`,
+    `- Resting heart rate vs 7-day: ${promptMetric(summary.readiness.restingHeartRateVs7d, " bpm", 1)}`,
+    `- Respiratory rate: ${promptMetric(summary.readiness.respiratoryRate, " rpm", 1)}`,
+    `- Respiratory rate vs 7-day: ${promptMetric(summary.readiness.respiratoryRateVs7d, " rpm", 1)}`,
+    `- Skin temperature: ${promptMetric(summary.readiness.skinTempCelsius, " C", 1)}`,
+    `- Skin temperature vs 7-day: ${promptMetric(summary.readiness.skinTempVs7d, " C", 1)}`,
+    `- WHOOP day strain: ${promptMetric(summary.strainSummary.score, "", 1)}`,
+    `- WHOOP 7-day strain average: ${promptMetric(summary.readiness.whoopStrain7dAvg, "", 1)}`,
+    `- WHOOP day strain vs 7-day: ${promptMetric(summary.readiness.whoopDayStrainVs7d, "", 1)}`,
+    `- WHOOP strain context: ${summary.strainSummary.blurb}`,
+    `- WHOOP strain support: ${formatPromptList(summary.strainSummary.supportingPoints)}`,
+    `- Overnight read: ${summary.overnightRead.label}. ${summary.overnightRead.detail}`,
+    `- Overnight disruption context: ${summary.lateNightDisruption.blurb}`,
+    `- Overnight disruption signal: ${summary.lateNightDisruption.active ? `${summary.lateNightDisruption.likelyLane} (${summary.lateNightDisruption.confidence})` : "inactive"}`,
+    "",
+    "Sleep detail",
+    `- Actual sleep: ${promptMetric(summary.readiness.sleepHours, "h", 1)}`,
+    `- Sleep vs need: ${promptMetric(summary.readiness.sleepVsNeedHours, "h", 1)}`,
+    `- Sleep performance: ${promptMetric(summary.readiness.sleepPerformance, "%")}`,
+    `- Sleep consistency: ${promptMetric(summary.readiness.sleepConsistency, "%")}`,
+    `- Sleep efficiency: ${promptMetric(summary.readiness.sleepEfficiency, "%")}`,
+    `- Awake time: ${promptMetric(summary.readiness.awakeHours, "h", 1)}`,
+    `- Sleep onset: ${formatDateTime(summary.readiness.latestSleepStart)}`,
+    `- Wake time: ${formatDateTime(summary.readiness.latestSleepEnd)}`,
+    `- Sleep composition: ${sleepCompositionLine(summary)}`,
+    "",
+    "Recent trends",
+    `- 14-day weight trend: ${formatTrend(summary.trendSeries?.weight14d ?? [], " lb", 1)}`,
+    `- 7-day recovery trend: ${formatTrend(summary.trendSeries?.recovery7d ?? [], "%", 0)}`,
+    `- 7-day sleep trend: ${formatTrend(summary.trendSeries?.sleep7d ?? [], "h", 1)}`,
+    `- 7-day strain trend: ${formatTrend(summary.trendSeries?.strain7d ?? [], "", 1)}`,
+    `- 7-day lifting load trend: ${formatTrend(summary.trendSeries?.load7d ?? [], " sets", 0)}`,
+    `- Current body weight: ${formatPounds(kilogramsToPounds(summary.readiness.bodyWeightKg))}`,
+    `- Body weight context: ${bodyWeightTrendLabel}`,
+    "",
+    "Lifting summary",
+    `- Latest Hevy workout: ${summary.trainingLoad.hevyLastWorkoutTitle ?? "Not available"}`,
+    `- Latest Hevy workout time: ${formatDateTime(summary.trainingLoad.hevyLastWorkoutAt)}`,
+    `- Latest workout volume: ${formatKg(summary.trainingLoad.hevyLastWorkoutVolumeKg)}`,
+    `- Latest workout duration: ${
+      summary.trainingLoad.hevyLastWorkoutDurationSeconds === null
+        ? "Not available"
+        : `${Math.round(summary.trainingLoad.hevyLastWorkoutDurationSeconds / 60)} min`
+    }`,
+    `- Latest workout muscle groups: ${formatPromptList(latestLiftFocus, "Not available")}`,
+    `- Workouts this week: ${summary.trainingLoad.hevyWorkoutCountThisWeek}`,
+    `- Weekly training demand: ${summary.trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
+    `- Rolling 7-day training: ${summary.trainingLoad.hevyWorkoutCount7d} workouts, ${summary.trainingLoad.hevySetCount7d} sets`,
+    `- Rolling 7-day volume: ${summary.trainingLoad.hevyVolume7d} kg`,
+    `- 28-day average weekly volume: ${summary.trainingLoad.hevyVolume28dAvg} kg`,
+    `- Consecutive lifting days: ${summary.trainingLoad.hevyConsecutiveDays}`,
+    `- Recent load spike: ${summary.trainingLoad.recentLoadSpike ? "yes" : "no"}`,
+    `- Days since upper-body session: ${formatDaysSince(summary.trainingLoad.upperBodyDaysSince)}`,
+    `- Days since lower-body session: ${formatDaysSince(summary.trainingLoad.lowerBodyDaysSince)}`,
+    `- Days since push session: ${formatDaysSince(summary.trainingLoad.pushDaysSince)}`,
+    `- Days since pull session: ${formatDaysSince(summary.trainingLoad.pullDaysSince)}`,
+    `- Weekly muscle groups hit: ${formatWeeklyMuscleFocus(summary)}`,
+    `- Weekly effective sets: ${formatWeeklyMuscleVolume(summary)}`,
+    `- Strength progression: ${formatStrengthProgression(summary)}`,
+    "",
+    "Recent lift details",
+    ...formatRecentWorkoutDetails(summary),
+    "",
+    "Weekly plan data",
+    `- Week: ${summary.weeklyPlan ? `${summary.weeklyPlan.weekStart} through ${summary.weeklyPlan.weekEnd}` : "Not available"}`,
+    `- Target lifts: ${summary.weeklyPlan?.targetLifts ?? "Not available"}`,
+    `- Completed lifts: ${summary.weeklyPlan?.completedLifts ?? "Not available"}`,
+    ...formatWeeklyPlan(summary),
+    "",
+    "Nutrition",
     `- Calorie target: ${summary.physiqueDecision.calorieTargetLabel}`,
-    `- Calorie recommendation: ${summary.physiqueDecision.calorieRecommendation}`,
+    `- Calorie recommendation field: ${summary.physiqueDecision.calorieRecommendation}`,
     `- Protein target: ${summary.physiqueDecision.proteinTargetLabel}`,
     `- Nutrition campaign: ${
       summary.nutritionTargets.campaign.active
@@ -379,79 +551,33 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Campaign calorie lanes: ${
       summary.nutritionTargets.campaign.active
         ? `${summary.nutritionTargets.campaign.averageCalorieTarget} average / ${summary.nutritionTargets.campaign.trainingDayCalorieTarget} training / ${summary.nutritionTargets.campaign.restDayCalorieTarget} rest`
-        : "normal saved or smart targets"
+        : "Not available"
     }`,
-    `- Protein floor: ${summary.nutritionTargets.campaign.active ? `${summary.nutritionTargets.campaign.proteinMinimumG}g` : "not campaign-managed"}`,
+    `- Protein floor: ${summary.nutritionTargets.campaign.active ? `${summary.nutritionTargets.campaign.proteinMinimumG}g` : "Not available"}`,
     `- Qualified loss rate: ${
       summary.nutritionTargets.campaign.qualifiedLossRateLbPerWeek === null
-        ? "unavailable"
+        ? "Not available"
         : `${summary.nutritionTargets.campaign.qualifiedLossRateLbPerWeek.toFixed(2)} lb/week`
     }`,
-    `- Nutrition target evidence: ${summary.nutritionTargets.campaign.evidence}`,
+    `- Nutrition target evidence: ${formatOptional(summary.nutritionTargets.campaign.evidence)}`,
     `- Intake logged today: ${formatNutritionActuals(summary)}`,
     `- Intake remaining: ${formatNutritionRemaining(summary)}`,
-    `- Recovery score: ${promptMetric(summary.readiness.recoveryScore, "%")}`,
-    `- Recovery 3-day trend: ${promptMetric(summary.readiness.recoveryTrend3d, "%")}`,
-    `- Actual sleep: ${promptMetric(summary.readiness.sleepHours, "h", 1)}`,
-    `- Sleep vs need: ${promptMetric(summary.readiness.sleepVsNeedHours, "h", 1)}`,
-    `- Sleep composition: ${sleepCompositionLine(summary)}`,
-    `- WHOOP day strain: ${promptMetric(summary.strainSummary.score, "", 1)}`,
-    `- WHOOP strain context: ${summary.strainSummary.blurb}`,
+    ...formatNutritionEntries(summary),
+    "",
+    "Activity",
     `- Activity context (${summary.activityContext.displayWindowLabel}): ${summary.activityContext.summaryLine}`,
-    `- Latest non-lifting activity: ${activityDetail(summary)}`,
     `- Activity interpretation: ${summary.activityContext.interpretation}`,
-    `- Overnight read: ${summary.overnightRead.label}`,
-    `- Overnight disruption context: ${summary.lateNightDisruption.blurb}`,
-    `- Overnight disruption signal: ${summary.lateNightDisruption.active ? `${summary.lateNightDisruption.likelyLane} (${summary.lateNightDisruption.confidence})` : "inactive"}`,
-    `- Latest Hevy workout: ${summary.trainingLoad.hevyLastWorkoutTitle ?? "Not available"}`,
-    `- Latest workout muscle groups: ${formatPromptList(latestLiftFocus, "Not available")}`,
-    `- Days since upper-body session: ${formatDaysSince(summary.trainingLoad.upperBodyDaysSince)}`,
-    `- Days since lower-body session: ${formatDaysSince(summary.trainingLoad.lowerBodyDaysSince)}`,
-    `- Source freshness: ${formatFreshness(summary)}`,
-    "",
-    "Trend and weekly context",
-    `- Weekly pace: ${summary.physiqueDecision.weeklyPaceLabel}`,
-    `- Days left in week: ${summary.physiqueDecision.daysLeftInWeek}`,
-    `- Lifts needed for 4x: ${summary.physiqueDecision.liftsNeededForGoal}`,
-    `- Can still hit 4x if resting today: ${summary.physiqueDecision.canStillHitWeeklyGoalIfRestToday ? "yes" : "no"}`,
-    `- Decision factors: ${formatDecisionFactors(summary)}`,
-    `- Weekly scorecard: ${formatScorecard(summary)}`,
-    `- Weekly muscle groups hit: ${formatWeeklyMuscleFocus(summary)}`,
-    `- Weekly effective sets: ${formatWeeklyMuscleVolume(summary)}`,
-    `- Strength progression: ${formatStrengthProgression(summary)}`,
-    `- Workouts this week: ${summary.trainingLoad.hevyWorkoutCountThisWeek}`,
-    `- Weekly training demand: ${summary.trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
-    `- Rolling 7-day training: ${summary.trainingLoad.hevyWorkoutCount7d} workouts, ${summary.trainingLoad.hevySetCount7d} sets`,
-    `- Current body weight: ${formatPounds(kilogramsToPounds(summary.readiness.bodyWeightKg))}`,
-    `- Body weight context: ${bodyWeightTrendLabel}`,
-    `- 14-day weight trend: ${formatTrend(summary.trendSeries?.weight14d ?? [], " lb", 1)}`,
-    `- 7-day recovery trend: ${formatTrend(summary.trendSeries?.recovery7d ?? [], "%", 0)}`,
-    `- 7-day sleep trend: ${formatTrend(summary.trendSeries?.sleep7d ?? [], "h", 1)}`,
-    `- 7-day strain trend: ${formatTrend(summary.trendSeries?.strain7d ?? [], "", 1)}`,
-    `- 7-day lifting load trend: ${formatTrend(summary.trendSeries?.load7d ?? [], " sets", 0)}`,
-    `- Days since push session: ${formatDaysSince(summary.trainingLoad.pushDaysSince)}`,
-    `- Days since pull session: ${formatDaysSince(summary.trainingLoad.pullDaysSince)}`,
-    "",
-    "Output format",
-    "1. Read on the situation: 2-4 sentences, including the main bottleneck and any conflicting signals.",
-    "2. Action items for today: training, eating, recovery, supplements, and caution. Keep each item concrete.",
-    "3. Next-week game plan: suggested lifting cadence, upper/lower sequencing, nutrition focus, and recovery guardrails.",
-    "4. Nutrition targets: calories, protein, timing, and what to do if intake is already behind.",
-    "5. Training priorities: target split, intensity, exercise anchors, progression or deload guidance.",
-    "6. Recovery priorities: sleep, strain, activity, and when to preserve a better training day.",
-    "7. Watchouts: risks, low-confidence areas, or data that would change the recommendation.",
-    "8. Optional follow-up questions: ask only questions that would materially improve the plan.",
-    "",
-    "For every recommendation, include:",
-    "- the main metric drivers",
-    "- the practical tradeoff",
-    "- confidence: high, medium, or low",
+    `- Activity buckets: ${formatActivityBuckets(summary)}`,
+    `- Latest non-lifting activity: ${activityDetail(summary)}`,
+    `- Total non-lifting sessions: ${summary.activityContext.totalSessions}`,
+    `- Total non-lifting duration: ${summary.activityContext.totalDurationMinutes} min`,
+    `- Total non-lifting strain: ${summary.activityContext.totalStrain.toFixed(1)}`,
   ].join("\n");
 
   return {
-    headline: "ChatGPT coach handoff",
+    headline: "LLM context packet",
     subheadline:
-      "A one-shot prompt with today context, weekly trajectory, and enough metric drivers for a fresh coach read.",
+      "A concise HealthMax data dump for asking a separate question in another LLM.",
     metricCards,
     trainingContextCards,
     weeklyMuscleFocus,
@@ -460,6 +586,8 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     latestLiftFocus,
     overnightReadLabel: summary.overnightRead.label,
     llmQuestion,
-    promptText,
+    copyLabel: "Copy data packet",
+    contextPacketText,
+    promptText: contextPacketText,
   };
 }
