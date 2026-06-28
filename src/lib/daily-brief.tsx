@@ -35,8 +35,8 @@ export function buildDiscordSummaryText(summary: DailySummary) {
     `Strength: ${summary.physiqueDecision.strengthProgression.length > 0 ? summary.physiqueDecision.strengthProgression.slice(0, 3).map((lift) => `${lift.exercise} ${lift.deltaLabel}`).join(", ") : "repeat lift history needed"}`,
     `Latest session: ${summary.trainingLoad.hevyLastWorkoutTitle ?? "None logged"} | ${handoff.latestLiftFocus.length > 0 ? handoff.latestLiftFocus.slice(0, 4).join(", ") : "No recent focus logged"}`,
     `Body weight: ${formatPounds(kilogramsToPounds(summary.readiness.bodyWeightKg))} | ${handoff.bodyWeightTrendLabel}`,
-    `Prompt: ${handoff.llmQuestion}`,
-    "_Attached image is optimized for quick review and fresh LLM judgment._",
+    `Data packet: ${handoff.llmQuestion}`,
+    "_Attached image is a compact context companion to the copied HealthMax data packet._",
   ].join("\n");
 }
 
@@ -252,7 +252,7 @@ export function createDailyBriefImage(summary: DailySummary) {
                 fontWeight: 700,
               }}
             >
-              Ask the LLM
+              LLM Context
             </div>
             <div style={{ fontSize: "24px", lineHeight: 1.45 }}>{handoff.llmQuestion}</div>
           </div>

@@ -35,6 +35,7 @@ import type {
   RecommendationActionTile,
   DailyStressFlags,
   DailySummary,
+  DailyRecentWorkoutDetail,
   DailyTrainingLoad,
   DailyNutritionTargets,
   DailyNutritionActuals,
@@ -87,6 +88,7 @@ type WhoopRecoveryRow = {
   recovery_score: number | null;
   resting_heart_rate: number | null;
   hrv_rmssd_milli: number | null;
+  spo2_percentage: number | null;
   skin_temp_celsius: number | null;
   raw_json: string;
 };
@@ -117,6 +119,7 @@ type HevySetEntry = {
   type?: string | null;
   weight_kg?: number | null;
   reps?: number | null;
+  rpe?: number | null;
 };
 
 type HevyExerciseEntry = {
@@ -589,6 +592,66 @@ function getHevyExercises(rawJson: string) {
   }
 }
 
+function formatHevySet(set: HevySetEntry) {
+  const weight =
+    typeof set.weight_kg === "number" ? `${Math.round(kilogramsToPounds(set.weight_kg) ?? set.weight_kg)} lb` : "bodyweight";
+  const reps = typeof set.reps === "number" ? `${set.reps} reps` : "reps not logged";
+  const type = set.type && set.type !== "normal" ? ` ${set.type}` : "";
+  return `${weight} x ${reps}${type}`;
+}
+
+function summarizeExerciseSets(sets: HevySetEntry[] | undefined) {
+  const safeSets = Array.isArray(sets) ? sets : [];
+  const workingSets = safeSets.filter((set) => set.type !== "warmup");
+  const setSummary = workingSets.length
+    ? workingSets.slice(0, 4).map(formatHevySet).join("; ")
+    : safeSets.length
+      ? safeSets.slice(0, 4).map(formatHevySet).join("; ")
+      : "No set detail";
+  const topSet = workingSets
+    .map((set) => ({
+      set,
+      value:
+        typeof set.weight_kg === "number" && typeof set.reps === "number" && set.reps > 0
+          ? set.weight_kg * (1 + set.reps / 30)
+          : null,
+    }))
+    .filter((entry): entry is { set: HevySetEntry; value: number } => entry.value !== null)
+    .sort((a, b) => b.value - a.value)[0];
+
+  return {
+    setCount: safeSets.length,
+    workingSetCount: workingSets.length,
+    topSetLabel: topSet ? formatHevySet(topSet.set) : null,
+    setSummary,
+  };
+}
+
+export function buildRecentWorkoutDetailsForLlm(workouts: HevyWorkoutRow[], now = new Date()): DailyRecentWorkoutDetail[] {
+  const cutoff = new Date(now.getTime() - 14 * DAY_MS).toISOString();
+  const candidates = workouts.filter((workout) => workout.start_time >= cutoff);
+  const selected = (candidates.length ? candidates : workouts).slice(0, 4);
+
+  return selected.map((workout) => ({
+    id: workout.id,
+    title: workout.title ?? "Untitled workout",
+    startedAt: workout.start_time,
+    durationMinutes: workout.duration_seconds === null ? null : Math.round(workout.duration_seconds / 60),
+    volumeKg: workout.volume_kg,
+    setCount: workout.set_count,
+    exerciseCount: workout.exercise_count,
+    exercises: getHevyExercises(workout.raw_json)
+      .map((exercise) => {
+        const setDetail = summarizeExerciseSets(exercise.sets);
+        return {
+          title: exercise.title?.trim() || "Untitled exercise",
+          ...setDetail,
+        };
+      })
+      .slice(0, 8),
+  }));
+}
+
 function normalizeExerciseTitle(title: string) {
   return title
     .toLowerCase()
@@ -881,7 +944,7 @@ async function buildReadiness(): Promise<DailyReadiness> {
     dbAll<WhoopRecoveryRow>(
       `
       SELECT created_at, recovery_score, resting_heart_rate, hrv_rmssd_milli,
-             skin_temp_celsius, raw_json
+             spo2_percentage, skin_temp_celsius, raw_json
       FROM whoop_recovery_summaries
       WHERE created_at >= ?
       ORDER BY created_at DESC
@@ -977,6 +1040,7 @@ async function buildReadiness(): Promise<DailyReadiness> {
       latestRecovery?.hrv_rmssd_milli !== null && hrv7d !== null
         ? round(latestRecovery.hrv_rmssd_milli - hrv7d)
         : null,
+    spo2Percentage: round(latestRecovery?.spo2_percentage ?? null, 1),
     respiratoryRate: round(latestRecovery ? parseRespiratoryRate(latestRecovery.raw_json) : null),
     respiratoryRateVs7d:
       latestRecovery !== null && respiratoryRate7d !== null
@@ -1480,6 +1544,7 @@ async function buildTrainingLoad(): Promise<DailyTrainingLoad> {
       workoutsThisWeek.map((workout) => workout.raw_json),
     ),
     latestWorkoutFocus: latestWorkout ? summarizeWorkoutMuscleGroups(latestWorkout.raw_json) : [],
+    recentWorkoutDetails: buildRecentWorkoutDetailsForLlm(workouts),
   };
 }
 
@@ -2673,8 +2738,8 @@ function buildPromptText(summary: DailySummary) {
   const latestActivity = summary.activityContext.latestSession;
 
   return [
-    "Goal",
-    "- Physique progression without ignoring recovery.",
+    "HealthMax summary context",
+    "- Use as data only. Gary will ask a separate question outside this packet.",
     "",
     "Decision layer",
     `- Training availability: ${summary.physiqueDecision.trainingAvailability}`,
@@ -2757,8 +2822,8 @@ function buildPromptText(summary: DailySummary) {
         : "not enough repeat lift history"
     }`,
     "",
-    "Ask",
-    "- Make a fresh call for training, eating, recovery, supplements, and cautions.",
+    "Use",
+    "- Do not invent unavailable metrics or treat this summary as a request for default recommendations.",
   ].join("\n");
 }
 

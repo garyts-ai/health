@@ -135,10 +135,10 @@ export function DailyBriefExport({
     <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">External LLM handoff</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">LLM context packet</h2>
         </div>
         <p className="max-w-xl text-sm leading-6 text-[#645c7d]">
-          The export stays terse and metrics-led so an external model can make a fresh call without inheriting the app&apos;s recommendations.
+          Copy a concise HealthMax data dump, then ask your own question in the other model.
         </p>
       </div>
 
@@ -156,7 +156,7 @@ export function DailyBriefExport({
           type="button"
           onClick={handleCopyText}
         >
-          {copied ? "Prompt copied" : "Copy prompt text"}
+          {copied ? "Data packet copied" : handoff.copyLabel}
         </button>
         <button
           className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#efc8cf] bg-[#fff5f6] px-4 text-sm font-semibold text-[#8b3850] transition hover:border-[#d993a3] hover:bg-[#fff0f2] disabled:cursor-not-allowed disabled:opacity-60"
