@@ -124,6 +124,7 @@ function makeActivityContext(overrides: Partial<DailyActivityContext> = {}): Dai
     summaryLine: "No walks, tennis, or conditioning logged this week.",
     interpretation: "No extra conditioning load is affecting today.",
     latestSession: null,
+    sessions: [],
     buckets: [],
     days: [],
     totalSessions: 0,

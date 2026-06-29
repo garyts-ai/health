@@ -22,135 +22,26 @@ type HeroStatCardProps = {
   };
 };
 
-function formatSleepDuration(rawValue: string) {
-  const parsed = Number.parseFloat(rawValue.replace("h", ""));
-  if (!Number.isFinite(parsed)) {
-    return rawValue;
-  }
-
+function compactValue(label: string, value: string) {
+  if (label !== "Sleep") return value;
+  const parsed = Number.parseFloat(value.replace("h", ""));
+  if (!Number.isFinite(parsed)) return value;
   const hours = Math.floor(parsed);
   const minutes = Math.round((parsed - hours) * 60);
   return `${hours}:${minutes.toString().padStart(2, "0")}`;
 }
 
-function parseClockMinutes(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const match = value.match(/(\d+):(\d+)\s?(AM|PM)/i);
-  if (!match) {
-    return null;
-  }
-
-  let hours = Number(match[1]) % 12;
-  const minutes = Number(match[2]);
-  const period = match[3].toUpperCase();
-  if (period === "PM") {
-    hours += 12;
-  }
-
-  return hours * 60 + minutes;
+function tone(label: string) {
+  if (label === "Strain") return { line: "#ff8b72", soft: "rgba(255,139,114,0.22)" };
+  if (label === "Sleep") return { line: "#b5abff", soft: "rgba(181,171,255,0.22)" };
+  return { line: "#72fff2", soft: "rgba(114,255,242,0.18)" };
 }
 
-function formatTrendValue(label: string, point: number | null) {
-  if (point === null) {
-    return "--";
-  }
-
-  if (label === "Recovery") {
-    return `${Math.round(point)}%`;
-  }
-
-  if (label === "Sleep") {
-    return `${point.toFixed(1)}h`;
-  }
-
+function trendLabel(label: string, point: number | null) {
+  if (point === null) return "--";
+  if (label === "Recovery") return `${Math.round(point)}%`;
+  if (label === "Sleep") return `${point.toFixed(1)}h`;
   return point.toFixed(1);
-}
-
-function formatStageDuration(hours: number | null | undefined) {
-  if (typeof hours !== "number" || !Number.isFinite(hours)) {
-    return "--";
-  }
-
-  const wholeHours = Math.floor(hours);
-  const minutes = Math.round((hours - wholeHours) * 60);
-
-  if (wholeHours <= 0) {
-    return `${minutes}m`;
-  }
-
-  return minutes === 0 ? `${wholeHours}h` : `${wholeHours}h ${minutes}m`;
-}
-
-function getInterpretation(label: string, point: number | null, index: number, trend: Array<number | null>) {
-  if (point === null) {
-    return "No reading";
-  }
-
-  const previous = index > 0 ? trend[index - 1] : null;
-  const delta = typeof previous === "number" ? point - previous : null;
-
-  if (label === "Recovery") {
-    if (point < 34) return "Low";
-    if (point < 67) return delta !== null && delta > 5 ? "Rebounding" : "Moderate";
-    return "High";
-  }
-
-  if (label === "Sleep") {
-    if (point < 6) return "Short";
-    if (point < 7.5) return "Okay";
-    return "Solid";
-  }
-
-  if (point < 6) return "Easy";
-  if (point < 12) return "Moderate";
-  return "High";
-}
-
-function getCardTone(label: string) {
-  if (label === "Strain") {
-    return {
-      accent: "#ff8f75",
-      accentSoft: "rgba(255, 143, 117, 0.28)",
-      track: "rgba(255, 143, 117, 0.14)",
-    };
-  }
-
-  if (label === "Sleep") {
-    return {
-      accent: "#6d68bd",
-      accentSoft: "rgba(109, 104, 189, 0.3)",
-      track: "rgba(95, 88, 167, 0.13)",
-    };
-  }
-
-  return {
-    accent: "#625bb0",
-    accentSoft: "rgba(98, 91, 176, 0.3)",
-    track: "rgba(95, 88, 167, 0.13)",
-  };
-}
-
-function buildSleepCoordinates(sleepWindow: HeroStatCardProps["sleepWindow"]) {
-  const sleepStartMinutes = parseClockMinutes(sleepWindow?.startLabel);
-  const sleepEndMinutes = parseClockMinutes(sleepWindow?.endLabel);
-  const timelineStart = 20 * 60;
-  const timelineEnd = 12 * 60 + 24 * 60;
-  const normalize = (value: number | null) =>
-    value === null ? null : value < timelineStart ? value + 24 * 60 : value;
-  const normalizedSleepStart = normalize(sleepStartMinutes);
-  const normalizedSleepEnd = normalize(sleepEndMinutes);
-  const scale = (value: number | null, fallback: number) =>
-    value === null
-      ? fallback
-      : 24 + ((value - timelineStart) / (timelineEnd - timelineStart)) * 252;
-
-  return {
-    startX: scale(normalizedSleepStart, 24),
-    endX: scale(normalizedSleepEnd, 276),
-  };
 }
 
 export function HeroStatCard({
@@ -163,211 +54,101 @@ export function HeroStatCard({
   sleepWindow,
 }: HeroStatCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const tone = getCardTone(label);
+  const colors = tone(label);
   const numericTrend = trend.filter((point): point is number => typeof point === "number");
   const min = numericTrend.length ? Math.min(...numericTrend) : 0;
   const max = numericTrend.length ? Math.max(...numericTrend) : 0;
   const range = max - min || 1;
-  const chartMode =
-    label === "Recovery" ? "gauge" : label === "Sleep" ? "timeline" : "bars";
-  const recoveryGauge = typeof gaugeValue === "number" ? Math.max(0, Math.min(100, gaugeValue)) : 0;
-  const sleepDurationLabel = label === "Sleep" ? formatSleepDuration(value) : value;
-  const latestStrainValue =
-    trend.length && trend[trend.length - 1] !== null
-      ? trend[trend.length - 1]!.toFixed(1)
-      : value;
-  const sleepCoordinates = buildSleepCoordinates(sleepWindow);
-  const sleepStageSegments = sleepWindow?.stages?.filter(
-    (stage) => typeof stage.hours === "number" && stage.hours > 0,
-  ) ?? [];
-  const sleepStageTotal = sleepStageSegments.reduce((total, stage) => total + (stage.hours ?? 0), 0);
   const bars = trend.map((point) => {
-    if (point === null) {
-      return { height: 10 };
-    }
-
-    const normalized = (point - min) / range;
-    return { height: 18 + normalized * 34 };
+    if (point === null) return 8;
+    return 10 + ((point - min) / range) * 22;
   });
+  const gauge = typeof gaugeValue === "number" ? Math.max(0, Math.min(100, gaugeValue)) : 0;
+  const sleepStages = sleepWindow?.stages?.filter((stage) => typeof stage.hours === "number" && stage.hours > 0) ?? [];
+  const sleepTotal = sleepStages.reduce((total, stage) => total + (stage.hours ?? 0), 0);
 
   return (
     <section
       data-premium-surface
       data-premium-tone="light"
       data-premium-enter
-      className="@container group relative overflow-hidden rounded-[12px] border border-[#d7d1e5] bg-[#f8f5ff] p-3.5 text-[#171329] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(28,20,62,0.08)] transition-colors hover:border-[#bdb4d9]"
+      className="overflow-hidden rounded-[10px] border border-[#d8d2e4] bg-[#f7f4fb] text-[#171329]"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,_transparent,_rgba(98,91,176,0.42),_transparent)]" />
       <button
         aria-expanded={expanded}
-        className="block w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-[#6d68bd]/35"
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none transition-colors hover:bg-white/42 focus-visible:ring-2 focus-visible:ring-[#71fff1]/40"
         onClick={() => setExpanded((value) => !value)}
         type="button"
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-[12px] font-medium text-[#6b6484]">{label}</div>
-          <div className="text-[10px] font-medium text-[#8a83a4]">
-            {expanded ? "Hide" : "Details"}
+        <div className="min-w-[4.25rem]">
+          <div className="text-[11px] font-medium text-[#746d8e]">{label}</div>
+          <div className="mt-0.5 text-2xl font-semibold leading-none tracking-[-0.05em] text-[#171329]">
+            {compactValue(label, value)}
           </div>
         </div>
-      </button>
 
-      <div className="mt-2 @lg:grid @lg:grid-cols-[minmax(180px,0.82fr)_minmax(210px,1fr)] @lg:items-center @lg:gap-4">
-        <button
-          aria-label={`${expanded ? "Hide" : "Show"} ${label} trend details`}
-          aria-expanded={expanded}
-          className="flex min-h-[104px] w-full items-center justify-center rounded-[10px] bg-[linear-gradient(180deg,_rgba(255,255,255,0.48),_rgba(238,233,247,0.36))] outline-none ring-1 ring-[#e5e0ef] transition-colors group-hover:ring-[#cec5e4] focus-visible:ring-2 focus-visible:ring-[#6d68bd]/35"
-          onClick={() => setExpanded((value) => !value)}
-          type="button"
-        >
-          {chartMode === "gauge" ? (
-            <svg aria-hidden="true" viewBox="0 0 128 112" className="h-[106px] w-[128px] overflow-visible">
-              <circle cx="64" cy="56" r="39" fill="none" stroke={tone.track} strokeWidth="12" />
-              <circle
-                cx="64"
-                cy="56"
-                r="39"
-                fill="none"
-                stroke={tone.accent}
-                strokeWidth="12"
-                strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 39}
-                strokeDashoffset={(2 * Math.PI * 39) * (1 - recoveryGauge / 100)}
-                transform="rotate(-90 64 56)"
+        <div className="min-w-0 flex-1">
+          {label === "Recovery" ? (
+            <div className="h-2 overflow-hidden rounded-full bg-[#e5dfef]">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${gauge}%`, backgroundColor: colors.line }}
               />
-              <text x="64" y="59" textAnchor="middle" className="fill-[#2f285f] text-[25px] font-semibold">
-                {value}
-              </text>
-            </svg>
-          ) : chartMode === "timeline" ? (
-            sleepStageSegments.length ? (
-              <div className="w-full max-w-[300px]">
-                <div className="text-center text-[28px] font-semibold leading-none tracking-[-0.04em] text-[#2f285f]">
-                  {sleepDurationLabel}
-                </div>
-                <div className="mt-3 overflow-hidden rounded-full bg-[rgba(95,88,167,0.13)] p-[3px]">
-                  <div className="flex h-3 overflow-hidden rounded-full">
-                    {sleepStageSegments.map((stage) => (
-                      <span
-                        aria-hidden="true"
-                        key={stage.key}
-                        className="block min-w-[3px]"
-                        style={{
-                          width: `${((stage.hours ?? 0) / sleepStageTotal) * 100}%`,
-                          backgroundColor: stage.color,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#655d85]">
-                  <span>{sleepWindow?.startLabel ?? "--"}</span>
-                  <span>{sleepWindow?.endLabel ?? "--"}</span>
-                </div>
-                <div className="mt-2 grid grid-cols-4 gap-1">
-                  {sleepStageSegments.map((stage) => (
-                    <div key={`${stage.key}-stage`} className="min-w-0 rounded-[7px] bg-white/40 px-1.5 py-1 text-center">
-                      <div className="mx-auto mb-0.5 h-1 w-5 rounded-full" style={{ backgroundColor: stage.color }} />
-                      <div className="truncate text-[9px] font-medium text-[#756e8f]">{stage.label}</div>
-                      <div className="text-[10px] font-semibold text-[#332b64]">
-                        {formatStageDuration(stage.hours)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <svg aria-hidden="true" viewBox="0 0 320 92" className="h-[96px] w-full max-w-[300px] overflow-visible">
-                <text x="160" y="25" textAnchor="middle" className="fill-[#2f285f] text-[28px] font-semibold">
-                  {sleepDurationLabel}
-                </text>
-                <line x1="24" y1="54" x2="296" y2="54" stroke={tone.track} strokeWidth="7" strokeLinecap="round" />
-                <line
-                  x1={sleepCoordinates.startX}
-                  y1="54"
-                  x2={sleepCoordinates.endX}
-                  y2="54"
-                  stroke={tone.accent}
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                />
-                <circle cx={sleepCoordinates.startX} cy="54" r="5" fill={tone.accent} />
-                <circle cx={sleepCoordinates.endX} cy="54" r="5" fill="#8d86db" />
-                <text x="24" y="82" className="fill-[#655d85] text-[11px] font-medium">
-                  {sleepWindow?.startLabel ?? "--"}
-                </text>
-                <text x="296" y="82" textAnchor="end" className="fill-[#655d85] text-[11px] font-medium">
-                  {sleepWindow?.endLabel ?? "--"}
-                </text>
-              </svg>
-            )
-          ) : (
-            <svg aria-hidden="true" viewBox="0 0 260 104" className="h-[96px] w-full max-w-[260px] overflow-visible">
-              <text x="130" y="25" textAnchor="middle" className="fill-[#2f285f] text-[28px] font-semibold">
-                {latestStrainValue}
-              </text>
-              <line x1="72" y1="78" x2="188" y2="78" stroke="rgba(99,90,126,0.16)" strokeWidth="1.5" />
-              {bars.map((bar, index) => (
-                <rect
-                  key={`${label}-bar-${index}`}
-                  x={88 + index * 34}
-                  y={80 - bar.height}
-                  width={18}
-                  height={bar.height}
-                  rx="4"
-                  fill={index === bars.length - 1 ? tone.accent : tone.accentSoft}
+            </div>
+          ) : label === "Sleep" && sleepStages.length ? (
+            <div className="flex h-2 overflow-hidden rounded-full bg-[#e5dfef]">
+              {sleepStages.map((stage) => (
+                <span
+                  key={stage.key}
+                  className="min-w-[2px]"
+                  style={{
+                    width: `${((stage.hours ?? 0) / sleepTotal) * 100}%`,
+                    backgroundColor: stage.color,
+                  }}
                 />
               ))}
-            </svg>
+            </div>
+          ) : (
+            <div className="flex h-9 items-end gap-1">
+              {bars.map((height, index) => (
+                <span
+                  key={`${label}-bar-${index}`}
+                  className="w-full rounded-t-[3px]"
+                  style={{
+                    height,
+                    backgroundColor: index === bars.length - 1 ? colors.line : colors.soft,
+                  }}
+                />
+              ))}
+            </div>
           )}
-        </button>
+          <p className="mt-1 truncate text-[12px] text-[#675f80]">{detail}</p>
+        </div>
 
-        <div className="@lg:min-w-0">
-          <div className="text-center text-[13px] leading-5 text-[#625b7c] @lg:text-left">{detail}</div>
+        <span className="text-[11px] font-medium text-[#7b7492]">{expanded ? "Less" : "More"}</span>
+      </button>
 
-          <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[8px] border border-[#e1dcec] bg-[#f0ecf7]">
+      {expanded ? (
+        <div className="border-t border-[#e4deec] px-3 py-2.5">
+          {label === "Sleep" && sleepWindow?.startLabel ? (
+            <div className="mb-2 flex justify-between gap-3 text-[12px] text-[#625b7c]">
+              <span>{sleepWindow.startLabel}</span>
+              <span>{sleepWindow.inBedLabel ?? "Sleep window"}</span>
+              <span>{sleepWindow.endLabel ?? "--"}</span>
+            </div>
+          ) : null}
+          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[8px] bg-[#e6e0ed]">
             {trend.map((point, index) => (
-              <div
-                key={`${label}-trend-${index}`}
-                className="border-l border-[rgba(116,108,152,0.09)] px-2 py-2 text-center first:border-l-0"
-              >
-                <div className="text-[9px] text-[#807894]">{trendLabels[index] ?? ""}</div>
-                <div className="mt-0.5 text-[11px] font-semibold text-[#382f68]">
-                  {formatTrendValue(label, point)}
+              <div key={`${label}-${trendLabels[index]}`} className="bg-white/54 px-2 py-2 text-center">
+                <div className="text-[9px] text-[#7f7895]">{trendLabels[index] ?? ""}</div>
+                <div className="mt-0.5 text-[11px] font-semibold text-[#342d5f]">
+                  {trendLabel(label, point)}
                 </div>
               </div>
             ))}
           </div>
-
-          {expanded ? (
-            <div className="mt-3 rounded-[9px] border border-[rgba(116,108,152,0.1)] bg-[rgba(255,255,255,0.32)] p-2.5">
-              {label === "Sleep" && sleepWindow?.inBedLabel ? (
-                <div className="mb-2 flex items-center justify-between gap-3 text-[12px]">
-                  <span className="text-[#746d8e]">In-bed window</span>
-                  <span className="font-semibold text-[#2f285f]">{sleepWindow.inBedLabel}</span>
-                  <span className="min-w-[74px] text-right text-[#6b6484]">
-                    {sleepWindow.startLabel ?? "--"} to {sleepWindow.endLabel ?? "--"}
-                  </span>
-                </div>
-              ) : null}
-              <div className="grid gap-1.5">
-                {trend.map((point, index) => (
-                  <div
-                    key={`${label}-detail-${index}`}
-                    className="flex items-center justify-between gap-3 text-[12px]"
-                  >
-                    <span className="text-[#746d8e]">{trendLabels[index] ?? `Day ${index + 1}`}</span>
-                    <span className="font-semibold text-[#2f285f]">{formatTrendValue(label, point)}</span>
-                    <span className="min-w-[74px] text-right text-[#6b6484]">
-                      {getInterpretation(label, point, index, trend)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }

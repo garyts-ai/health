@@ -18,12 +18,12 @@ export async function DailyBriefPreviewCard({
     deliveryStatus,
   );
   const imagePrompt =
-    "Use this image as compact HealthMax context only. Pair it with the copied data packet and your own specific question.";
+    "Use only this snapshot to infer today's training, eating, recovery, supplements, and caution priorities. Make a fresh call from the metrics rather than echoing the app's built-in recommendations.";
 
   return (
-    <div className="w-full max-w-[1040px] rounded-[16px] bg-[linear-gradient(155deg,_#2b2353_0%,_#6250a7_44%,_#ff9a82_100%)] p-5 text-[#19162a]">
+    <div className="w-full max-w-[1040px] rounded-[10px] bg-[#171126] p-3 text-[#19162a]">
       <div className="flex flex-col gap-3">
-        <div className="rounded-[12px] bg-[rgba(17,13,31,0.34)] px-5 py-3 text-white ring-1 ring-white/8">
+        <div className="rounded-[9px] bg-white/6 px-4 py-2.5 text-white ring-1 ring-white/8">
           <div className="flex items-center justify-between gap-6">
             <div>
               <p className="text-[11px] font-medium text-white/58">LLM context packet</p>
@@ -35,9 +35,9 @@ export async function DailyBriefPreviewCard({
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="grid gap-3 lg:grid-cols-[210px_minmax(0,1fr)]">
           <div className="space-y-3">
-            <div className="rounded-[12px] bg-[rgba(19,15,34,0.72)] px-4 py-4 text-white shadow-[0_12px_32px_rgba(16,12,33,0.18)] ring-1 ring-white/10">
+            <div className="rounded-[9px] bg-white/6 px-3 py-3 text-white ring-1 ring-white/10">
               <p className="text-[11px] text-white/58">Overnight read</p>
               <p className="mt-2 text-[30px] font-semibold leading-[0.95] tracking-[-0.04em]">
                 {dashboard.hero.overnightRead.label}
@@ -47,7 +47,7 @@ export async function DailyBriefPreviewCard({
               </p>
             </div>
 
-            <div className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(243,239,251,0.92)_0%,_rgba(255,255,255,0.84)_100%)] p-3 shadow-[0_12px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
+            <div className="rounded-[9px] bg-[#eee8f7] p-2 ring-1 ring-[rgba(77,67,119,0.12)]">
               <div className="space-y-2.5">
                 {dashboard.hero.metrics.map((metric) => (
                   <MiniExportStat
@@ -65,12 +65,12 @@ export async function DailyBriefPreviewCard({
             </div>
           </div>
 
-          <div className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(74,56,144,0.46)_0%,_rgba(93,67,145,0.34)_52%,_rgba(252,149,127,0.3)_100%)] p-4 shadow-[0_14px_36px_rgba(22,20,35,0.12)] ring-1 ring-white/10">
-            <div className="grid gap-4">
+          <div className="rounded-[9px] bg-white/6 p-3 ring-1 ring-white/10">
+            <div className="grid gap-3">
               <div>
-                <div className="rounded-[10px] bg-[rgba(17,13,31,0.18)] p-4 text-white/92 ring-1 ring-white/8">
+                <div className="rounded-[9px] bg-[#171126] p-3 text-white/92 ring-1 ring-white/8">
                   <p className="text-[11px] text-white/58">Today&apos;s split call</p>
-                  <p className="mt-2 text-[34px] font-semibold leading-[0.92] tracking-[-0.05em] text-white">
+                  <p className="mt-2 text-[30px] font-semibold leading-[0.92] tracking-[-0.05em] text-white">
                     {dashboard.hero.todayCall}
                   </p>
                   <p className="mt-2 text-[12px] leading-5 text-white/76">
@@ -105,7 +105,7 @@ export async function DailyBriefPreviewCard({
                 </div>
               </div>
 
-              <div className="rounded-[10px] bg-[rgba(17,13,31,0.16)] p-4 text-white ring-1 ring-white/8">
+              <div className="rounded-[9px] bg-[#171126] p-3 text-white ring-1 ring-white/8">
                 <p className="text-[12px] text-white/68">Training context</p>
                 <p className="mt-2 text-[13px] leading-5 text-white/78">
                   {dashboard.hero.focusLabel}
@@ -113,7 +113,7 @@ export async function DailyBriefPreviewCard({
               </div>
             </div>
 
-            <div className="mt-3 grid gap-px overflow-hidden rounded-[10px] bg-[rgba(17,13,31,0.12)] ring-1 ring-white/10 md:grid-cols-4">
+            <div className="mt-3 grid gap-px overflow-hidden rounded-[9px] bg-white/10 ring-1 ring-white/10 md:grid-cols-4">
               {dashboard.trendBand.map((item) => (
                 <div key={item.label} className="bg-[rgba(255,255,255,0.86)] px-4 py-3">
                   <p className="text-[11px] text-[#7a7395]">{item.label}</p>
@@ -125,7 +125,7 @@ export async function DailyBriefPreviewCard({
               ))}
             </div>
 
-            <div className="mt-3 rounded-[10px] bg-[rgba(17,13,31,0.24)] px-4 py-3 text-white ring-1 ring-white/8">
+            <div className="mt-3 rounded-[9px] bg-[#171126] px-3 py-2.5 text-white ring-1 ring-white/8">
               <p className="text-[11px] leading-5 text-white/86">{imagePrompt}</p>
             </div>
           </div>
@@ -185,7 +185,7 @@ function MiniExportStat({
   const sleepDurationLabel = label === "Sleep" ? formatSleepDuration(value) : value;
 
   return (
-    <div className="rounded-[10px] bg-white/72 px-3 py-3 ring-1 ring-[rgba(77,67,119,0.08)]">
+    <div className="rounded-[8px] bg-white/72 px-3 py-2 ring-1 ring-[rgba(77,67,119,0.08)]">
       <p className="text-[11px] text-[#776f92]">{label}</p>
       <div className="mt-2 flex min-h-[60px] items-center justify-center">
         {chartMode === "gauge" ? (

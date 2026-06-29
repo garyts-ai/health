@@ -165,7 +165,7 @@ body {
 
 .giga-shell::before,
 .giga-shell::after {
-  animation: giga-atmosphere 18s ease-in-out infinite;
+  animation: none;
 }
 
 .giga-reveal {
@@ -200,16 +200,16 @@ body {
   transform:
     perspective(1000px)
     translate3d(0, var(--premium-enter-y), 0)
-    rotateX(var(--premium-rx))
-    rotateY(var(--premium-ry))
-    scale(calc(1 + var(--premium-lift) * 0.006));
+    rotateX(calc(var(--premium-rx) * 0.32))
+    rotateY(calc(var(--premium-ry) * 0.32))
+    scale(calc(1 + var(--premium-lift) * 0.002));
   transform-style: preserve-3d;
   transform-origin: center;
   backface-visibility: hidden;
   transition:
     transform 220ms var(--ease-precision),
     border-color 200ms var(--ease-product),
-    box-shadow 220ms var(--ease-product);
+    box-shadow 180ms var(--ease-product);
   will-change: transform;
 }
 
@@ -221,7 +221,7 @@ body {
   z-index: 4;
   border-radius: inherit;
   pointer-events: none;
-  opacity: calc(var(--premium-intensity) * 0.72);
+  opacity: calc(var(--premium-intensity) * 0.32);
   transition: opacity 200ms var(--ease-product);
 }
 
@@ -230,23 +230,13 @@ body {
   background:
     radial-gradient(
       circle at var(--premium-x) var(--premium-y),
-      rgba(255, 255, 255, 0.38) 0,
-      rgba(255, 255, 255, 0.12) 8%,
-      transparent 24%
-    ),
-    conic-gradient(
-      from 205deg at var(--premium-x) var(--premium-y),
-      transparent 0deg,
-      var(--premium-violet) 42deg,
-      transparent 88deg,
-      var(--premium-cyan) 154deg,
-      transparent 210deg,
-      var(--premium-rose) 278deg,
-      transparent 335deg
+      rgba(255, 255, 255, 0.22) 0,
+      rgba(255, 255, 255, 0.08) 8%,
+      transparent 22%
     );
   background-blend-mode: screen;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 0 -1px 0 rgba(74, 62, 114, 0.08);
 }
 
@@ -256,9 +246,9 @@ body {
     linear-gradient(
       112deg,
       transparent 24%,
-      rgba(255, 255, 255, 0.03) 35%,
-      rgba(255, 255, 255, 0.34) 46%,
-      rgba(199, 221, 255, 0.14) 52%,
+      rgba(255, 255, 255, 0.02) 35%,
+      rgba(255, 255, 255, 0.16) 46%,
+      rgba(199, 221, 255, 0.08) 52%,
       transparent 64%
     ),
     radial-gradient(rgba(255, 255, 255, 0.16) 0.55px, transparent 0.8px);
@@ -295,9 +285,7 @@ body {
 [data-premium-surface][data-premium-active],
 [data-premium-surface][data-premium-focus] {
   --premium-intensity: 1;
-  box-shadow:
-    0 12px 28px rgba(21, 14, 45, 0.14),
-    0 2px 8px rgba(21, 14, 45, 0.08);
+  box-shadow: 0 2px 8px rgba(21, 14, 45, 0.1);
   transition: transform 90ms var(--ease-precision), border-color 180ms var(--ease-product), box-shadow 180ms var(--ease-product);
 }
 
@@ -367,7 +355,7 @@ body {
 }
 
 .instrument-muscle-map {
-  min-height: 31rem;
+  min-height: 0;
 }
 
 .instrument-muscle-map .anatomy-layer {
@@ -381,8 +369,7 @@ body {
     saturate(0.82)
     contrast(1.18)
     brightness(0.94)
-    drop-shadow(0 20px 32px rgba(5, 3, 16, 0.34))
-    drop-shadow(0 0 16px rgba(114, 255, 242, 0.08));
+    drop-shadow(0 8px 18px rgba(5, 3, 16, 0.24));
 }
 
 .instrument-muscle-map .anatomy-layer-weekly {
@@ -474,7 +461,7 @@ body {
     radial-gradient(circle at 64% 42%, rgba(114, 255, 242, 0.12), transparent 22%),
     radial-gradient(circle at 50% 80%, rgba(255, 142, 122, 0.08), transparent 30%);
   filter: blur(12px);
-  opacity: 0.82;
+  opacity: 0.36;
 }
 
 .instrument-muscle-map::after {
@@ -483,7 +470,7 @@ body {
   box-shadow:
     inset 0 0 42px rgba(114, 255, 242, 0.05),
     0 0 34px rgba(114, 255, 242, 0.08);
-  opacity: calc(0.32 + var(--assembly-latest, 0) * 0.22);
+  opacity: calc(0.16 + var(--assembly-latest, 0) * 0.12);
 }
 
 .cinematic-anatomy .anatomy-layer-base {

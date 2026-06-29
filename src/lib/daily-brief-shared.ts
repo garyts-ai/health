@@ -56,6 +56,49 @@ export function formatHandoffDate(isoDate: string) {
   }).format(new Date(isoDate));
 }
 
+function formatPromptDateTime(isoDate: string | null) {
+  if (!isoDate) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(isoDate));
+}
+
+function formatPromptTime(isoDate: string | null) {
+  if (!isoDate) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(isoDate));
+}
+
+function formatOptionalNumber(value: number | null, suffix = "", digits = 0) {
+  if (value === null || Number.isNaN(value)) {
+    return "--";
+  }
+
+  return `${value.toFixed(digits)}${suffix}`;
+}
+
+function formatDistanceMeters(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return "--";
+  }
+
+  return `${(value / 1609.344).toFixed(2)} mi`;
+}
+
 function sleepCompositionLine(summary: DailySummary) {
   const stages = summary.readiness.sleepStageSummary;
   if (!stages) {
@@ -229,6 +272,104 @@ function formatNutritionEntries(summary: DailySummary) {
   return summary.nutritionActuals.entries.slice(0, 8).map(
     (entry) =>
       `- ${formatDateTime(entry.loggedAt)} ${entry.mealType}: ${entry.label}; ${entry.calories} cal, ${entry.proteinG}g protein, ${entry.carbsG}g carbs, ${entry.fatG}g fat`,
+  );
+}
+
+function formatRecentSleepWindows(summary: DailySummary) {
+  return formatPromptList(
+    summary.trendSeries.sleepWindows7d.slice(-7).map((window) => {
+      const endLabel = window.end ? formatPromptTime(window.end) : "open";
+      return [
+        `${window.label} ${formatPromptDateTime(window.start)}-${endLabel}`,
+        `${formatOptionalNumber(window.sleepHours, "h", 1)} sleep`,
+        `${formatOptionalNumber(window.inBedHours, "h", 1)} in bed`,
+        `${formatOptionalNumber(window.awakeHours, "h", 1)} awake`,
+        `deep ${formatOptionalNumber(window.deepHours, "h", 1)}`,
+        `REM ${formatOptionalNumber(window.remHours, "h", 1)}`,
+        `light ${formatOptionalNumber(window.lightHours, "h", 1)}`,
+        `perf ${formatOptionalNumber(window.sleepPerformance, "%")}`,
+        `eff ${formatOptionalNumber(window.sleepEfficiency, "%")}`,
+      ].join("; ");
+    }),
+    "No recent sleep windows available",
+  );
+}
+
+function formatActivitySessions(summary: DailySummary) {
+  return formatPromptList(
+    summary.activityContext.sessions.slice(0, 10).map((session) => {
+      const endLabel = session.end ? formatPromptTime(session.end) : "open";
+      return [
+        `${formatPromptDateTime(session.start)}-${endLabel}`,
+        session.sportName,
+        `${session.durationMinutes} min`,
+        `strain ${formatOptionalNumber(session.strain, "", 1)}`,
+        `avg HR ${formatOptionalNumber(session.averageHeartRate, " bpm")}`,
+        `max HR ${formatOptionalNumber(session.maxHeartRate, " bpm")}`,
+        `distance ${formatDistanceMeters(session.distanceMeter)}`,
+      ].join("; ");
+    }),
+    "No walking, tennis, or conditioning sessions in displayed activity window",
+  );
+}
+
+function formatActivityDays(summary: DailySummary) {
+  return formatPromptList(
+    summary.activityContext.days.map((day) => {
+      if (!day.hasActivity) {
+        return `${day.label}: none`;
+      }
+
+      const buckets = day.buckets
+        .map((bucket) => `${bucket.kind} ${bucket.count}x / strain ${bucket.strain.toFixed(1)}`)
+        .join(", ");
+      return `${day.label}: ${buckets}; total strain ${day.totalStrain.toFixed(1)}`;
+    }),
+    "No activity day buckets available",
+  );
+}
+
+function formatNutritionEntrySummary(summary: DailySummary) {
+  return formatPromptList(
+    summary.nutritionActuals.entries.map((entry) =>
+      [
+        `${formatPromptDateTime(entry.loggedAt)} ${entry.mealType}`,
+        entry.label,
+        `${entry.calories} cal`,
+        `${entry.proteinG}g protein`,
+        `${entry.carbsG}g carbs`,
+        `${entry.fatG}g fat`,
+        entry.note ? `note: ${entry.note}` : "",
+      ]
+        .filter(Boolean)
+        .join("; "),
+    ),
+    "No meal entries logged today",
+  );
+}
+
+function formatWeeklyPlanRows(summary: DailySummary) {
+  if (!summary.weeklyPlan) {
+    return "No weekly plan available";
+  }
+
+  return formatPromptList(
+    summary.weeklyPlan.days.map((day) =>
+      [
+        `${day.label} ${day.date}`,
+        day.state,
+        day.workoutType,
+        day.intent,
+        day.actualWorkout ? `actual: ${day.actualWorkout}` : "",
+        day.anchors.length ? `anchors: ${day.anchors.join(", ")}` : "",
+        `${day.calorieTarget ?? "--"} cal`,
+        `${day.proteinTargetG ?? "--"}g protein`,
+        `recovery: ${day.recoveryPriority}`,
+        day.guardrail ? `guardrail: ${day.guardrail}` : "",
+      ]
+        .filter(Boolean)
+        .join("; "),
+    ),
   );
 }
 
@@ -572,6 +713,22 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Total non-lifting sessions: ${summary.activityContext.totalSessions}`,
     `- Total non-lifting duration: ${summary.activityContext.totalDurationMinutes} min`,
     `- Total non-lifting strain: ${summary.activityContext.totalStrain.toFixed(1)}`,
+    "",
+    "Recent high-resolution data",
+    `- Recent sleep windows: ${formatRecentSleepWindows(summary)}`,
+    `- Activity sessions (${summary.activityContext.displayWindowLabel}): ${formatActivitySessions(summary)}`,
+    `- Activity day buckets (${summary.activityContext.displayWindowLabel}): ${formatActivityDays(summary)}`,
+    `- Today's meal entries: ${formatNutritionEntrySummary(summary)}`,
+    `- Weekly plan rows: ${formatWeeklyPlanRows(summary)}`,
+    `- App recommendation candidates as evidence: ${formatPromptList(
+      summary.recommendations.map(
+        (item) =>
+          `${item.category}/${item.priority}/${item.confidence}: ${item.title}; actions ${item.actionBullets.join(", ")}; evidence ${
+            item.supportingMetrics.join(", ") || item.why
+          }`,
+      ),
+      "No recommendation candidates available",
+    )}`,
   ].join("\n");
 
   return {

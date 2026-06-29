@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { ProtectedSettingsActions } from "@/components/protected-settings-actions";
@@ -31,14 +31,22 @@ export function UtilityDrawer({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const open = searchParams.get("utilities") === "open";
-  const portalRoot = useSyncExternalStore(
-    () => () => undefined,
-    () => document.body,
-    () => null,
-  );
+  const urlOpen = searchParams.get("utilities") === "open";
+  const [open, setOpen] = useState(urlOpen);
+  const openParams = new URLSearchParams(searchParams.toString());
+  openParams.set("utilities", "open");
+  const openHref = `${pathname}?${openParams.toString()}`;
+  const closeParams = new URLSearchParams(searchParams.toString());
+  closeParams.delete("utilities");
+  const closeQuery = closeParams.toString();
+  const closeHref = closeQuery ? `${pathname}?${closeQuery}` : pathname;
+
+  useEffect(() => {
+    setOpen(urlOpen);
+  }, [urlOpen]);
 
   const setDrawerState = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
     const nextParams = new URLSearchParams(searchParams.toString());
 
     if (nextOpen) {
@@ -77,41 +85,37 @@ export function UtilityDrawer({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setDrawerState(true)}
-        className="inline-flex h-11 items-center gap-3 rounded-[10px] border border-white/14 bg-[rgba(20,14,38,0.18)] px-4 text-sm font-medium text-white transition hover:border-white/28 hover:bg-[rgba(20,14,38,0.28)]"
+      <Link
+        href={openHref}
+        className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-white/14 bg-white/5 px-3 text-sm font-medium text-white transition hover:border-white/28 hover:bg-white/10"
       >
-        <span className="block h-2 w-2 rounded-full bg-[#ff8d72]" />
+        <span className="block h-1.5 w-1.5 rounded-full bg-[#ff8d72]" />
         <span>Utilities</span>
-      </button>
+      </Link>
 
-      {open && portalRoot
-        ? createPortal(
+      {open ? (
             <div className="fixed inset-0 z-50 min-h-dvh">
-              <button
-                type="button"
+              <Link
+                href={closeHref}
                 aria-label="Close utilities"
                 className="absolute inset-0 bg-[rgba(18,14,31,0.56)]"
-                onClick={() => setDrawerState(false)}
               />
 
-              <aside className="absolute right-0 top-0 h-dvh w-full overflow-y-auto border-l border-[#dad4eb] bg-[#f6f3fb] shadow-[-18px_0_72px_rgba(18,14,30,0.22)] sm:max-w-[42rem]">
-                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e7e2f2] bg-[#f6f3fb]/96 px-6 py-5 backdrop-blur">
+              <aside className="absolute right-0 top-0 h-dvh w-full overflow-y-auto border-l border-[#dad4eb] bg-[#f6f3fb] shadow-[-8px_0_28px_rgba(18,14,30,0.18)] sm:max-w-[40rem]">
+                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e7e2f2] bg-[#f6f3fb]/96 px-4 py-3 backdrop-blur sm:px-5">
                   <div>
-                    <h2 className="text-xl font-semibold text-[#19162a]">Utilities</h2>
-                    <p className="mt-1 text-sm text-[#645c7d]">{utilityLabel}</p>
+                    <h2 className="text-lg font-semibold text-[#19162a]">Utilities</h2>
+                    <p className="mt-0.5 text-[13px] text-[#645c7d]">{utilityLabel}</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setDrawerState(false)}
-                    className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d8d1ec] bg-white px-3 text-sm font-medium text-[#2a2540] transition hover:border-[#bdb2e0] hover:bg-[#faf8ff]"
+                  <Link
+                    href={closeHref}
+                    className="inline-flex h-9 items-center justify-center rounded-[8px] border border-[#d8d1ec] bg-white px-3 text-sm font-medium text-[#2a2540] transition hover:border-[#bdb2e0] hover:bg-[#faf8ff]"
                   >
                     Close
-                  </button>
+                  </Link>
                 </div>
 
-                <div className="px-6 py-6">
+                <div className="px-4 py-4 sm:px-5">
                   <ProtectedSettingsActions
                     deliveryStatus={deliveryStatus}
                     hevy={hevy}
@@ -122,10 +126,8 @@ export function UtilityDrawer({
                   />
                 </div>
               </aside>
-            </div>,
-            portalRoot,
-          )
-        : null}
+            </div>
+          ) : null}
     </>
   );
 }

@@ -34,6 +34,7 @@ export function DailyBriefExport({
   const captureCardRef = useRef<HTMLDivElement>(null);
   const handoff = buildLlmHandoff(summary);
   const [copied, setCopied] = useState(false);
+  const [goalNote, setGoalNote] = useState("");
   const [sendState, setSendState] = useState<{
     kind: "idle" | "success" | "error";
     message: string | null;
@@ -70,7 +71,15 @@ export function DailyBriefExport({
   };
 
   const handleCopyText = async () => {
-    await navigator.clipboard.writeText(handoff.promptText);
+    const trimmedGoal = goalNote.trim();
+    const promptToCopy = trimmedGoal
+      ? handoff.promptText.replace(
+          "[Add your goal, constraint, or follow-up question here before sending.]",
+          trimmedGoal,
+        )
+      : handoff.promptText;
+
+    await navigator.clipboard.writeText(promptToCopy);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
@@ -132,31 +141,50 @@ export function DailyBriefExport({
   };
 
   return (
-    <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[10px] border border-[rgba(77,67,119,0.12)] bg-[#fbf9fd] p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">LLM context packet</h2>
+          <h2 className="text-xl font-semibold tracking-[-0.03em] text-[#19162a]">LLM context packet</h2>
         </div>
-        <p className="max-w-xl text-sm leading-6 text-[#645c7d]">
-          Copy a concise HealthMax data dump, then ask your own question in the other model.
+        <p className="max-w-xl text-[13px] leading-5 text-[#645c7d]">
+          Copy one prompt with today&apos;s actions, metric drivers, and a next-week plan request.
         </p>
       </div>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-4 rounded-[9px] border border-[rgba(77,67,119,0.12)] bg-white/72 p-3">
+        <label htmlFor="handoff-goal" className="text-sm font-medium text-[#312c49]">
+          Add your goal or follow-up
+        </label>
+        <textarea
+          id="handoff-goal"
+          className="mt-2 min-h-20 w-full resize-y rounded-[8px] border border-[#d9d2e8] bg-white/86 px-3 py-2 text-sm leading-5 text-[#241f3c] outline-none transition focus:border-[#7c70bd] focus:ring-2 focus:ring-[#7c70bd]/18"
+          placeholder="Example: Make this stricter for fat loss, but avoid compromising sleep."
+          value={goalNote}
+          onChange={(event) => setGoalNote(event.target.value)}
+        />
+
+        <div className="mt-2 grid gap-2 text-sm text-[#4d4764] sm:grid-cols-3">
+          <PromptInclude label="Today actions" />
+          <PromptInclude label="Metric drivers" />
+          <PromptInclude label="Next-week plan" />
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
-          className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#19162a] px-4 text-sm font-semibold text-white transition hover:bg-[#2b2443] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#19162a] px-4 text-sm font-semibold text-white transition hover:bg-[#2b2443]"
+          type="button"
+          onClick={handleCopyText}
+        >
+          {copied ? "Copied" : "Copy ChatGPT prompt"}
+        </button>
+        <button
+          className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d7d0e7] px-4 text-sm font-semibold text-[#312c49] transition hover:border-[#8f84c7] hover:bg-[#faf8ff] disabled:cursor-not-allowed disabled:opacity-60"
           type="button"
           onClick={handleDownload}
           disabled={isPending}
         >
           {isPending ? "Rendering image..." : "Download image"}
-        </button>
-        <button
-          className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d7d0e7] px-4 text-sm font-semibold text-[#312c49] transition hover:border-[#8f84c7] hover:bg-[#faf8ff]"
-          type="button"
-          onClick={handleCopyText}
-        >
-          {copied ? "Data packet copied" : handoff.copyLabel}
         </button>
         <button
           className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#efc8cf] bg-[#fff5f6] px-4 text-sm font-semibold text-[#8b3850] transition hover:border-[#d993a3] hover:bg-[#fff0f2] disabled:cursor-not-allowed disabled:opacity-60"
@@ -178,9 +206,11 @@ export function DailyBriefExport({
         </p>
       ) : null}
 
-      <div className="mt-4 rounded-[10px] border border-[rgba(77,67,119,0.12)] bg-white/72 p-4 text-sm text-[#4d4764]">
-        <p className="text-sm font-medium text-[#312c49]">Discord delivery status</p>
-        <div className="mt-2 grid gap-2">
+      <details className="mt-3 rounded-[9px] border border-[rgba(77,67,119,0.12)] bg-white/54 p-3 text-sm text-[#4d4764]">
+        <summary className="cursor-pointer text-sm font-medium text-[#312c49]">
+          Delivery status
+        </summary>
+        <div className="mt-3 grid gap-2">
           <p>
             Today:{" "}
             <span className="font-semibold text-[#19162a]">
@@ -213,9 +243,9 @@ export function DailyBriefExport({
             <p className="text-[#b24861]">{deliveryStatus.today.lastErrorMessage}</p>
           ) : null}
         </div>
-      </div>
+      </details>
 
-      <div ref={visibleCardRef} className="mt-6 overflow-x-auto">
+      <div ref={visibleCardRef} className="mt-4 overflow-x-auto">
         <div className="mx-auto min-w-[1040px]">{preview}</div>
       </div>
 
@@ -231,5 +261,13 @@ export function DailyBriefExport({
         </div>
       </div>
     </section>
+  );
+}
+
+function PromptInclude({ label }: { label: string }) {
+  return (
+    <div className="rounded-[7px] border border-[rgba(77,67,119,0.1)] bg-[#f7f4fc] px-3 py-1.5 text-center text-xs font-medium text-[#4d4764]">
+      {label}
+    </div>
   );
 }

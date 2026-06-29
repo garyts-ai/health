@@ -32,6 +32,7 @@ import type {
   DailyReadiness,
   DailyPhysiqueDecision,
   DailyRecommendation,
+  DailySleepWindow,
   RecommendationActionTile,
   DailyStressFlags,
   DailySummary,
@@ -523,6 +524,7 @@ export function buildActivityContextFromRows(
     summaryLine: buildActivitySummaryLine(displayWindowLabel, currentWeekHasActivity, buckets),
     interpretation: buildActivityInterpretation(displaySessions, fallbackUsed),
     latestSession: displaySessions[0] ?? null,
+    sessions: displaySessions.slice(0, 12),
     buckets,
     days: buildActivityDays(windowStart, displaySessions),
     totalSessions: displaySessions.length,
@@ -1079,6 +1081,8 @@ async function buildMiniTrends() {
     dbAll<{
       start: string;
       end: string;
+      sleep_performance_percentage: number | null;
+      sleep_efficiency_percentage: number | null;
       total_in_bed_time_milli: number | null;
       total_awake_time_milli: number | null;
       total_light_sleep_time_milli: number | null;
@@ -1086,7 +1090,8 @@ async function buildMiniTrends() {
       total_rem_sleep_time_milli: number | null;
     }>(
       `
-      SELECT start, total_in_bed_time_milli, total_awake_time_milli,
+      SELECT start, sleep_performance_percentage, sleep_efficiency_percentage,
+             total_in_bed_time_milli, total_awake_time_milli,
              total_light_sleep_time_milli, total_slow_wave_sleep_time_milli,
              total_rem_sleep_time_milli
              , "end"
@@ -1182,11 +1187,14 @@ async function buildTrendSeries() {
       total_light_sleep_time_milli: number | null;
       total_slow_wave_sleep_time_milli: number | null;
       total_rem_sleep_time_milli: number | null;
+      sleep_performance_percentage: number | null;
+      sleep_efficiency_percentage: number | null;
     }>(
       `
       SELECT start, total_in_bed_time_milli, total_awake_time_milli,
              total_light_sleep_time_milli, total_slow_wave_sleep_time_milli,
-             total_rem_sleep_time_milli
+             total_rem_sleep_time_milli, sleep_performance_percentage,
+             sleep_efficiency_percentage
              , "end"
       FROM whoop_sleep_summaries
       WHERE start >= ?
@@ -1235,30 +1243,42 @@ async function buildTrendSeries() {
   }
 
   const latestSleepByDay = new Map<string, number | null>();
+  const latestSleepWindowByDay = new Map<string, DailySleepWindow>();
   for (const row of sleepRows) {
     const key = getDateKey(row.start);
     if (!latestSleepByDay.has(key)) {
-      latestSleepByDay.set(
-        key,
-        round(
-          getActualSleepHours({
-            start: row.start,
-            end: row.end,
-            sleep_performance_percentage: null,
-            sleep_consistency_percentage: null,
-            sleep_efficiency_percentage: null,
-            total_in_bed_time_milli: row.total_in_bed_time_milli,
-            total_awake_time_milli: row.total_awake_time_milli,
-            total_light_sleep_time_milli: row.total_light_sleep_time_milli,
-            total_slow_wave_sleep_time_milli: row.total_slow_wave_sleep_time_milli,
-            total_rem_sleep_time_milli: row.total_rem_sleep_time_milli,
-            sleep_needed_baseline_milli: null,
-            sleep_needed_debt_milli: null,
-            sleep_needed_strain_milli: null,
-            sleep_needed_nap_milli: null,
-          }),
-        ),
-      );
+      const sleepRow = {
+        start: row.start,
+        end: row.end,
+        sleep_performance_percentage: row.sleep_performance_percentage,
+        sleep_consistency_percentage: null,
+        sleep_efficiency_percentage: row.sleep_efficiency_percentage,
+        total_in_bed_time_milli: row.total_in_bed_time_milli,
+        total_awake_time_milli: row.total_awake_time_milli,
+        total_light_sleep_time_milli: row.total_light_sleep_time_milli,
+        total_slow_wave_sleep_time_milli: row.total_slow_wave_sleep_time_milli,
+        total_rem_sleep_time_milli: row.total_rem_sleep_time_milli,
+        sleep_needed_baseline_milli: null,
+        sleep_needed_debt_milli: null,
+        sleep_needed_strain_milli: null,
+        sleep_needed_nap_milli: null,
+      };
+      const sleepHours = round(getActualSleepHours(sleepRow));
+      latestSleepByDay.set(key, sleepHours);
+      latestSleepWindowByDay.set(key, {
+        dateKey: key,
+        label: NEW_YORK_WEEKDAY.format(new Date(row.start)),
+        start: row.start,
+        end: row.end ?? null,
+        sleepHours,
+        inBedHours: round(hoursFromMillis(row.total_in_bed_time_milli)),
+        awakeHours: round(hoursFromMillis(row.total_awake_time_milli)),
+        lightHours: round(hoursFromMillis(row.total_light_sleep_time_milli)),
+        deepHours: round(hoursFromMillis(row.total_slow_wave_sleep_time_milli)),
+        remHours: round(hoursFromMillis(row.total_rem_sleep_time_milli)),
+        sleepPerformance: row.sleep_performance_percentage ?? null,
+        sleepEfficiency: row.sleep_efficiency_percentage ?? null,
+      });
     }
   }
 
@@ -1294,6 +1314,9 @@ async function buildTrendSeries() {
       value: loadCountByDay.get(entry.key) ?? 0,
     })),
     weight14d: toTrendPoints(dateWindow14, latestWeightByDay, "monthDay"),
+    sleepWindows7d: dateWindow7
+      .map((entry) => latestSleepWindowByDay.get(entry.key) ?? null)
+      .filter((entry): entry is DailySleepWindow => entry !== null),
   };
 }
 

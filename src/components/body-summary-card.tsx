@@ -51,9 +51,7 @@ function MetricChip({
   toneClass: string;
 }) {
   return (
-    <div
-      className={`rounded-[10px] border px-3 py-2 shadow-[0_8px_18px_rgba(22,20,35,0.08)] ${toneClass}`}
-    >
+    <div className={`rounded-[8px] border px-3 py-2 ${toneClass}`}>
       <p className="text-[10px] font-semibold opacity-70">{label}</p>
       <p className="mt-1 text-lg font-semibold">{value}</p>
     </div>
@@ -70,18 +68,17 @@ export async function BodySummaryCard({
   const sleepClass = getSleepTone(summary.bodyCard.sleepHours);
 
   return (
-    <article className="relative overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,_rgba(33,24,76,0.98)_0%,_rgba(85,67,148,0.95)_46%,_rgba(248,141,116,0.92)_100%)] p-6 text-white shadow-[0_20px_80px_rgba(31,24,61,0.24)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,_rgba(255,255,255,0.1),_transparent_18%),radial-gradient(circle_at_78%_85%,_rgba(255,146,118,0.14),_transparent_24%),radial-gradient(circle_at_50%_100%,_rgba(67,66,154,0.34),_transparent_42%)]" />
+    <article className="relative overflow-hidden rounded-[10px] border border-white/10 bg-[#171126] p-4 text-white">
       <div className="relative">
         <div>
-          <p className="text-sm font-medium text-white/68">
+          <p className="text-[12px] font-medium text-white/58">
             {eyebrow}
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">{title}</h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-white/72">{description}</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-white">{title}</h2>
+          <p className="mt-1 max-w-xl text-[13px] leading-5 text-white/62">{description}</p>
         </div>
 
-        <div className="relative mt-6 overflow-hidden rounded-[12px] bg-[rgba(19,13,34,0.18)] px-4 pb-5 pt-6 ring-1 ring-white/10 sm:px-6">
+        <div className="relative mt-4 overflow-hidden rounded-[9px] bg-[#120d24] px-3 pb-4 pt-4 ring-1 ring-white/10 sm:px-4">
           <div className="pointer-events-none absolute left-4 top-3 z-10 sm:left-8">
             <MetricChip
               label="Recovery"
@@ -103,11 +100,11 @@ export async function BodySummaryCard({
             />
           </div>
 
-          <div className="mx-auto mt-12 flex max-w-[860px] flex-col items-center gap-4">
+          <div className="mx-auto mt-11 flex max-w-[760px] flex-col items-center gap-3">
             <div className="relative w-full">
               {summary.bodyCard.latestWorkoutName ? (
                 <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center">
-                  <div className="rounded-[999px] border border-white/10 bg-white/10 px-4 py-2 text-[11px] font-semibold tracking-[0.04em] text-white shadow-[0_12px_28px_rgba(5,8,7,0.24)] backdrop-blur">
+                  <div className="rounded-[8px] border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white">
                     {summary.bodyCard.latestWorkoutName}
                   </div>
                 </div>
@@ -117,17 +114,17 @@ export async function BodySummaryCard({
                 <AnatomyFigure
                   weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
                   latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
-                  className="h-[20rem] w-full max-w-[42rem] sm:h-[26rem]"
+                  className="h-[18rem] w-full max-w-[38rem] sm:h-[22rem]"
                 />
               </div>
             </div>
           </div>
 
-          <div className="mt-4 border-t border-white/10 pt-4 text-center">
-            <p className="text-[11px] font-medium text-white/64">
+          <div className="mt-3 border-t border-white/10 pt-3 text-center">
+            <p className="text-[11px] font-medium text-white/56">
               Body Weight
             </p>
-            <p className="mt-2 text-2xl font-semibold text-white">
+            <p className="mt-1 text-xl font-semibold text-white">
               {formatPounds(summary.bodyCard.weightLb)}
             </p>
             <p className="mt-3 text-[10px] text-white/42">
