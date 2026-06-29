@@ -41,8 +41,8 @@ async function main() {
 
   const result = await importWhoopExport(path.resolve(input));
   console.log(
-    result.imported
-      ? `Imported ${result.cycles.length} cycles, ${result.sleeps.length} sleeps, ${result.workouts.length} workouts, and ${result.journals.length} journal answers.`
+    result.status === "imported"
+      ? `Imported ${result.counts.cycles} cycles, ${result.counts.sleeps} sleeps, ${result.counts.workouts} workouts, and ${result.counts.journals} journal answers.`
       : `Export ${result.sourceName} was already imported; no rows changed.`,
   );
 }
