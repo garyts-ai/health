@@ -14,6 +14,44 @@ const summary: DailySummary = {
     weightTrend: [161.4, 161.8, 162],
     liftsThisWeek: 4,
   },
+  trendSeries: {
+    recovery7d: [
+      { label: "Thu", value: 61 },
+      { label: "Fri", value: 71 },
+    ],
+    sleep7d: [
+      { label: "Thu", value: 7.4 },
+      { label: "Fri", value: 7.5 },
+    ],
+    strain7d: [
+      { label: "Thu", value: 8.1 },
+      { label: "Fri", value: 9.2 },
+    ],
+    load7d: [
+      { label: "Thu", value: 1 },
+      { label: "Fri", value: 1 },
+    ],
+    weight14d: [
+      { label: "Apr 3", value: 161.8 },
+      { label: "Apr 4", value: 162 },
+    ],
+    sleepWindows7d: [
+      {
+        dateKey: "2026-04-04",
+        label: "Sat",
+        start: "2026-04-04T03:00:00.000Z",
+        end: "2026-04-04T10:30:00.000Z",
+        sleepHours: 7.5,
+        inBedHours: 8.3,
+        awakeHours: 0.8,
+        lightHours: 4.1,
+        deepHours: 1.3,
+        remHours: 2.1,
+        sleepPerformance: 86,
+        sleepEfficiency: 90,
+      },
+    ],
+  },
   readiness: {
     recoveryScore: 71,
     recoveryTrend3d: 62,
@@ -249,11 +287,52 @@ const summary: DailySummary = {
       maxHeartRate: 146,
       distanceMeter: null,
     },
+    sessions: [
+      {
+        id: "tennis-1",
+        kind: "tennis",
+        sportName: "Tennis",
+        start: "2026-03-29T18:00:00.000Z",
+        end: "2026-03-29T18:57:00.000Z",
+        durationMinutes: 57,
+        strain: 8.6,
+        averageHeartRate: 120,
+        maxHeartRate: 146,
+        distanceMeter: null,
+      },
+      {
+        id: "walk-1",
+        kind: "walking",
+        sportName: "Walking",
+        start: "2026-03-28T14:10:00.000Z",
+        end: "2026-03-28T14:42:00.000Z",
+        durationMinutes: 32,
+        strain: 4.2,
+        averageHeartRate: 98,
+        maxHeartRate: 121,
+        distanceMeter: 2800,
+      },
+    ],
     buckets: [
       { kind: "walking", label: "Walking", count: 5, durationMinutes: 132, strain: 25.2, distanceMeter: null },
       { kind: "tennis", label: "Tennis", count: 1, durationMinutes: 57, strain: 8.6, distanceMeter: null },
     ],
-    days: [],
+    days: [
+      {
+        dateKey: "2026-03-28",
+        label: "Sat",
+        buckets: [{ kind: "walking", count: 1, strain: 4.2 }],
+        totalStrain: 4.2,
+        hasActivity: true,
+      },
+      {
+        dateKey: "2026-03-29",
+        label: "Sun",
+        buckets: [{ kind: "tennis", count: 1, strain: 8.6 }],
+        totalStrain: 8.6,
+        hasActivity: true,
+      },
+    ],
     totalSessions: 6,
     totalDurationMinutes: 189,
     totalStrain: 33.8,
@@ -399,12 +478,19 @@ test("buildLlmHandoff prompt asks the model to infer priorities from metrics", (
   assert.match(handoff.promptText, /Intake logged today: 1780\/2500 cal, 112\/150g protein/);
   assert.match(handoff.promptText, /Activity context \(Last week\): No walks or tennis logged yet this week/);
   assert.match(handoff.promptText, /Latest non-lifting activity: Tennis: 57 min \/ strain 8\.6/);
+  assert.match(handoff.promptText, /Recent exact data for coaching/);
+  assert.match(handoff.promptText, /Recent sleep windows: Sat/);
+  assert.match(handoff.promptText, /7\.5h sleep; 8\.3h in bed; 0\.8h awake/);
+  assert.match(handoff.promptText, /Activity sessions \(Last week\): .*Tennis; 57 min; strain 8\.6; avg HR 120 bpm; max HR 146 bpm/);
+  assert.match(handoff.promptText, /Walking; 32 min; strain 4\.2; avg HR 98 bpm; max HR 121 bpm; distance 1\.74 mi/);
+  assert.match(handoff.promptText, /Activity day buckets \(Last week\): Sat: walking 1x \/ strain 4\.2; total strain 4\.2/);
+  assert.match(handoff.promptText, /Today's meal entries: .*restaurant; Rice bowl; 780 cal; 48g protein; 92g carbs; 22g fat/);
+  assert.match(handoff.promptText, /Recommendation candidates from app: training\/high\/high: Keep intensity moderate/);
   assert.match(handoff.promptText, /Body weight context: stable versus last week/);
   assert.match(handoff.promptText, /Latest workout muscle groups: Chest, Front delts, Biceps, Triceps/);
   assert.match(handoff.promptText, /Source freshness: WHOOP: connected, fresh/);
   assert.match(handoff.promptText, /For every recommendation, include:/);
-  assert.doesNotMatch(handoff.promptText, /Keep intensity moderate/);
-  assert.doesNotMatch(handoff.promptText, /Protect tonight's sleep/);
+  assert.match(handoff.promptText, /Treat the app's deterministic decision as evidence, not as something to blindly echo/);
 });
 
 test("buildLlmHandoff prompt labels missing data clearly", () => {
@@ -417,8 +503,12 @@ test("buildLlmHandoff prompt labels missing data clearly", () => {
   sparseSummary.trainingLoad.latestWorkoutFocus = [];
   sparseSummary.physiqueDecision.strengthProgression = [];
   sparseSummary.nutritionActuals.hasLoggedIntake = false;
+  sparseSummary.nutritionActuals.entries = [];
   sparseSummary.nutritionActuals.remainingCalories = null;
   sparseSummary.nutritionActuals.remainingProteinG = null;
+  sparseSummary.activityContext.sessions = [];
+  sparseSummary.activityContext.days = [];
+  sparseSummary.trendSeries.sleepWindows7d = [];
 
   const handoff = buildLlmHandoff(sparseSummary);
 
@@ -431,4 +521,7 @@ test("buildLlmHandoff prompt labels missing data clearly", () => {
   assert.match(handoff.promptText, /Weekly effective sets: No current-week lifting volume/);
   assert.match(handoff.promptText, /Strength progression: Not enough repeat lift history/);
   assert.match(handoff.promptText, /Latest workout muscle groups: Not available/);
+  assert.match(handoff.promptText, /Recent sleep windows: No recent sleep windows available/);
+  assert.match(handoff.promptText, /Activity sessions \(Last week\): No walking, tennis, or conditioning sessions/);
+  assert.match(handoff.promptText, /Today's meal entries: No meal entries logged today/);
 });

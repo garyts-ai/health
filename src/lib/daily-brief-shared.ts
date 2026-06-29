@@ -54,6 +54,50 @@ export function formatHandoffDate(isoDate: string) {
   }).format(new Date(isoDate));
 }
 
+function formatPromptDateTime(isoDate: string | null) {
+  if (!isoDate) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(isoDate));
+}
+
+function formatPromptTime(isoDate: string | null) {
+  if (!isoDate) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(isoDate));
+}
+
+function formatOptionalNumber(value: number | null, suffix = "", digits = 0) {
+  if (value === null || Number.isNaN(value)) {
+    return "--";
+  }
+
+  return `${value.toFixed(digits)}${suffix}`;
+}
+
+function formatDistanceMeters(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return "--";
+  }
+
+  const miles = value / 1609.344;
+  return `${miles.toFixed(2)} mi`;
+}
+
 function sleepCompositionLine(summary: DailySummary) {
   const stages = summary.readiness.sleepStageSummary;
   if (!stages) {
@@ -158,6 +202,106 @@ function formatFreshness(summary: DailySummary) {
     sourceLine("WHOOP", summary.freshness.whoop),
     sourceLine("Hevy", summary.freshness.hevy),
   ].join("; ");
+}
+
+function formatRecentSleepWindows(summary: DailySummary) {
+  return formatPromptList(
+    summary.trendSeries.sleepWindows7d
+      .slice(-7)
+      .map((window) => {
+        const endLabel = window.end ? formatPromptTime(window.end) : "open";
+        return [
+          `${window.label} ${formatPromptDateTime(window.start)}-${endLabel}`,
+          `${formatOptionalNumber(window.sleepHours, "h", 1)} sleep`,
+          `${formatOptionalNumber(window.inBedHours, "h", 1)} in bed`,
+          `${formatOptionalNumber(window.awakeHours, "h", 1)} awake`,
+          `deep ${formatOptionalNumber(window.deepHours, "h", 1)}`,
+          `REM ${formatOptionalNumber(window.remHours, "h", 1)}`,
+          `light ${formatOptionalNumber(window.lightHours, "h", 1)}`,
+          `perf ${formatOptionalNumber(window.sleepPerformance, "%")}`,
+          `eff ${formatOptionalNumber(window.sleepEfficiency, "%")}`,
+        ].join("; ");
+      }),
+    "No recent sleep windows available",
+  );
+}
+
+function formatActivitySessions(summary: DailySummary) {
+  return formatPromptList(
+    summary.activityContext.sessions.slice(0, 10).map((session) => {
+      const endLabel = session.end ? formatPromptTime(session.end) : "open";
+      return [
+        `${formatPromptDateTime(session.start)}-${endLabel}`,
+        session.sportName,
+        `${session.durationMinutes} min`,
+        `strain ${formatOptionalNumber(session.strain, "", 1)}`,
+        `avg HR ${formatOptionalNumber(session.averageHeartRate, " bpm")}`,
+        `max HR ${formatOptionalNumber(session.maxHeartRate, " bpm")}`,
+        `distance ${formatDistanceMeters(session.distanceMeter)}`,
+      ].join("; ");
+    }),
+    "No walking, tennis, or conditioning sessions in displayed activity window",
+  );
+}
+
+function formatActivityDays(summary: DailySummary) {
+  return formatPromptList(
+    summary.activityContext.days.map((day) => {
+      if (!day.hasActivity) {
+        return `${day.label}: none`;
+      }
+
+      const buckets = day.buckets
+        .map((bucket) => `${bucket.kind} ${bucket.count}x / strain ${bucket.strain.toFixed(1)}`)
+        .join(", ");
+      return `${day.label}: ${buckets}; total strain ${day.totalStrain.toFixed(1)}`;
+    }),
+    "No activity day buckets available",
+  );
+}
+
+function formatNutritionEntries(summary: DailySummary) {
+  return formatPromptList(
+    summary.nutritionActuals.entries.map((entry) =>
+      [
+        `${formatPromptDateTime(entry.loggedAt)} ${entry.mealType}`,
+        entry.label,
+        `${entry.calories} cal`,
+        `${entry.proteinG}g protein`,
+        `${entry.carbsG}g carbs`,
+        `${entry.fatG}g fat`,
+        entry.note ? `note: ${entry.note}` : "",
+      ]
+        .filter(Boolean)
+        .join("; "),
+    ),
+    "No meal entries logged today",
+  );
+}
+
+function formatWeeklyPlanRows(summary: DailySummary) {
+  if (!summary.weeklyPlan) {
+    return "No weekly plan available";
+  }
+
+  return formatPromptList(
+    summary.weeklyPlan.days.map((day) =>
+      [
+        `${day.label} ${day.date}`,
+        day.state,
+        day.workoutType,
+        day.intent,
+        day.actualWorkout ? `actual: ${day.actualWorkout}` : "",
+        day.anchors.length ? `anchors: ${day.anchors.join(", ")}` : "",
+        `${day.calorieTarget ?? "--"} cal`,
+        `${day.proteinTargetG ?? "--"}g protein`,
+        `recovery: ${day.recoveryPriority}`,
+        day.guardrail ? `guardrail: ${day.guardrail}` : "",
+      ]
+        .filter(Boolean)
+        .join("; "),
+    ),
+  );
 }
 
 function formatDaysSince(value: number | null) {
@@ -394,7 +538,12 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Recovery 3-day trend: ${promptMetric(summary.readiness.recoveryTrend3d, "%")}`,
     `- Actual sleep: ${promptMetric(summary.readiness.sleepHours, "h", 1)}`,
     `- Sleep vs need: ${promptMetric(summary.readiness.sleepVsNeedHours, "h", 1)}`,
+    `- Latest sleep window: ${formatPromptDateTime(summary.readiness.latestSleepStart)} to ${formatPromptDateTime(summary.readiness.latestSleepEnd)}`,
     `- Sleep composition: ${sleepCompositionLine(summary)}`,
+    `- Resting heart rate: ${promptMetric(summary.readiness.restingHeartRate, " bpm")} (vs 7d ${promptMetric(summary.readiness.restingHeartRateVs7d, " bpm", 1)})`,
+    `- HRV RMSSD: ${promptMetric(summary.readiness.hrvRmssd, " ms", 1)} (vs 7d ${promptMetric(summary.readiness.hrvVs7d, " ms", 1)})`,
+    `- Respiratory rate: ${promptMetric(summary.readiness.respiratoryRate, "/min", 1)} (vs 7d ${promptMetric(summary.readiness.respiratoryRateVs7d, "/min", 1)})`,
+    `- Skin temp: ${promptMetric(summary.readiness.skinTempCelsius, " C", 1)} (vs 7d ${promptMetric(summary.readiness.skinTempVs7d, " C", 1)})`,
     `- WHOOP day strain: ${promptMetric(summary.strainSummary.score, "", 1)}`,
     `- WHOOP strain context: ${summary.strainSummary.blurb}`,
     `- Activity context (${summary.activityContext.displayWindowLabel}): ${summary.activityContext.summaryLine}`,
@@ -404,6 +553,8 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- Overnight disruption context: ${summary.lateNightDisruption.blurb}`,
     `- Overnight disruption signal: ${summary.lateNightDisruption.active ? `${summary.lateNightDisruption.likelyLane} (${summary.lateNightDisruption.confidence})` : "inactive"}`,
     `- Latest Hevy workout: ${summary.trainingLoad.hevyLastWorkoutTitle ?? "Not available"}`,
+    `- Latest Hevy workout time: ${formatPromptDateTime(summary.trainingLoad.hevyLastWorkoutAt)}`,
+    `- Latest Hevy duration/volume: ${formatOptionalNumber(summary.trainingLoad.hevyLastWorkoutDurationSeconds === null ? null : summary.trainingLoad.hevyLastWorkoutDurationSeconds / 60, " min", 0)} / ${formatOptionalNumber(summary.trainingLoad.hevyLastWorkoutVolumeKg, " kg", 0)}`,
     `- Latest workout muscle groups: ${formatPromptList(latestLiftFocus, "Not available")}`,
     `- Days since upper-body session: ${formatDaysSince(summary.trainingLoad.upperBodyDaysSince)}`,
     `- Days since lower-body session: ${formatDaysSince(summary.trainingLoad.lowerBodyDaysSince)}`,
@@ -431,6 +582,20 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     `- 7-day lifting load trend: ${formatTrend(summary.trendSeries?.load7d ?? [], " sets", 0)}`,
     `- Days since push session: ${formatDaysSince(summary.trainingLoad.pushDaysSince)}`,
     `- Days since pull session: ${formatDaysSince(summary.trainingLoad.pullDaysSince)}`,
+    "",
+    "Recent exact data for coaching",
+    `- Recent sleep windows: ${formatRecentSleepWindows(summary)}`,
+    `- Activity sessions (${summary.activityContext.displayWindowLabel}): ${formatActivitySessions(summary)}`,
+    `- Activity day buckets (${summary.activityContext.displayWindowLabel}): ${formatActivityDays(summary)}`,
+    `- Today's meal entries: ${formatNutritionEntries(summary)}`,
+    `- Weekly plan rows: ${formatWeeklyPlanRows(summary)}`,
+    `- Recommendation candidates from app: ${formatPromptList(
+      summary.recommendations.map(
+        (item) =>
+          `${item.category}/${item.priority}/${item.confidence}: ${item.title}; actions ${item.actionBullets.join(", ")}; evidence ${item.supportingMetrics.join(", ") || item.why}`,
+      ),
+      "No recommendation candidates available",
+    )}`,
     "",
     "Output format",
     "1. Read on the situation: 2-4 sentences, including the main bottleneck and any conflicting signals.",

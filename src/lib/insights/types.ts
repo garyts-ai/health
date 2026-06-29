@@ -330,6 +330,21 @@ export type TrendPoint = {
   value: number | null;
 };
 
+export type DailySleepWindow = {
+  dateKey: string;
+  label: string;
+  start: string;
+  end: string | null;
+  sleepHours: number | null;
+  inBedHours: number | null;
+  awakeHours: number | null;
+  lightHours: number | null;
+  deepHours: number | null;
+  remHours: number | null;
+  sleepPerformance: number | null;
+  sleepEfficiency: number | null;
+};
+
 export type DailyActivityKind = "walking" | "tennis" | "other_conditioning";
 
 export type DailyActivitySession = {
@@ -374,6 +389,7 @@ export type DailyActivityContext = {
   summaryLine: string;
   interpretation: string;
   latestSession: DailyActivitySession | null;
+  sessions: DailyActivitySession[];
   buckets: DailyActivityBucket[];
   days: DailyActivityDay[];
   totalSessions: number;
@@ -398,6 +414,7 @@ export type DailySummary = {
     strain7d: TrendPoint[];
     load7d: TrendPoint[];
     weight14d: TrendPoint[];
+    sleepWindows7d: DailySleepWindow[];
   };
   readiness: DailyReadiness;
   trainingLoad: DailyTrainingLoad;
