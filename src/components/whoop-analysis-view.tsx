@@ -67,9 +67,9 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
   if (report.empty) {
     return (
       <section className="border border-[#d8d2e4] bg-[#fbf9fd] px-6 py-12 text-center">
-        <h2 className="text-xl font-semibold text-[#171329]">No WHOOP export seeded</h2>
+        <h2 className="text-xl font-semibold text-[#171329]">No WHOOP export uploaded</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#645c7d]">
-          Seed an export locally to populate this private long-range report.
+          Upload the full WHOOP export ZIP above to populate this private long-range report.
         </p>
       </section>
     );
@@ -103,6 +103,7 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
               <summary className="cursor-pointer font-medium text-white/76">Dataset detail</summary>
               <p className="mt-2 leading-5">
                 {formatDate(report.inventory.start)} – {formatDate(report.inventory.end)} · {report.inventory.counts.cycles} cycles · {report.inventory.counts.workouts} workouts · {report.inventory.counts.journalAnswers} journal answers.
+                {report.inventory.imports.length > 1 ? ` Latest upload: ${report.inventory.latestImport?.sourceName ?? "unknown"}.` : ""}
               </p>
               <p className="mt-2 text-white/42">Unavailable: {report.inventory.missing.join(", ")}.</p>
             </details>

@@ -85,6 +85,20 @@ export type WhoopAnalysisReport = {
   inventory: {
     sourceName: string | null;
     importedAt: string | null;
+    latestImport: {
+      sourceName: string;
+      importedAt: string;
+      fingerprint: string;
+      start: string | null;
+      end: string | null;
+    } | null;
+    imports: Array<{
+      sourceName: string;
+      importedAt: string;
+      fingerprint: string;
+      start: string | null;
+      end: string | null;
+    }>;
     start: string | null;
     end: string | null;
     days: number;
@@ -315,7 +329,8 @@ export function journalFindings(cycles: CycleRow[], journals: JournalRow[]) {
 }
 
 export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
-  const latestImport = await dbGet<{
+  const imports = await dbAll<{
+    fingerprint: string;
     source_name: string;
     imported_at: string;
     date_start: string | null;
@@ -324,13 +339,14 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
     sleep_count: number;
     workout_count: number;
     journal_count: number;
-  }>("SELECT * FROM whoop_export_imports ORDER BY imported_at DESC LIMIT 1");
+  }>("SELECT * FROM whoop_export_imports ORDER BY imported_at DESC LIMIT 8");
+  const latestImport = imports[0] ?? null;
 
   if (!latestImport) {
     return {
       empty: true,
       inventory: {
-        sourceName: null, importedAt: null, start: null, end: null, days: 0,
+        sourceName: null, importedAt: null, latestImport: null, imports: [], start: null, end: null, days: 0,
         counts: {}, gaps: 0, reliability: "No WHOOP export has been seeded.", missing: [],
       },
       metrics: { sleep: [], cardiovascular: [], recovery: [], activity: [] },
@@ -345,15 +361,18 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
     };
   }
 
-  const [cycles, workouts, journals] = await Promise.all([
+  const [cycles, workouts, journals, sleepCount] = await Promise.all([
     dbAll<CycleRow>("SELECT * FROM whoop_export_cycles ORDER BY cycle_start ASC"),
     dbAll<WorkoutRow>("SELECT * FROM whoop_export_workouts ORDER BY workout_start ASC"),
     dbAll<JournalRow>("SELECT cycle_start, question_text, answered_yes FROM whoop_export_journal_answers"),
+    dbGet<{ count: number | string }>("SELECT COUNT(*) AS count FROM whoop_export_sleeps"),
   ]);
   const recent = cycles.slice(-28);
+  const coverageStart = cycles[0]?.cycle_start ?? latestImport.date_start;
+  const coverageEnd = cycles.at(-1)?.cycle_start ?? latestImport.date_end;
   const days =
-    latestImport.date_start && latestImport.date_end
-      ? Math.floor((new Date(latestImport.date_end).getTime() - new Date(latestImport.date_start).getTime()) / 86_400_000) + 1
+    coverageStart && coverageEnd
+      ? Math.floor((new Date(coverageEnd).getTime() - new Date(coverageStart).getTime()) / 86_400_000) + 1
       : cycles.length;
   const asleep = average(values(cycles, "asleep_minutes"));
   const asleepRecent = average(values(recent, "asleep_minutes"));
@@ -535,14 +554,28 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
     inventory: {
       sourceName: latestImport.source_name,
       importedAt: latestImport.imported_at,
-      start: latestImport.date_start,
-      end: latestImport.date_end,
+      latestImport: {
+        sourceName: latestImport.source_name,
+        importedAt: latestImport.imported_at,
+        fingerprint: latestImport.fingerprint,
+        start: latestImport.date_start,
+        end: latestImport.date_end,
+      },
+      imports: imports.map((item) => ({
+        sourceName: item.source_name,
+        importedAt: item.imported_at,
+        fingerprint: item.fingerprint,
+        start: item.date_start,
+        end: item.date_end,
+      })),
+      start: coverageStart,
+      end: coverageEnd,
       days,
       counts: {
-        cycles: latestImport.cycle_count,
-        sleeps: latestImport.sleep_count,
-        workouts: latestImport.workout_count,
-        journalAnswers: latestImport.journal_count,
+        cycles: cycles.length,
+        sleeps: Number(sleepCount?.count ?? 0),
+        workouts: workouts.length,
+        journalAnswers: journals.length,
       },
       gaps: gapCount(cycles),
       reliability: days < 14 ? "Suggestive only: fewer than 14 days." : `${days} days supports baseline and pattern analysis.`,

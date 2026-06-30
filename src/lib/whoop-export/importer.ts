@@ -9,6 +9,13 @@ import { persistPostgresWhoopExport } from "@/lib/whoop-export/postgres-import";
 
 export type CsvRow = Record<string, string>;
 
+export const REQUIRED_WHOOP_EXPORT_FILES = [
+  "physiological_cycles.csv",
+  "sleeps.csv",
+  "workouts.csv",
+  "journal_entries.csv",
+] as const;
+
 export type WhoopExportArchive = {
   fingerprint: string;
   sourceName: string;
@@ -28,6 +35,21 @@ export type NormalizedWhoopExport = {
   sleeps: Array<Array<string | number | null>>;
   workouts: Array<Array<string | number | null>>;
   journals: Array<Array<string | number | null>>;
+};
+
+export type WhoopExportImportResult = {
+  status: "imported" | "duplicate";
+  sourceName: string;
+  fingerprint: string;
+  importedAt: string;
+  dateStart: string | null;
+  dateEnd: string | null;
+  counts: {
+    cycles: number;
+    sleeps: number;
+    workouts: number;
+    journals: number;
+  };
 };
 
 export function parseCsv(text: string): CsvRow[] {
@@ -98,8 +120,10 @@ function booleanValue(row: CsvRow, key: string) {
   return row[key]?.trim().toLowerCase() === "true" ? 1 : 0;
 }
 
-export async function readWhoopExport(zipPath: string): Promise<WhoopExportArchive> {
-  const buffer = await fs.readFile(zipPath);
+export async function readWhoopExportBuffer(
+  buffer: Buffer,
+  sourceName: string,
+): Promise<WhoopExportArchive> {
   const zip = await JSZip.loadAsync(buffer);
   const read = async (name: string) => {
     const entry = zip.file(name);
@@ -111,12 +135,17 @@ export async function readWhoopExport(zipPath: string): Promise<WhoopExportArchi
 
   return {
     fingerprint: createHash("sha256").update(buffer).digest("hex"),
-    sourceName: path.basename(zipPath),
+    sourceName,
     cycles: await read("physiological_cycles.csv"),
     sleeps: await read("sleeps.csv"),
     workouts: await read("workouts.csv"),
     journals: await read("journal_entries.csv"),
   };
+}
+
+export async function readWhoopExport(zipPath: string): Promise<WhoopExportArchive> {
+  const buffer = await fs.readFile(zipPath);
+  return readWhoopExportBuffer(buffer, path.basename(zipPath));
 }
 
 export function normalizeWhoopArchive(
@@ -235,22 +264,34 @@ export function normalizeWhoopArchive(
   };
 }
 
-export async function importWhoopExport(zipPath: string) {
-  const archive = await readWhoopExport(zipPath);
-  const normalized = normalizeWhoopArchive(archive);
+function resultFromNormalized(
+  normalized: NormalizedWhoopExport,
+  status: WhoopExportImportResult["status"],
+): WhoopExportImportResult {
+  return {
+    status,
+    sourceName: normalized.sourceName,
+    fingerprint: normalized.fingerprint,
+    importedAt: normalized.importedAt,
+    dateStart: normalized.dateStart,
+    dateEnd: normalized.dateEnd,
+    counts: {
+      cycles: normalized.cycles.length,
+      sleeps: normalized.sleeps.length,
+      workouts: normalized.workouts.length,
+      journals: normalized.journals.length,
+    },
+  };
+}
 
-  if (shouldUsePostgres()) {
-    const imported = await persistPostgresWhoopExport(normalized);
-    return { imported, ...archive };
-  }
-
+function persistSqliteWhoopExport(normalized: NormalizedWhoopExport) {
   const db = getDb();
   const existing = db
     .prepare("SELECT fingerprint FROM whoop_export_imports WHERE fingerprint = ?")
-    .get(archive.fingerprint);
+    .get(normalized.fingerprint);
 
   if (existing) {
-    return { imported: false, ...archive };
+    return false;
   }
 
   const insertCycle = db.prepare(`
@@ -297,5 +338,29 @@ export async function importWhoopExport(zipPath: string) {
     throw error;
   }
 
-  return { imported: true, ...archive };
+  return true;
+}
+
+export async function importWhoopExportArchive(
+  archive: WhoopExportArchive,
+): Promise<WhoopExportImportResult> {
+  const normalized = normalizeWhoopArchive(archive);
+
+  if (shouldUsePostgres()) {
+    const imported = await persistPostgresWhoopExport(normalized);
+    return resultFromNormalized(normalized, imported ? "imported" : "duplicate");
+  }
+
+  return resultFromNormalized(
+    normalized,
+    persistSqliteWhoopExport(normalized) ? "imported" : "duplicate",
+  );
+}
+
+export async function importWhoopExportBuffer(buffer: Buffer, sourceName: string) {
+  return importWhoopExportArchive(await readWhoopExportBuffer(buffer, sourceName));
+}
+
+export async function importWhoopExport(zipPath: string) {
+  return importWhoopExportArchive(await readWhoopExport(zipPath));
 }
