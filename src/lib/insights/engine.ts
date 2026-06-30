@@ -2731,35 +2731,21 @@ function buildWhyChangedToday(
 }
 
 function buildPromptText(summary: DailySummary) {
-  const intensityDisplay =
-    summary.physiqueDecision.trainingIntent === "Push"
-      ? "Progress"
-      : summary.physiqueDecision.trainingIntent;
   const latestActivity = summary.activityContext.latestSession;
 
   return [
     "HealthMax summary context",
-    "- Use as data only. Gary will ask a separate question outside this packet.",
+    "- Observational data only. Gary will ask a separate question outside this packet.",
+    "- Planned actions and prescription-style HealthMax fields are excluded.",
     "",
-    "Decision layer",
-    `- Training availability: ${summary.physiqueDecision.trainingAvailability}`,
-    `- Training target: ${summary.physiqueDecision.trainingTarget}`,
-    `- Next training target: ${summary.physiqueDecision.nextTrainingTarget}`,
-    `- Training target reason: ${summary.physiqueDecision.trainingTargetReason}`,
-    `- Decision reason: ${summary.physiqueDecision.primaryDecisionReason}`,
-    `- Weekly pace: ${summary.physiqueDecision.weeklyPaceLabel}`,
-    `- Lifts needed for 4x: ${summary.physiqueDecision.liftsNeededForGoal}`,
-    `- Days left in week: ${summary.physiqueDecision.daysLeftInWeek}`,
-    `- Can still hit 4x if resting today: ${summary.physiqueDecision.canStillHitWeeklyGoalIfRestToday ? "yes" : "no"}`,
-    `- Decision factors: ${summary.physiqueDecision.decisionFactors.map((factor) => `${factor.label} (${factor.tone}): ${factor.detail}`).join("; ")}`,
-    `- Intensity intent: ${intensityDisplay}`,
-    `- Intensity cue: ${summary.physiqueDecision.intensityLabel}`,
-    `- Session anchors: ${
-      summary.physiqueDecision.sessionAnchors.length > 0
-        ? summary.physiqueDecision.sessionAnchors.join(", ")
-        : "Use planned main lifts"
-    }`,
-    `- Calories: ${summary.physiqueDecision.calorieTargetLabel} (${summary.physiqueDecision.calorieRecommendation})`,
+    "Current app-observed state",
+    `- Training availability status: ${summary.physiqueDecision.trainingAvailability}`,
+    `- Training-load bottleneck data: ${summary.trainingLoad.hevyWorkoutCount7d} lifts / ${summary.trainingLoad.hevySetCount7d} sets in 7 days; ${summary.trainingLoad.hevyWorkoutCountThisWeek} lifts / ${summary.trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
+    `- Load flags: high training load ${summary.stressFlags.highTrainingLoad ? "yes" : "no"}; recent load spike ${summary.trainingLoad.recentLoadSpike ? "yes" : "no"}; consecutive lifting days ${summary.trainingLoad.hevyConsecutiveDays}`,
+    `- Split recency observations: upper ${summary.trainingLoad.upperBodyDaysSince ?? "--"}d; lower ${summary.trainingLoad.lowerBodyDaysSince ?? "--"}d; push ${summary.trainingLoad.pushDaysSince ?? "--"}d; pull ${summary.trainingLoad.pullDaysSince ?? "--"}d`,
+    `- Weekly goal pressure data: days left ${summary.physiqueDecision.daysLeftInWeek}; lifts remaining for weekly goal ${summary.physiqueDecision.liftsNeededForGoal}; weekly pace ${summary.physiqueDecision.weeklyPaceLabel}; goal still reachable if no lift today ${summary.physiqueDecision.canStillHitWeeklyGoalIfRestToday ? "yes" : "no"}`,
+    `- Source signal factors: ${summary.physiqueDecision.decisionFactors.map((factor) => `${factor.label} (${factor.tone})`).join("; ") || "Not available"}`,
+    `- Calories target: ${summary.physiqueDecision.calorieTargetLabel}`,
     `- Protein: ${summary.physiqueDecision.proteinTargetLabel}`,
     `- Nutrition phase: ${summary.nutritionTargets.campaign.active ? `${summary.nutritionTargets.campaign.phase}, ${summary.nutritionTargets.campaign.daysRemaining} days to July 17` : "normal targets"}`,
     `- Campaign targets: ${
@@ -2787,7 +2773,6 @@ function buildPromptText(summary: DailySummary) {
         ? "no protein target"
         : `${summary.nutritionActuals.remainingProteinG}g protein`
     }`,
-    `- Bottleneck: ${summary.physiqueDecision.mainBottleneck}`,
     "",
     "Metrics",
     `- Recovery: ${summary.readiness.recoveryScore ?? "--"}%`,
@@ -2822,8 +2807,8 @@ function buildPromptText(summary: DailySummary) {
         : "not enough repeat lift history"
     }`,
     "",
-    "Use",
-    "- Do not invent unavailable metrics or treat this summary as a request for default recommendations.",
+    "Data boundary",
+    "- Do not invent unavailable metrics; treat unavailable values as missing data.",
   ].join("\n");
 }
 
