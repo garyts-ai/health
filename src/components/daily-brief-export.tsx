@@ -138,7 +138,8 @@ export function DailyBriefExport({
           <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#19162a]">LLM context packet</h2>
         </div>
         <p className="max-w-xl text-sm leading-6 text-[#645c7d]">
-          Copy a concise HealthMax data dump, then ask your own question in the other model.
+          Copy a data-only HealthMax packet, then ask your own question in the other model. It does not include
+          HealthMax recommendations or planned actions.
         </p>
       </div>
 
