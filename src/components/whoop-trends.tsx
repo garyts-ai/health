@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type {
   WhoopAnalysisReport,
@@ -39,6 +39,33 @@ function formatDate(value: string | null) {
     : "Not available";
 }
 
+function formatShortDate(value: string | null) {
+  return value
+    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(value))
+    : "--";
+}
+
+function formatChartValue(value: number | null, unit: string, digits = 1) {
+  if (value === null || !Number.isFinite(value)) {
+    return "--";
+  }
+
+  return `${Number(value.toFixed(digits))}${unit}`;
+}
+
+function formatChartDelta(value: number | null, baseline: number | null, unit: string) {
+  if (value === null || baseline === null) {
+    return "No baseline";
+  }
+
+  const delta = value - baseline;
+  if (Math.abs(delta) < 0.05) {
+    return `even vs baseline`;
+  }
+
+  return `${delta > 0 ? "+" : ""}${Number(delta.toFixed(1))}${unit} vs baseline`;
+}
+
 function directionLabel(direction: WhoopMetric["direction"]) {
   if (direction === "missing") return "No comparison";
   if (direction === "flat") return "Near baseline";
@@ -63,72 +90,198 @@ function selectedImpact(
   return direction === "up" ? "favorable" : "unfavorable";
 }
 
+type ChartPoint = {
+  date: string;
+  value: number;
+  x: number;
+  y: number;
+  originalIndex: number;
+};
+
 function chartGeometry(
   values: Array<{ date: string; value: number | null }>,
   baseline: number | null,
   floor = 12,
   ceiling = 88,
 ) {
-  const present = values.filter((point) => point.value !== null);
-  const numeric = present.map((point) => point.value as number);
+  const present = values
+    .map((point, index) => ({ ...point, originalIndex: index }))
+    .filter((point): point is { date: string; value: number; originalIndex: number } => point.value !== null && Number.isFinite(point.value));
+  const numeric = present.map((point) => point.value);
   const domain = baseline === null ? numeric : [...numeric, baseline];
   const min = domain.length ? Math.min(...domain) : 0;
   const max = domain.length ? Math.max(...domain) : 1;
   const span = max - min || 1;
-  const coordinates = present.map((point, index) => ({
-    x: present.length === 1 ? 50 : (index / (present.length - 1)) * 100,
+  const coordinates: ChartPoint[] = present.map((point) => ({
+    date: point.date,
+    value: point.value,
+    originalIndex: point.originalIndex,
+    x: values.length <= 1 ? 50 : (point.originalIndex / (values.length - 1)) * 100,
     y: ceiling - (((point.value as number) - min) / span) * (ceiling - floor),
   }));
   return {
     present,
+    coordinates,
     points: coordinates.map((point) => `${point.x},${point.y}`).join(" "),
     area: coordinates.length
       ? `0,${ceiling + 4} ${coordinates.map((point) => `${point.x},${point.y}`).join(" ")} 100,${ceiling + 4}`
       : "",
     latest: coordinates.at(-1),
     baselineY: baseline === null ? null : ceiling - ((baseline - min) / span) * (ceiling - floor),
+    min,
+    max,
   };
 }
 
-function Sparkline({
+function nearestPoint(points: ChartPoint[], x: number) {
+  return points.reduce<ChartPoint | null>((best, point) => {
+    if (!best) return point;
+    return Math.abs(point.x - x) < Math.abs(best.x - x) ? point : best;
+  }, null);
+}
+
+function InteractiveSeriesChart({
   series,
   range,
+  rangeLabel,
   heightClass = "h-20",
+  compact = false,
+  dark = false,
 }: {
   series: WhoopAnalysisReport["series"][number];
   range: WhoopChartRange;
+  rangeLabel: string;
   heightClass?: string;
+  compact?: boolean;
+  dark?: boolean;
 }) {
-  const values = filterWhoopChartValues(series.values, range);
-  const geometry = chartGeometry(values, series.baseline, 18, 82);
+  const summary = summarizeWhoopChartRange(series, range);
+  const geometry = chartGeometry(summary.values, series.baseline, compact ? 20 : 16, compact ? 80 : 88);
   const tone = tones[series.tone];
-  const gradientId = `spark-${series.key}-${range}`;
+  const gradientSeed = useId().replace(/:/g, "");
+  const gradientId = `whoop-chart-${series.key}-${range}-${gradientSeed}`;
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [activePoint, setActivePoint] = useState<ChartPoint | null>(null);
+  const displayPoint = activePoint;
+  const latestPoint = geometry.latest ?? null;
+  const textTone = dark ? "text-white/56" : "text-[#746d87]";
+  const strongTone = dark ? "text-white" : "text-[#171329]";
+  const mutedLine = dark ? "rgba(255,255,255,0.11)" : "rgba(63,54,82,0.12)";
+  const baselineLine = dark ? "rgba(255,255,255,0.3)" : "rgba(63,54,82,0.28)";
+
+  const setNearestFromClientX = (clientX: number) => {
+    const bounds = svgRef.current?.getBoundingClientRect();
+    if (!bounds || geometry.coordinates.length === 0) return;
+
+    const relativeX = ((clientX - bounds.left) / bounds.width) * 100;
+    setActivePoint(nearestPoint(geometry.coordinates, Math.max(0, Math.min(100, relativeX))));
+  };
 
   if (geometry.present.length < 2) {
-    return <div className={`${heightClass} flex items-center text-xs text-[#8a8498]`}>Insufficient observations</div>;
+    const onlyPoint = geometry.coordinates[0] ?? null;
+    return (
+      <div className={`${heightClass} flex flex-col justify-center ${textTone}`}>
+        <div className={`text-sm font-medium tabular-nums ${strongTone}`}>
+          {onlyPoint ? formatChartValue(onlyPoint.value, series.unit) : "No values"}
+        </div>
+        <div className="mt-1 text-xs">
+          {onlyPoint ? `${formatDate(onlyPoint.date)} · one observation in ${rangeLabel}` : `No observations in ${rangeLabel}`}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <svg
-      className={`${heightClass} w-full`}
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      role="img"
-      aria-label={`${series.label} sparkline`}
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={tone.fill} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={tone.fill} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {geometry.baselineY !== null ? (
-        <line x1="0" y1={geometry.baselineY} x2="100" y2={geometry.baselineY} stroke="#bdb6c8" strokeWidth="1" strokeDasharray="3 3" />
+    <div className="relative">
+      {!compact ? (
+        <div className={`mb-2 flex items-center justify-between gap-3 text-[11px] ${textTone}`}>
+          <span>max {formatChartValue(geometry.max, series.unit)}</span>
+          <span>avg {formatChartValue(summary.average, series.unit)}</span>
+          <span>min {formatChartValue(geometry.min, series.unit)}</span>
+        </div>
       ) : null}
-      <polygon points={geometry.area} fill={`url(#${gradientId})`} />
-      <polyline points={geometry.points} fill="none" stroke={tone.line} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-      {geometry.latest ? <circle cx={geometry.latest.x} cy={geometry.latest.y} r="2.2" fill={tone.line} /> : null}
-    </svg>
+      <svg
+        ref={svgRef}
+        className={`${heightClass} w-full touch-pan-y outline-none`}
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`${series.label} trend for ${rangeLabel}. Latest ${formatChartValue(summary.latest, series.unit)}.`}
+        onPointerMove={(event) => setNearestFromClientX(event.clientX)}
+        onPointerDown={(event) => setNearestFromClientX(event.clientX)}
+        onPointerLeave={() => setActivePoint(null)}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={tone.fill} stopOpacity={dark ? "0.28" : "0.18"} />
+            <stop offset="100%" stopColor={tone.fill} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="88" x2="100" y2="88" stroke={mutedLine} strokeWidth="1" />
+        <line x1="0" y1="52" x2="100" y2="52" stroke={mutedLine} strokeWidth="0.7" />
+        <line x1="0" y1="16" x2="100" y2="16" stroke={mutedLine} strokeWidth="0.7" />
+        {geometry.baselineY !== null ? (
+          <line x1="0" y1={geometry.baselineY} x2="100" y2={geometry.baselineY} stroke={baselineLine} strokeWidth="1" strokeDasharray="3 3" />
+        ) : null}
+        <polygon points={geometry.area} fill={`url(#${gradientId})`} />
+        <polyline points={geometry.points} fill="none" stroke={tone.line} strokeWidth={compact ? "1.8" : "2.2"} vectorEffect="non-scaling-stroke" />
+        {latestPoint && !displayPoint ? (
+          <circle cx={latestPoint.x} cy={latestPoint.y} r={compact ? "2" : "2.5"} fill={tone.line} vectorEffect="non-scaling-stroke" />
+        ) : null}
+        {displayPoint ? (
+          <>
+            <line x1={displayPoint.x} y1="12" x2={displayPoint.x} y2="92" stroke={dark ? "rgba(255,255,255,0.24)" : "rgba(57,48,74,0.26)"} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <circle cx={displayPoint.x} cy={displayPoint.y} r={compact ? "2.4" : "3"} fill={tone.line} stroke={dark ? "#171126" : "#fbf9fd"} strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
+          </>
+        ) : null}
+        {geometry.coordinates.map((point) => (
+          <circle
+            key={`${series.key}-${point.date}-${point.originalIndex}`}
+            cx={point.x}
+            cy={point.y}
+            r={compact ? "5" : "4.8"}
+            fill="transparent"
+            tabIndex={0}
+            role="button"
+            aria-label={`${series.label} on ${formatDate(point.date)}: ${formatChartValue(point.value, series.unit)}, ${formatChartDelta(point.value, series.baseline, series.unit)}`}
+            onFocus={() => setActivePoint(point)}
+            onBlur={() => setActivePoint(null)}
+            onPointerEnter={() => setActivePoint(point)}
+          />
+        ))}
+      </svg>
+      {activePoint ? (
+        <div
+          className={`pointer-events-none absolute z-10 min-w-[8.5rem] border px-2.5 py-2 text-xs shadow-[0_2px_8px_rgba(0,0,0,0.16)] ${
+            dark ? "border-white/12 bg-[#211a32] text-white" : "border-[#d8d2e4] bg-[#fbf9fd] text-[#171329]"
+          }`}
+          style={{
+            left: `${Math.min(78, Math.max(22, activePoint.x))}%`,
+            top: `${Math.min(78, Math.max(8, activePoint.y - 22))}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div className={dark ? "text-white/54" : "text-[#746d87]"}>{formatDate(activePoint.date)}</div>
+          <div className="mt-1 font-semibold tabular-nums" style={{ color: tone.line }}>
+            {formatChartValue(activePoint.value, series.unit)}
+          </div>
+          <div className={dark ? "mt-1 text-white/58" : "mt-1 text-[#5f5871]"}>
+            {formatChartDelta(activePoint.value, series.baseline, series.unit)}
+          </div>
+        </div>
+      ) : null}
+      <div className={`mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] ${textTone}`}>
+        <span>{formatShortDate(geometry.coordinates[0]?.date ?? null)}</span>
+        <span className={`tabular-nums ${strongTone}`}>
+          {activePoint
+            ? `${formatShortDate(activePoint.date)} ${formatChartValue(activePoint.value, series.unit)}`
+            : latestPoint
+              ? `Latest ${formatShortDate(latestPoint.date)} ${formatChartValue(latestPoint.value, series.unit)}`
+              : "Select a point"}
+        </span>
+        <span>{formatShortDate(geometry.coordinates.at(-1)?.date ?? null)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -141,10 +294,8 @@ function TrendChart({
   range: WhoopChartRange;
   rangeLabel: string;
 }) {
-  const summary = summarizeWhoopChartRange(series, range);
-  const geometry = chartGeometry(summary.values, series.baseline, 16, 88);
   const tone = tones[series.tone];
-  const gradientId = `whoop-${series.key}-${range}`;
+  const summary = summarizeWhoopChartRange(series, range);
 
   return (
     <section data-premium-surface data-premium-tone="dark" data-premium-enter className="min-w-0 bg-[#171126] p-5 text-white">
@@ -162,31 +313,12 @@ function TrendChart({
           <div className="mt-1 text-xs text-white/46">{directionLabel(summary.direction)}</div>
         </div>
       </div>
-      {geometry.present.length > 1 ? (
-        <svg className="mt-4 h-36 w-full" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${series.label} trend for ${rangeLabel}`}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor={tone.fill} stopOpacity="0.28" />
-              <stop offset="100%" stopColor={tone.fill} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <line x1="0" y1="92" x2="100" y2="92" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-          {geometry.baselineY !== null ? (
-            <line x1="0" y1={geometry.baselineY} x2="100" y2={geometry.baselineY} stroke="rgba(255,255,255,0.26)" strokeWidth="1" strokeDasharray="3 3" />
-          ) : null}
-          <polygon points={geometry.area} fill={`url(#${gradientId})`} />
-          <polyline points={geometry.points} fill="none" stroke={tone.line} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-          {geometry.latest ? <circle cx={geometry.latest.x} cy={geometry.latest.y} r="2.4" fill={tone.line} /> : null}
-        </svg>
-      ) : (
-        <div className="mt-4 flex h-36 items-center justify-center text-sm text-white/48">
-          {geometry.present.length === 1 ? "One observation in this range" : "No observations in this range"}
-        </div>
-      )}
+      <div className="mt-4">
+        <InteractiveSeriesChart series={series} range={range} rangeLabel={rangeLabel} heightClass="h-36" dark />
+      </div>
       <div className="mt-2 flex justify-between gap-2 text-[11px] text-white/36">
-        <span>{formatDate(geometry.present[0]?.date ?? null)}</span>
         <span>baseline {series.baseline === null ? "--" : `${series.baseline}${series.unit}`}</span>
-        <span>{formatDate(geometry.present.at(-1)?.date ?? null)}</span>
+        <span>range avg {summary.average === null ? "--" : `${Number(summary.average.toFixed(1))}${series.unit}`}</span>
       </div>
     </section>
   );
@@ -220,11 +352,13 @@ function InstrumentRow({
   rows,
   series,
   range,
+  rangeLabel,
 }: {
   title: string;
   rows: WhoopMetric[];
   series: WhoopAnalysisReport["series"][number];
   range: WhoopChartRange;
+  rangeLabel: string;
 }) {
   const summary = summarizeWhoopChartRange(series, range);
   const direction = summary.direction;
@@ -243,7 +377,7 @@ function InstrumentRow({
         <div className="mt-1 text-xs text-[#7b7492]">{directionLabel(direction)}</div>
       </div>
 
-      <Sparkline series={series} range={range} />
+      <InteractiveSeriesChart series={series} range={range} rangeLabel={rangeLabel} compact />
 
       <div>
         <div className="text-xs text-[#746d87]">{series.label} average</div>
@@ -482,7 +616,7 @@ export function WhoopVisualAnalysis({ report }: { report: WhoopAnalysisReport })
         <h2 className="mb-3 text-2xl font-semibold tracking-[-0.03em] text-[#171329]">Baseline instruments</h2>
         <div className="border-y border-[#d8d2e4] bg-[#fbf9fd]">
           {instruments.map(([title, rows, series]) =>
-            series ? <InstrumentRow key={title} title={title} rows={rows} series={series} range={range} /> : null,
+            series ? <InstrumentRow key={title} title={title} rows={rows} series={series} range={range} rangeLabel={rangeLabel} /> : null,
           )}
         </div>
       </section>
