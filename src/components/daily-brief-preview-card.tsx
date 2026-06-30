@@ -21,12 +21,12 @@ export async function DailyBriefPreviewCard({
     "Use only this snapshot to infer today's training, eating, recovery, supplements, and caution priorities. Make a fresh call from the metrics rather than echoing the app's built-in recommendations.";
 
   return (
-    <div className="w-full max-w-[1040px] rounded-[10px] bg-[#171126] p-3 text-[#19162a]">
-      <div className="flex flex-col gap-3">
-        <div className="rounded-[9px] bg-white/6 px-4 py-2.5 text-white ring-1 ring-white/8">
+    <div className="hud-frame w-full max-w-[1040px] bg-[#030814] p-3 text-white">
+      <div className="hud-content flex flex-col gap-3">
+        <div className="border border-[#39f8ff]/18 bg-white/[0.035] px-4 py-2.5 text-white">
           <div className="flex items-center justify-between gap-6">
             <div>
-              <p className="text-[11px] font-medium text-white/58">LLM context packet</p>
+              <p className="hud-micro-label text-[#39f8ff]">LLM context packet</p>
             </div>
             <div className="text-right">
               <p className="text-[11px] text-white/58">{dashboard.header.productName}</p>
@@ -37,8 +37,8 @@ export async function DailyBriefPreviewCard({
 
         <div className="grid gap-3 lg:grid-cols-[210px_minmax(0,1fr)]">
           <div className="space-y-3">
-            <div className="rounded-[9px] bg-white/6 px-3 py-3 text-white ring-1 ring-white/10">
-              <p className="text-[11px] text-white/58">Overnight read</p>
+            <div className="border border-[#39f8ff]/18 bg-white/[0.035] px-3 py-3 text-white">
+              <p className="hud-micro-label text-[#39f8ff]">Overnight read</p>
               <p className="mt-2 text-[30px] font-semibold leading-[0.95] tracking-[-0.04em]">
                 {dashboard.hero.overnightRead.label}
               </p>
@@ -47,7 +47,7 @@ export async function DailyBriefPreviewCard({
               </p>
             </div>
 
-            <div className="rounded-[9px] bg-[#eee8f7] p-2 ring-1 ring-[rgba(77,67,119,0.12)]">
+            <div className="border border-[#39f8ff]/14 bg-[#07101c] p-2">
               <div className="space-y-2.5">
                 {dashboard.hero.metrics.map((metric) => (
                   <MiniExportStat
@@ -65,11 +65,11 @@ export async function DailyBriefPreviewCard({
             </div>
           </div>
 
-          <div className="rounded-[9px] bg-white/6 p-3 ring-1 ring-white/10">
+          <div className="border border-[#39f8ff]/16 bg-white/[0.035] p-3">
             <div className="grid gap-3">
               <div>
-                <div className="rounded-[9px] bg-[#171126] p-3 text-white/92 ring-1 ring-white/8">
-                  <p className="text-[11px] text-white/58">Today&apos;s split call</p>
+                <div className="border border-[#39f8ff]/18 bg-[#030814] p-3 text-white/92">
+                  <p className="hud-micro-label text-[#39f8ff]">Today&apos;s split call</p>
                   <p className="mt-2 text-[30px] font-semibold leading-[0.92] tracking-[-0.05em] text-white">
                     {dashboard.hero.todayCall}
                   </p>
@@ -105,27 +105,27 @@ export async function DailyBriefPreviewCard({
                 </div>
               </div>
 
-              <div className="rounded-[9px] bg-[#171126] p-3 text-white ring-1 ring-white/8">
-                <p className="text-[12px] text-white/68">Training context</p>
+              <div className="border border-[#39f8ff]/18 bg-[#030814] p-3 text-white">
+                <p className="hud-micro-label text-[#39f8ff]">Training context</p>
                 <p className="mt-2 text-[13px] leading-5 text-white/78">
                   {dashboard.hero.focusLabel}
                 </p>
               </div>
             </div>
 
-            <div className="mt-3 grid gap-px overflow-hidden rounded-[9px] bg-white/10 ring-1 ring-white/10 md:grid-cols-4">
+            <div className="mt-3 grid gap-px overflow-hidden border border-[#39f8ff]/16 bg-[#39f8ff]/14 md:grid-cols-4">
               {dashboard.trendBand.map((item) => (
-                <div key={item.label} className="bg-[rgba(255,255,255,0.86)] px-4 py-3">
-                  <p className="text-[11px] text-[#7a7395]">{item.label}</p>
-                  <p className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-[#171329]">
+                <div key={item.label} className="bg-[#07101c] px-4 py-3">
+                  <p className="text-[11px] text-white/50">{item.label}</p>
+                  <p className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-white">
                     {item.value}
                   </p>
-                  <p className="mt-1 text-[11px] leading-5 text-[#6a6384]">{item.detail}</p>
+                  <p className="mt-1 text-[11px] leading-5 text-white/58">{item.detail}</p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-3 rounded-[9px] bg-[#171126] px-3 py-2.5 text-white ring-1 ring-white/8">
+            <div className="mt-3 border border-[#ff9f1c]/26 bg-[#ff9f1c]/[0.06] px-3 py-2.5 text-white">
               <p className="text-[11px] leading-5 text-white/86">{imagePrompt}</p>
             </div>
           </div>
@@ -185,55 +185,55 @@ function MiniExportStat({
   const sleepDurationLabel = label === "Sleep" ? formatSleepDuration(value) : value;
 
   return (
-    <div className="rounded-[8px] bg-white/72 px-3 py-2 ring-1 ring-[rgba(77,67,119,0.08)]">
-      <p className="text-[11px] text-[#776f92]">{label}</p>
+    <div className="border border-[#39f8ff]/14 bg-white/[0.035] px-3 py-2">
+      <p className="text-[11px] text-white/54">{label}</p>
       <div className="mt-2 flex min-h-[60px] items-center justify-center">
         {chartMode === "gauge" ? (
           <svg aria-hidden="true" viewBox="0 0 86 86" className="h-[68px] w-[68px] overflow-visible">
-            <circle cx="43" cy="43" r="23" fill="none" stroke="rgba(112,104,151,0.14)" strokeWidth="7" />
+            <circle cx="43" cy="43" r="23" fill="none" stroke="rgba(113,255,241,0.14)" strokeWidth="7" />
             <circle
               cx="43"
               cy="43"
               r="23"
               fill="none"
-              stroke="#6a64b5"
+              stroke="#39f8ff"
               strokeWidth="7"
               strokeLinecap="round"
               strokeDasharray={2 * Math.PI * 23}
               strokeDashoffset={(2 * Math.PI * 23) * (1 - recoveryGauge / 100)}
               transform="rotate(-90 43 43)"
             />
-            <text x="43" y="43" textAnchor="middle" className="fill-[#332b64] text-[18px] font-semibold">
+            <text x="43" y="43" textAnchor="middle" className="fill-white text-[18px] font-semibold">
               {value}
             </text>
           </svg>
         ) : chartMode === "timeline" ? (
           <div className="w-full max-w-[150px]">
-            <div className="text-center text-[18px] font-semibold tracking-[-0.03em] text-[#332b64]">
+            <div className="text-center text-[18px] font-semibold tracking-[-0.03em] text-white">
               {sleepDurationLabel}
             </div>
-            <div className="mt-2 h-[5px] rounded-full bg-[rgba(112,104,151,0.16)]">
-              <div className="relative mx-auto h-[5px] w-[54%] rounded-full bg-[#6a64b5]">
-                <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-[#6a64b5]" />
-                <span className="absolute -right-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-[#8b84db]" />
+            <div className="mt-2 h-[5px] rounded-full bg-white/10">
+              <div className="relative mx-auto h-[5px] w-[54%] rounded-full bg-[#7b5cff]">
+                <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-[#39f8ff]" />
+                <span className="absolute -right-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-[#ff6fae]" />
               </div>
             </div>
-            <div className="mt-1 flex justify-between text-[9px] text-[#6d6690]">
+            <div className="mt-1 flex justify-between text-[9px] text-white/48">
               <span>{sleepWindow?.startLabel ?? "--"}</span>
               <span>{sleepWindow?.endLabel ?? "--"}</span>
             </div>
           </div>
         ) : (
           <div className="w-full max-w-[120px]">
-            <div className="text-center text-[18px] font-semibold tracking-[-0.03em] text-[#332b64]">
+            <div className="text-center text-[18px] font-semibold tracking-[-0.03em] text-white">
               {value}
             </div>
-            <div className="mt-2 flex items-end justify-center gap-2 border-b border-[rgba(123,115,146,0.16)] pb-0.5">
+            <div className="mt-2 flex items-end justify-center gap-2 border-b border-white/10 pb-0.5">
               {bars.map((bar, index) => (
                 <div
                   key={`${label}-mini-bar-${index}`}
                   className={`w-3 rounded-t-[3px] ${
-                    index === bars.length - 1 ? "bg-[#ff967e]" : "bg-[rgba(255,150,126,0.48)]"
+                    index === bars.length - 1 ? "bg-[#ff9f1c]" : "bg-[rgba(255,159,28,0.42)]"
                   }`}
                   style={{ height: `${bar.height}px` }}
                 />
@@ -242,12 +242,12 @@ function MiniExportStat({
           </div>
         )}
       </div>
-      <p className="mt-1 text-center text-[11px] leading-4 text-[#6b6484]">{detail}</p>
-      <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-[8px] bg-[rgba(104,96,153,0.08)]">
+      <p className="mt-1 text-center text-[11px] leading-4 text-white/56">{detail}</p>
+      <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden bg-[#39f8ff]/10">
         {trend.map((point, index) => (
-          <div key={`${label}-mini-trend-${index}`} className="bg-white/45 px-1.5 py-1.5 text-center">
-            <div className="text-[8px] text-[#8a83a4]">{trendLabels[index] ?? ""}</div>
-            <div className="mt-0.5 text-[9px] font-semibold text-[#433a72]">{formatTrendValue(point)}</div>
+          <div key={`${label}-mini-trend-${index}`} className="bg-[#07101c] px-1.5 py-1.5 text-center">
+            <div className="text-[8px] text-white/42">{trendLabels[index] ?? ""}</div>
+            <div className="mt-0.5 text-[9px] font-semibold text-white/78">{formatTrendValue(point)}</div>
           </div>
         ))}
       </div>

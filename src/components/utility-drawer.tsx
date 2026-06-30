@@ -87,9 +87,11 @@ export function UtilityDrawer({
     <>
       <Link
         href={openHref}
-        className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-white/14 bg-white/5 px-3 text-sm font-medium text-white transition hover:border-white/28 hover:bg-white/10"
+        className="hud-chip hud-chip-coral inline-flex h-10 items-center gap-2 px-3.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-white shadow-[0_0_24px_rgba(255,159,28,0.18)] transition hover:translate-y-[-1px] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#39f8ff]"
       >
-        <span className="block h-1.5 w-1.5 rounded-full bg-[#ff8d72]" />
+        <span className="grid h-4 w-4 place-items-center text-[#39f8ff]" aria-hidden="true">
+          <span className="h-2 w-2 rounded-full bg-[#ff9f1c] shadow-[0_0_16px_rgba(255,159,28,1)]" />
+        </span>
         <span>Utilities</span>
       </Link>
 
@@ -98,18 +100,19 @@ export function UtilityDrawer({
               <Link
                 href={closeHref}
                 aria-label="Close utilities"
-                className="absolute inset-0 bg-[rgba(18,14,31,0.56)]"
+                className="absolute inset-0 bg-[#020711]/78"
               />
 
-              <aside className="absolute right-0 top-0 h-dvh w-full overflow-y-auto border-l border-[#dad4eb] bg-[#f6f3fb] shadow-[-8px_0_28px_rgba(18,14,30,0.18)] sm:max-w-[40rem]">
-                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e7e2f2] bg-[#f6f3fb]/96 px-4 py-3 backdrop-blur sm:px-5">
+              <aside className="absolute right-0 top-0 h-dvh w-full overflow-y-auto border-l border-[#39f8ff]/26 bg-[#06101c] text-white shadow-[-24px_0_80px_rgba(0,190,255,0.16)] sm:max-w-[40rem]">
+                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#39f8ff]/18 bg-[#06101c]/96 px-4 py-3 backdrop-blur sm:px-5">
                   <div>
-                    <h2 className="text-lg font-semibold text-[#19162a]">Utilities</h2>
-                    <p className="mt-0.5 text-[13px] text-[#645c7d]">{utilityLabel}</p>
+                    <p className="hud-micro-label text-[#39f8ff]">Command drawer</p>
+                    <h2 className="mt-1 text-xl font-semibold tracking-[-0.04em] text-white">Utilities</h2>
+                    <p className="mt-0.5 text-[13px] text-white/62">{utilityLabel}</p>
                   </div>
                   <Link
                     href={closeHref}
-                    className="inline-flex h-9 items-center justify-center rounded-[8px] border border-[#d8d1ec] bg-white px-3 text-sm font-medium text-[#2a2540] transition hover:border-[#bdb2e0] hover:bg-[#faf8ff]"
+                    className="inline-flex h-9 items-center justify-center border border-[#39f8ff]/24 bg-white/[0.04] px-3 text-sm font-medium text-white transition hover:border-[#39f8ff]/60 hover:bg-white/[0.08]"
                   >
                     Close
                   </Link>

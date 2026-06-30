@@ -107,13 +107,11 @@ function ActionTile({
 }) {
   return (
     <span
-      className={`inline-flex min-h-7 items-center gap-1.5 rounded-[7px] border px-2 text-[12px] font-medium ${
-        subtle
-          ? "border-[#ddd7e9] bg-[#f3eff8] text-[#5f5874]"
-          : "border-[#d9d2e6] bg-white text-[#29233d]"
+      className={`hud-chip inline-flex min-h-7 items-center gap-1.5 px-2 text-[12px] font-medium ${
+        subtle ? "hud-chip-coral text-[#ffd0c4]" : "text-white/82"
       }`}
     >
-      <span className="text-[#5d54a3]">
+      <span className={subtle ? "text-[#ff9f1c]" : "text-[#39f8ff]"}>
         <ActionStepGlyph icon={tile.icon} />
       </span>
       {tile.label}
@@ -123,69 +121,67 @@ function ActionTile({
 
 function DecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-t border-white/10 px-3 py-2 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0">
-      <div className="text-[10px] text-white/44">{label}</div>
-      <div className="mt-0.5 truncate text-[13px] font-semibold text-white/84">{value}</div>
+    <div className="border-t border-white/10 bg-white/[0.025] px-3 py-2 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0">
+      <div className="hud-micro-label text-[10px]">{label}</div>
+      <div className="mt-1 truncate text-[13px] font-semibold text-white/88">{value}</div>
     </div>
   );
 }
 
 function FreshnessNotice({ message }: { message: string }) {
   return (
-    <div className="rounded-[9px] border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-[13px] leading-5 text-[#7c2d12]">
+    <div className="hud-frame hud-content border-[#ff9f1c]/55 bg-[#241202]/90 px-3 py-2 text-[13px] leading-5 text-[#ffe2bd] shadow-[0_0_26px_rgba(255,159,28,0.18)]">
       {message}
     </div>
   );
 }
 
 function ActionCard({ item, index }: { item: DailyRecommendation; index: number }) {
-  const tone =
-    item.category === "training"
-      ? "border-[#dcd6ea] bg-[#f8f5ff]"
-      : item.category === "recovery"
-        ? "border-[#d9dff0] bg-[#f6f7ff]"
-        : "border-[#edd8ce] bg-[#fff7f1]";
+  const isNutrition = item.category === "nutrition";
+  const isRecovery = item.category === "recovery";
 
   return (
     <article
       data-premium-surface
-      data-premium-tone={item.category === "recovery" ? "recovery" : item.category === "nutrition" ? "caution" : "light"}
+      data-premium-tone={isNutrition ? "caution" : isRecovery ? "recovery" : "hud"}
       data-premium-enter
-      className={`rounded-[10px] border ${tone} p-3`}
+      className="hud-frame text-white"
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] border border-[#dcd6ea] bg-white text-[#4f3b93]">
-          <RecommendationGlyph category={item.category} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-semibold text-[#6c6482]">#{index + 1}</span>
-            <span className="text-[11px] text-[#817994]">{item.priority}</span>
+      <div className="hud-content p-3">
+        <div className="flex items-start gap-3">
+          <div className={`hud-orb h-9 w-9 shrink-0 ${isNutrition ? "text-[#ff9f1c]" : isRecovery ? "text-[#78e08f]" : "text-[#39f8ff]"}`}>
+            <RecommendationGlyph category={item.category} />
           </div>
-          <h2 className="mt-1 text-[16px] font-semibold leading-5 tracking-[-0.03em] text-[#171329]">
-            {item.title}
-          </h2>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[11px] text-[#39f8ff] drop-shadow-[0_0_10px_rgba(57,248,255,0.8)]">0{index + 1}</span>
+              <span className="hud-micro-label text-[10px]">{item.priority}</span>
+            </div>
+            <h2 className="mt-1 text-[17px] font-semibold leading-5 tracking-[-0.035em] text-white">
+              {item.title}
+            </h2>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {item.primaryActions.slice(0, 2).map((tile) => (
-          <ActionTile key={`${item.title}-${tile.label}`} tile={tile} />
-        ))}
-        {item.conditionalActions?.slice(0, 1).map((tile) => (
-          <ActionTile key={`${item.title}-${tile.label}-conditional`} tile={tile} subtle />
-        ))}
-      </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {item.primaryActions.slice(0, 2).map((tile) => (
+            <ActionTile key={`${item.title}-${tile.label}`} tile={tile} />
+          ))}
+          {item.conditionalActions?.slice(0, 1).map((tile) => (
+            <ActionTile key={`${item.title}-${tile.label}-conditional`} tile={tile} subtle />
+          ))}
+        </div>
 
-      <details className="mt-2 text-[13px] leading-5 text-[#514a66]">
-        <summary className="cursor-pointer font-medium text-[#5d54a3]">Evidence</summary>
-        <p className="mt-1">{item.why}</p>
-      </details>
-      {item.supportingMetrics.length ? (
-        <p className="mt-2 truncate border-t border-[#e5dfed] pt-2 text-[11px] text-[#7b7492]">
-          {item.supportingMetrics.slice(0, 3).join(" · ")}
-        </p>
-      ) : null}
+        <details className="mt-2 text-[13px] leading-5 text-white/66">
+          <summary className="cursor-pointer font-medium text-[#39f8ff]">Evidence</summary>
+          <p className="mt-1">{item.why}</p>
+        </details>
+        {item.supportingMetrics.length ? (
+          <p className="mt-2 truncate border-t border-white/10 pt-2 text-[11px] text-white/46">
+            {item.supportingMetrics.slice(0, 3).join(" · ")}
+          </p>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -202,16 +198,15 @@ export async function MasterDashboard({
   const topRecommendation = vm.actionCards[0];
 
   return (
-    <main className="giga-shell premium-cockpit relative min-h-screen overflow-x-clip bg-[#0f0a1c] text-[#171329]">
+    <main className="hud-cockpit giga-shell premium-cockpit relative min-h-screen overflow-x-clip text-white">
       <MobilePullSync />
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(180deg,_#0f0a1c_0%,_#171126_58%,_#f3eff8_58%,_#f3eff8_100%)]" />
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1480px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-3 border-b border-white/10 pb-3 text-white sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-            <p className="text-[13px] font-medium text-white/56">{vm.header.productName}</p>
-            <h1 className="text-3xl font-semibold leading-none tracking-[-0.06em] sm:text-4xl">Today</h1>
-            <p className="text-[13px] text-white/52">{vm.header.dateLabel}</p>
+      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1560px] flex-col gap-4 px-3 py-3 sm:px-5 lg:px-7">
+        <header className="flex flex-col gap-3 border-b border-[#2adfff]/20 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <p className="hud-micro-label">{vm.header.productName}</p>
+            <span className="h-2 w-2 rounded-full bg-[#39f8ff] shadow-[0_0_16px_#39f8ff]" />
+            <p className="text-[13px] text-white/54">{vm.header.dateLabel}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
@@ -231,84 +226,34 @@ export async function MasterDashboard({
         {utilityBannerMessage ? <SummaryBanner message={utilityBannerMessage} /> : null}
         {vm.header.freshnessNotice ? <FreshnessNotice message={vm.header.freshnessNotice} /> : null}
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div
-            data-premium-surface
-            data-premium-tone="live"
-            data-premium-enter
-            className="rounded-[12px] border border-white/12 bg-[#171126] p-3 text-white"
-          >
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.86fr)_minmax(360px,1.14fr)]">
-              <div className="min-w-0">
-                <p className="text-[12px] text-white/48">Split call</p>
-                <div className="mt-1 text-[38px] font-semibold leading-[0.9] tracking-[-0.07em] sm:text-[48px]">
-                  {vm.hero.todayCall}
-                </div>
-                <p className="mt-3 text-[14px] leading-5 text-white/76">
-                  {vm.hero.decision.intensityIntentLabel}: {vm.hero.decision.intensity}
-                </p>
-                <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-white/58">
-                  {vm.hero.decision.targetReason}
-                </p>
-
-                <div className="mt-3 grid overflow-hidden rounded-[9px] border border-white/10 bg-white/5 sm:grid-cols-3">
-                  <DecisionCell label="Calories" value={vm.hero.decision.calories} />
-                  <DecisionCell label="Protein" value={vm.hero.decision.protein} />
-                  <DecisionCell label="Remaining" value={vm.hero.decision.remaining} />
-                </div>
-
-                {topRecommendation ? (
-                  <div className="mt-3 rounded-[9px] border border-white/10 bg-white/[0.06] p-3">
-                    <div className="text-[11px] text-white/46">Best move now</div>
-                    <div className="mt-1 text-[15px] font-semibold text-white/90">{topRecommendation.title}</div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {topRecommendation.primaryActions.slice(0, 3).map((tile) => (
-                        <span
-                          key={`${topRecommendation.title}-${tile.label}-top`}
-                          className="rounded-[8px] border border-white/10 bg-white/8 px-2.5 py-1.5 text-[12px] text-white/76"
-                        >
-                          {tile.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <TrainingMap
-                weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
-                latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
-                weeklyVolume={vm.hero.weeklyFocus}
-                latestWorkout={vm.hero.workoutLabel}
-                latestSessionAge={vm.hero.latestSessionAgeLabel}
-                workoutCount={summary.trainingLoad.hevyWorkoutCountThisWeek}
-                emptyMessage={vm.hero.weeklyFocusEmptyMessage}
-                note={vm.hero.weeklyMapNote}
-              />
+        <section className="grid gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
+          <aside className="order-2 grid content-start gap-3 xl:order-1">
+            <div className="relative hidden min-h-[190px] overflow-hidden px-1 pt-2 xl:block">
+              <div className="pointer-events-none absolute left-20 top-0 h-36 w-36 rounded-full border border-[#39f8ff]/32 shadow-[0_0_78px_rgba(57,248,255,0.3)]" />
+              <p className="hud-micro-label">Health OS</p>
+              <h1 className="mt-2 text-[76px] font-semibold leading-[0.82] tracking-[-0.095em] text-white drop-shadow-[0_0_34px_rgba(126,255,247,0.32)] sm:text-[92px] xl:text-[104px]">
+                Today
+              </h1>
+              <p className="mt-5 text-[15px] text-white/68">{vm.header.dateLabel}</p>
             </div>
 
-            <div className="mt-3 hidden overflow-hidden rounded-[9px] border border-white/10 bg-white/5 sm:grid sm:grid-cols-5">
-              <DecisionCell label="Call" value={vm.hero.decision.train} />
-              <DecisionCell label="Intent" value={vm.hero.decision.intensityIntentLabel} />
-              <DecisionCell label="Pace" value={vm.hero.decision.scheduleLabel} />
-              <DecisionCell label="Next" value={vm.hero.decision.nextTrainingTarget} />
-              <DecisionCell label="Latest" value={`${vm.hero.workoutLabel} / ${vm.hero.latestSessionAgeLabel}`} />
-            </div>
-          </div>
-
-          <aside className="hidden content-start gap-3 xl:grid">
             <div
               data-premium-surface
-              data-premium-tone="dark"
+              data-premium-tone="caution"
               data-premium-enter
-              className="rounded-[10px] border border-white/10 bg-[#171126] p-3 text-white"
+              className="hud-frame text-white"
             >
-              <div className="text-[12px] text-white/48">Overnight</div>
-              <div className="mt-1 text-xl font-semibold tracking-[-0.04em]">{vm.hero.overnightRead.label}</div>
-              <p className="mt-1 text-[13px] leading-5 text-white/62">{vm.hero.overnightRead.detail}</p>
+              <div className="hud-content p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="hud-micro-label">Overnight read</div>
+                  <span className="text-[#ff9f1c] drop-shadow-[0_0_12px_rgba(255,159,28,0.9)]">›</span>
+                </div>
+                <div className="mt-3 text-2xl font-semibold tracking-[-0.05em]">{vm.hero.overnightRead.label}</div>
+                <p className="mt-2 text-[13px] leading-5 text-white/66">{vm.hero.overnightRead.detail}</p>
+              </div>
             </div>
 
-            <div className="grid gap-2 rounded-[10px] border border-[#d9d2e6] bg-[#eee8f7] p-2">
+            <div className="grid gap-2">
               {vm.hero.metrics.map((metric) => (
                 <HeroStatCard
                   key={metric.label}
@@ -323,53 +268,118 @@ export async function MasterDashboard({
               ))}
             </div>
 
-            <details className="rounded-[10px] border border-[#d9d2e6] bg-[#f8f5ff] p-3 text-[#171329]">
-              <summary className="cursor-pointer text-[13px] font-semibold">What changed</summary>
-              <div className="mt-2 grid gap-1.5">
+            <details className="hud-frame text-white">
+              <summary className="hud-content cursor-pointer p-3 text-[13px] font-semibold text-[#39f8ff]">What changed</summary>
+              <div className="hud-content grid gap-1.5 border-t border-white/10 px-3 pb-3 pt-1">
                 {vm.contextBand.whyChanged.map((item) => (
-                  <p key={item} className="text-[13px] leading-5 text-[#514a66]">{item}</p>
+                  <p key={item} className="text-[13px] leading-5 text-white/62">{item}</p>
                 ))}
                 {vm.hero.historicalQualifier ? (
-                  <p className="border-t border-[#e5dfed] pt-2 text-[12px] text-[#746d8e]">
+                  <p className="border-t border-white/10 pt-2 text-[12px] text-white/48">
                     Personal baseline: {vm.hero.historicalQualifier}
                   </p>
                 ) : null}
               </div>
             </details>
           </aside>
-        </section>
 
-        <section className="grid gap-3 lg:grid-cols-3">
-          {vm.actionCards.map((item, index) => (
-            <ActionCard key={item.title} item={item} index={index} />
-          ))}
-        </section>
+          <div className="order-1 grid min-w-0 content-start gap-4 xl:order-2">
+            <section
+              data-premium-surface
+              data-premium-tone="command"
+              data-premium-enter
+              className="hud-frame hud-command text-white"
+            >
+              <span className="hud-scanline" />
+              <span className="hud-energy-rail" />
+              <div className="hud-content p-4 sm:p-5">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(520px,1.22fr)]">
+                  <div className="relative min-w-0">
+                    <div className="hud-reactor hud-reactor-command hidden lg:block">
+                      <div className="hud-reactor-icon">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8">
+                          <path
+                            d="M4.5 9.5v5M7 8.5v7M9.5 11h5M17 8.5v7M19.5 9.5v5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeWidth="1.8"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="hud-micro-label text-[#39f8ff]">Today&apos;s split call</p>
+                    <div className="mt-2 text-[52px] font-semibold leading-[0.84] tracking-[-0.09em] text-white drop-shadow-[0_0_42px_rgba(126,255,247,0.4)] sm:text-[72px] xl:text-[86px]">
+                      {vm.hero.todayCall}
+                    </div>
+                    <p className="mt-4 text-[18px] font-semibold leading-6 text-white/90">
+                      {vm.hero.decision.intensityIntentLabel}: {vm.hero.decision.intensity}
+                    </p>
+                    <p className="mt-2 max-w-[44rem] text-[13px] leading-5 text-white/62">
+                      {vm.hero.decision.targetReason}
+                    </p>
 
-        <section className="grid gap-3 xl:hidden">
-          <div
-            data-premium-surface
-            data-premium-tone="dark"
-            data-premium-enter
-            className="rounded-[10px] border border-white/10 bg-[#171126] p-3 text-white"
-          >
-            <div className="text-[12px] text-white/48">Overnight</div>
-            <div className="mt-1 text-xl font-semibold tracking-[-0.04em]">{vm.hero.overnightRead.label}</div>
-            <p className="mt-1 text-[13px] leading-5 text-white/62">{vm.hero.overnightRead.detail}</p>
-          </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <div className="hud-chip px-3 py-2">
+                        <div className="hud-micro-label text-[10px]">Schedule flexible</div>
+                        <div className="mt-1 text-[12px] text-white/78">{vm.hero.decision.scheduleLabel}</div>
+                      </div>
+                      <div className="hud-chip px-3 py-2">
+                        <div className="hud-micro-label text-[10px]">Physiology support</div>
+                        <div className="mt-1 text-[12px] text-white/78">{vm.hero.readinessQualifier}</div>
+                      </div>
+                      <div className="hud-chip hud-chip-coral px-3 py-2 sm:col-span-2">
+                        <div className="hud-micro-label text-[10px]">Session anchors</div>
+                        <div className="mt-1 text-[12px] text-white/78">{vm.hero.decision.sessionAnchorsLabel}</div>
+                      </div>
+                    </div>
 
-          <div className="grid gap-2 rounded-[10px] border border-[#d9d2e6] bg-[#eee8f7] p-2">
-            {vm.hero.metrics.map((metric) => (
-              <HeroStatCard
-                key={`${metric.label}-mobile`}
-                label={metric.label}
-                value={metric.value}
-                detail={metric.detail}
-                trend={metric.trend}
-                trendLabels={metric.trendLabels}
-                gaugeValue={metric.gaugeValue}
-                sleepWindow={metric.sleepWindow}
-              />
-            ))}
+                    <div className="mt-4 grid overflow-hidden border border-white/10 bg-white/[0.04] sm:grid-cols-3">
+                      <DecisionCell label="Calories" value={vm.hero.decision.calories} />
+                      <DecisionCell label="Protein" value={vm.hero.decision.protein} />
+                      <DecisionCell label="Remaining" value={vm.hero.decision.remaining} />
+                    </div>
+
+                    {topRecommendation ? (
+                    <div className="mt-4 border border-[#39f8ff]/40 bg-[#03172e]/84 p-3 shadow-[0_0_30px_rgba(57,248,255,0.14)]">
+                        <div className="hud-micro-label">Best move now</div>
+                        <div className="mt-1 text-[17px] font-semibold text-white">{topRecommendation.title}</div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {topRecommendation.primaryActions.slice(0, 3).map((tile) => (
+                            <ActionTile key={`${topRecommendation.title}-${tile.label}-top`} tile={tile} />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <TrainingMap
+                    weeklyHighlights={summary.bodyCard.weeklyHighlightedRegions}
+                    latestHighlights={summary.bodyCard.latestWorkoutOverlayRegions}
+                    weeklyVolume={vm.hero.weeklyFocus}
+                    latestWorkout={vm.hero.workoutLabel}
+                    latestSessionAge={vm.hero.latestSessionAgeLabel}
+                    workoutCount={summary.trainingLoad.hevyWorkoutCountThisWeek}
+                    emptyMessage={vm.hero.weeklyFocusEmptyMessage}
+                    note={vm.hero.weeklyMapNote}
+                  />
+                </div>
+
+                <div className="mt-4 grid overflow-hidden border border-white/10 bg-white/[0.04] sm:grid-cols-5">
+                  <DecisionCell label="Call" value={vm.hero.decision.train} />
+                  <DecisionCell label="Intent" value={vm.hero.decision.intensityIntentLabel} />
+                  <DecisionCell label="Pace" value={vm.hero.decision.scheduleLabel} />
+                  <DecisionCell label="Next" value={vm.hero.decision.nextTrainingTarget} />
+                  <DecisionCell label="Latest" value={`${vm.hero.workoutLabel} / ${vm.hero.latestSessionAgeLabel}`} />
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-3 lg:grid-cols-3">
+              {vm.actionCards.map((item, index) => (
+                <ActionCard key={item.title} item={item} index={index} />
+              ))}
+            </section>
           </div>
         </section>
       </div>
