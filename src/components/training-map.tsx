@@ -20,16 +20,16 @@ type TrainingMapProps = {
 };
 
 const LEGEND = [
-  { label: "1x", color: "bg-[#b5abff]" },
-  { label: "2x", color: "bg-[#ff8e7a]" },
-  { label: "3x+", color: "bg-[#ff5e86]" },
-  { label: "Latest", color: "bg-[#72fff2]" },
+  { label: "1x", color: "bg-[#7c5cff]" },
+  { label: "2x", color: "bg-[#ff9f1c]" },
+  { label: "3x+", color: "bg-[#b026ff]" },
+  { label: "Latest", color: "bg-[#39f8ff]" },
 ];
 
 function tierColor(hits: number) {
-  if (hits >= 3) return "bg-[#ff5e86]";
-  if (hits >= 2) return "bg-[#ff8e7a]";
-  return "bg-[#b5abff]";
+  if (hits >= 3) return "bg-[#b026ff]";
+  if (hits >= 2) return "bg-[#ff9f1c]";
+  return "bg-[#7c5cff]";
 }
 
 export async function TrainingMap({
@@ -44,70 +44,77 @@ export async function TrainingMap({
   variant = "dashboard",
 }: TrainingMapProps) {
   const isPreview = variant === "preview";
-  const visibleVolume = weeklyVolume.slice(0, isPreview ? 4 : 6);
+  const visibleVolume = weeklyVolume.slice(0, isPreview ? 4 : 7);
   const figureHeight = isPreview
-    ? "h-[170px] sm:h-[210px]"
-    : "h-[180px] sm:h-[240px] lg:h-[300px]";
+    ? "h-[190px] sm:h-[230px]"
+    : "h-[245px] sm:h-[330px] lg:h-[390px]";
 
   return (
     <section
       data-premium-surface
-      data-premium-tone="live"
-      className="training-map-compact overflow-hidden rounded-[10px] border border-white/10 bg-[#171126]/78"
+      data-premium-tone="command"
+      className="hud-frame training-map-compact text-white"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+      <div className="hud-content flex flex-wrap items-center justify-between gap-2 border-b border-[#39f8ff]/24 px-4 py-3">
         <div className="min-w-0">
-          <h3 className="text-[13px] font-semibold text-white">Weekly map</h3>
-          <p className="truncate text-[11px] text-white/48">
-            {typeof workoutCount === "number" ? `${workoutCount} lifts` : "Monday-Sunday"} · Latest {latestSessionAge ?? "session"}
+          <h3 className="hud-micro-label text-[#39f8ff]">This week&apos;s training map</h3>
+          <p className="mt-0.5 truncate text-[12px] text-white/70">
+            {typeof workoutCount === "number" ? `${workoutCount} lifts` : "Monday-Sunday"} - Latest{" "}
+            {latestSessionAge ?? "session"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-x-2.5 gap-y-1.5 text-[11px] text-white/70" aria-label="Training map legend">
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-white/86" aria-label="Training map legend">
           {LEGEND.map((item) => (
             <span key={item.label} className="inline-flex min-h-6 items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-full ${item.color}`} />
+              <span className={`h-2.5 w-2.5 rounded-full ${item.color} shadow-[0_0_18px_currentColor]`} />
               {item.label}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_245px]">
-        <div className="min-w-0 border-b border-white/10 p-2.5 lg:border-b-0 lg:border-r lg:border-white/10">
-          <div className={`flex ${figureHeight} items-center justify-center overflow-hidden rounded-[8px] bg-[#120d24] px-1`}>
+      <div className="hud-content grid lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 border-b border-[#39f8ff]/20 p-3 lg:border-b-0 lg:border-r">
+          <div className={`relative flex ${figureHeight} items-center justify-center overflow-hidden border border-[#39f8ff]/58 bg-[#010711] px-1 shadow-[inset_0_0_96px_rgba(0,140,255,0.32),0_0_54px_rgba(57,248,255,0.18)]`}>
+            <div className="pointer-events-none absolute inset-x-4 bottom-1 h-20 rounded-[50%] border border-[#39f8ff]/62 bg-[radial-gradient(ellipse_at_center,_rgba(57,248,255,0.32),_rgba(124,92,255,0.13)_38%,_transparent_68%)] shadow-[0_0_76px_rgba(57,248,255,0.42)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(57,248,255,0.095)_1px,_transparent_1px),linear-gradient(90deg,rgba(0,180,255,0.075)_1px,_transparent_1px)] [background-size:26px_26px]" />
+            <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[#39f8ff]/56 to-transparent shadow-[0_0_30px_rgba(57,248,255,0.9)]" />
+            <div className="pointer-events-none absolute inset-x-[18%] top-6 h-px bg-gradient-to-r from-transparent via-[#8c4dff]/76 to-transparent shadow-[0_0_28px_rgba(140,77,255,0.72)]" />
             <AnatomyFigure
               weeklyHighlights={weeklyHighlights}
               latestHighlights={latestHighlights}
-              className="h-full w-full max-w-[32rem]"
+              className="relative z-[1] h-full w-full max-w-[43rem] drop-shadow-[0_0_46px_rgba(57,248,255,0.56)]"
             />
           </div>
           <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-2 px-1 text-[12px]">
-            <span className="min-w-0 truncate font-medium text-white/84">Latest: {latestWorkout}</span>
-            {note ? <span className="text-white/48">{note}</span> : null}
+            <span className="min-w-0 truncate font-semibold text-[#39f8ff] drop-shadow-[0_0_12px_rgba(57,248,255,0.78)]">
+              Latest: {latestWorkout}
+            </span>
+            {note ? <span className="text-white/64">{note}</span> : null}
           </div>
         </div>
 
-        <aside className="min-w-0 px-3 py-2.5">
+        <aside className="min-w-0 bg-[#031126]/80 px-4 py-3 shadow-[inset_1px_0_0_rgba(57,248,255,0.2)]">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[12px] font-semibold text-white/82">Muscle volume</h3>
-            <span className="text-[11px] text-white/42">sets / freq</span>
+            <h3 className="hud-micro-label text-[#39f8ff]">Weekly muscle volume</h3>
+            <span className="text-[11px] text-white/56">sets / freq</span>
           </div>
           {visibleVolume.length ? (
-            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 lg:block lg:divide-y lg:divide-white/8">
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 lg:block lg:divide-y lg:divide-[#39f8ff]/18">
               {visibleVolume.map((item) => (
-                <div key={item.label} className="flex min-h-7 items-center justify-between gap-3 py-1 lg:min-h-8 lg:py-1.5">
-                  <span className="flex min-w-0 items-center gap-2 text-[12px] text-white/80">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${tierColor(item.hits)}`} />
+                <div key={item.label} className="flex min-h-8 items-center justify-between gap-3 py-1 lg:min-h-9 lg:py-1.5">
+                  <span className="flex min-w-0 items-center gap-2 text-[12px] text-white/88">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tierColor(item.hits)} shadow-[0_0_18px_currentColor]`} />
                     <span className="truncate">{item.label}</span>
                   </span>
-                  <span className="shrink-0 text-[12px] font-medium text-white/66">
-                    {item.effectiveSets} · {item.hits}x
+                  <span className="shrink-0 text-[12px] font-semibold text-white/80">
+                    {item.effectiveSets} - {item.hits}x
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="mt-2 rounded-[8px] border border-dashed border-white/12 px-3 py-2.5 text-[12px] leading-5 text-white/62">
+            <p className="mt-3 border border-dashed border-[#39f8ff]/26 bg-white/[0.045] px-3 py-2.5 text-[12px] leading-5 text-white/68">
               {emptyMessage}
             </p>
           )}
