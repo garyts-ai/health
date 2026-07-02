@@ -107,7 +107,7 @@ function ActionTile({
 }) {
   return (
     <span
-      className={`hud-chip inline-flex min-h-7 items-center gap-1.5 px-2 text-[12px] font-medium ${
+      className={`hud-chip aqua-action-chip inline-flex min-h-7 items-center gap-1.5 px-2 text-[12px] font-medium ${
         subtle ? "hud-chip-coral text-[#ffd0c4]" : "text-white/82"
       }`}
     >
@@ -121,7 +121,7 @@ function ActionTile({
 
 function DecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-t border-white/10 bg-white/[0.025] px-3 py-2 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0">
+    <div className="aqua-decision-cell border-t border-white/10 px-3 py-2 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0">
       <div className="hud-micro-label text-[10px]">{label}</div>
       <div className="mt-1 truncate text-[13px] font-semibold text-white/88">{value}</div>
     </div>
@@ -130,7 +130,7 @@ function DecisionCell({ label, value }: { label: string; value: string }) {
 
 function FreshnessNotice({ message }: { message: string }) {
   return (
-    <div className="hud-frame hud-content border-[#ff9f1c]/55 bg-[#241202]/90 px-3 py-2 text-[13px] leading-5 text-[#ffe2bd] shadow-[0_0_26px_rgba(255,159,28,0.18)]">
+    <div className="hud-frame hud-content aqua-freshness-notice px-3 py-2 text-[13px] leading-5 text-[#fff0c7]">
       {message}
     </div>
   );
@@ -145,7 +145,7 @@ function ActionCard({ item, index }: { item: DailyRecommendation; index: number 
       data-premium-surface
       data-premium-tone={isNutrition ? "caution" : isRecovery ? "recovery" : "hud"}
       data-premium-enter
-      className="hud-frame text-white"
+      className="hud-frame aqua-recommendation-card text-white"
     >
       <div className="hud-content p-3">
         <div className="flex items-start gap-3">
@@ -198,10 +198,10 @@ export async function MasterDashboard({
   const topRecommendation = vm.actionCards[0];
 
   return (
-    <main className="hud-cockpit giga-shell premium-cockpit relative min-h-screen overflow-x-clip text-white">
+    <main className="hud-cockpit aquarium-cockpit giga-shell premium-cockpit relative min-h-screen overflow-x-clip text-white">
       <MobilePullSync />
 
-      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1560px] flex-col gap-4 px-3 py-3 sm:px-5 lg:px-7">
+      <div className="aquarium-stage relative z-[1] mx-auto flex min-h-screen w-full max-w-[1560px] flex-col gap-4 px-3 py-3 sm:px-5 lg:px-7">
         <header className="flex flex-col gap-3 border-b border-[#2adfff]/20 pb-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <p className="hud-micro-label">{vm.header.productName}</p>
@@ -226,12 +226,12 @@ export async function MasterDashboard({
         {utilityBannerMessage ? <SummaryBanner message={utilityBannerMessage} /> : null}
         {vm.header.freshnessNotice ? <FreshnessNotice message={vm.header.freshnessNotice} /> : null}
 
-        <section className="grid gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
-          <aside className="order-2 grid content-start gap-3 xl:order-1">
-            <div className="relative hidden min-h-[190px] overflow-hidden px-1 pt-2 xl:block">
+        <section className="aquarium-layout-grid grid gap-4">
+          <aside className="aqua-left-rail grid content-start gap-3">
+            <div className="aqua-identity-lockup relative hidden min-h-[190px] overflow-hidden px-1 pt-2">
               <div className="pointer-events-none absolute left-20 top-0 h-36 w-36 rounded-full border border-[#39f8ff]/32 shadow-[0_0_78px_rgba(57,248,255,0.3)]" />
               <p className="hud-micro-label">Health OS</p>
-              <h1 className="mt-2 text-[76px] font-semibold leading-[0.82] tracking-[-0.095em] text-white drop-shadow-[0_0_34px_rgba(126,255,247,0.32)] sm:text-[92px] xl:text-[104px]">
+              <h1 className="mt-2 text-[76px] font-semibold leading-[0.82] tracking-[-0.04em] text-white drop-shadow-[0_0_34px_rgba(126,255,247,0.32)] sm:text-[92px]">
                 Today
               </h1>
               <p className="mt-5 text-[15px] text-white/68">{vm.header.dateLabel}</p>
@@ -241,12 +241,12 @@ export async function MasterDashboard({
               data-premium-surface
               data-premium-tone="caution"
               data-premium-enter
-              className="hud-frame text-white"
+              className="hud-frame aqua-overnight-pod text-white"
             >
               <div className="hud-content p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="hud-micro-label">Overnight read</div>
-                  <span className="text-[#ff9f1c] drop-shadow-[0_0_12px_rgba(255,159,28,0.9)]">›</span>
+                  <span className="text-[#ffb02e] drop-shadow-[0_0_12px_rgba(255,176,46,0.9)]">&rsaquo;</span>
                 </div>
                 <div className="mt-3 text-2xl font-semibold tracking-[-0.05em]">{vm.hero.overnightRead.label}</div>
                 <p className="mt-2 text-[13px] leading-5 text-white/66">{vm.hero.overnightRead.detail}</p>
@@ -283,19 +283,19 @@ export async function MasterDashboard({
             </details>
           </aside>
 
-          <div className="order-1 grid min-w-0 content-start gap-4 xl:order-2">
+          <div className="aquarium-layout-main grid min-w-0 content-start gap-4">
             <section
               data-premium-surface
               data-premium-tone="command"
               data-premium-enter
-              className="hud-frame hud-command text-white"
+              className="hud-frame hud-command aqua-command-deck text-white"
             >
               <span className="hud-scanline" />
               <span className="hud-energy-rail" />
               <div className="hud-content p-4 sm:p-5">
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(520px,1.22fr)]">
+                <div className="aquarium-command-grid grid gap-5">
                   <div className="relative min-w-0">
-                    <div className="hud-reactor hud-reactor-command hidden lg:block">
+                    <div className="hud-reactor hud-reactor-command aqua-jelly-orb hidden lg:block">
                       <div className="hud-reactor-icon">
                         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8">
                           <path
@@ -309,7 +309,7 @@ export async function MasterDashboard({
                       </div>
                     </div>
                     <p className="hud-micro-label text-[#39f8ff]">Today&apos;s split call</p>
-                    <div className="mt-2 text-[52px] font-semibold leading-[0.84] tracking-[-0.09em] text-white drop-shadow-[0_0_42px_rgba(126,255,247,0.4)] sm:text-[72px] xl:text-[86px]">
+                    <div className="mt-2 text-[52px] font-semibold leading-[0.88] tracking-[-0.04em] text-white drop-shadow-[0_0_42px_rgba(126,255,247,0.4)] sm:text-[72px]">
                       {vm.hero.todayCall}
                     </div>
                     <p className="mt-4 text-[18px] font-semibold leading-6 text-white/90">
@@ -319,29 +319,29 @@ export async function MasterDashboard({
                       {vm.hero.decision.targetReason}
                     </p>
 
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <div className="hud-chip px-3 py-2">
+                    <div className="aqua-evidence-grid mt-4 grid gap-2 sm:grid-cols-2">
+                      <div className="aqua-console-plate">
                         <div className="hud-micro-label text-[10px]">Schedule flexible</div>
                         <div className="mt-1 text-[12px] text-white/78">{vm.hero.decision.scheduleLabel}</div>
                       </div>
-                      <div className="hud-chip px-3 py-2">
+                      <div className="aqua-console-plate">
                         <div className="hud-micro-label text-[10px]">Physiology support</div>
                         <div className="mt-1 text-[12px] text-white/78">{vm.hero.readinessQualifier}</div>
                       </div>
-                      <div className="hud-chip hud-chip-coral px-3 py-2 sm:col-span-2">
+                      <div className="aqua-console-plate aqua-console-plate-coral sm:col-span-2">
                         <div className="hud-micro-label text-[10px]">Session anchors</div>
                         <div className="mt-1 text-[12px] text-white/78">{vm.hero.decision.sessionAnchorsLabel}</div>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid overflow-hidden border border-white/10 bg-white/[0.04] sm:grid-cols-3">
+                    <div className="aqua-decision-strip mt-4 grid overflow-hidden sm:grid-cols-3">
                       <DecisionCell label="Calories" value={vm.hero.decision.calories} />
                       <DecisionCell label="Protein" value={vm.hero.decision.protein} />
                       <DecisionCell label="Remaining" value={vm.hero.decision.remaining} />
                     </div>
 
                     {topRecommendation ? (
-                    <div className="mt-4 border border-[#39f8ff]/40 bg-[#03172e]/84 p-3 shadow-[0_0_30px_rgba(57,248,255,0.14)]">
+                      <div className="aqua-best-move mt-4 p-3">
                         <div className="hud-micro-label">Best move now</div>
                         <div className="mt-1 text-[17px] font-semibold text-white">{topRecommendation.title}</div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -365,7 +365,7 @@ export async function MasterDashboard({
                   />
                 </div>
 
-                <div className="mt-4 grid overflow-hidden border border-white/10 bg-white/[0.04] sm:grid-cols-5">
+                <div className="aqua-decision-strip aqua-decision-strip-bottom mt-4 grid overflow-hidden sm:grid-cols-5">
                   <DecisionCell label="Call" value={vm.hero.decision.train} />
                   <DecisionCell label="Intent" value={vm.hero.decision.intensityIntentLabel} />
                   <DecisionCell label="Pace" value={vm.hero.decision.scheduleLabel} />
@@ -375,7 +375,7 @@ export async function MasterDashboard({
               </div>
             </section>
 
-            <section className="grid gap-3 lg:grid-cols-3">
+            <section className="aqua-console-row grid gap-3 lg:grid-cols-3">
               {vm.actionCards.map((item, index) => (
                 <ActionCard key={item.title} item={item} index={index} />
               ))}

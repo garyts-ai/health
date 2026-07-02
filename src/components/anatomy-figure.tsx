@@ -1,5 +1,6 @@
 import { renderToString } from "@vue/server-renderer";
 import { HumanMuscleAnatomy } from "@lucawahlen/vue-human-muscle-anatomy";
+import Image from "next/image";
 import { createSSRApp, h } from "vue";
 import type { CSSProperties } from "react";
 
@@ -11,6 +12,8 @@ type AnatomyFigureProps = {
   latestHighlights?: BodyHighlight[];
   className?: string;
   mode?: "svg" | "instrument";
+  assetStyle?: "clinical" | "biomech";
+  motionMode?: "static" | "charged";
 };
 
 export type AnatomyFigureImageLayer = {
@@ -62,10 +65,13 @@ const INTENSITY_WEIGHT: Record<BodyHighlightIntensity, number> = {
 };
 
 const INTENSITY_COLOR: Record<BodyHighlightIntensity, string> = {
-  low: "#b5abff",
-  medium: "#ff8e7a",
-  high: "#ff5e86",
+  low: "#8a5cff",
+  medium: "#ffb02e",
+  high: "#f04cff",
 };
+
+const BIOMECH_ASSET_FRONT = "/images/anatomy-biomech-front.png";
+const BIOMECH_ASSET_BACK = "/images/anatomy-biomech-back.png";
 
 const REGION_TO_MUSCLE_GROUPS: Record<BodyRegionId, MuscleGroup[]> = {
   chest: ["chest"],
@@ -254,6 +260,26 @@ function buildStrokeOverlay(
     );
 }
 
+function buildBiomechExportSvg(className: string) {
+  return normalizeSvgMarkup(
+    [
+      `<svg viewBox="0 0 1200 1040" xmlns="http://www.w3.org/2000/svg">`,
+      `<defs>`,
+      `<filter id="biomechExportGlow" x="-20%" y="-20%" width="140%" height="140%">`,
+      `<feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#39f8ff" flood-opacity="0.5"/>`,
+      `<feDropShadow dx="0" dy="0" stdDeviation="18" flood-color="#7c5cff" flood-opacity="0.26"/>`,
+      `</filter>`,
+      `</defs>`,
+      `<g filter="url(#biomechExportGlow)">`,
+      `<image href="${BIOMECH_ASSET_FRONT}" x="0" y="0" width="560" height="1040" preserveAspectRatio="xMidYMid meet"/>`,
+      `<image href="${BIOMECH_ASSET_BACK}" x="640" y="0" width="560" height="1040" preserveAspectRatio="xMidYMid meet"/>`,
+      `</g>`,
+      `</svg>`,
+    ].join(""),
+    className,
+  );
+}
+
 async function renderAnatomySvg({
   className,
   defaultMuscleColor,
@@ -407,12 +433,24 @@ export async function renderAnatomyFigureImageLayers(
   props: AnatomyFigureProps,
 ): Promise<AnatomyFigureImageLayer[]> {
   const layers = await buildAnatomyFigureLayers(props);
+  const resolvedClassName = props.className ?? "h-full w-full";
+  const useBiomech = props.assetStyle !== "clinical";
 
   return [
-    { svg: layers.baseSvg },
-    { svg: layers.lowSvg, opacity: 0.9 },
-    { svg: layers.secondarySvg, opacity: 0.94 },
-    { svg: layers.primarySvg, opacity: 0.98 },
+    ...(useBiomech
+      ? [
+          {
+            svg: buildBiomechExportSvg(`${resolvedClassName} block`),
+            opacity: 1,
+            filter:
+              "drop-shadow(0 0 8px rgba(57,248,255,0.38)) drop-shadow(0 0 22px rgba(124,92,255,0.22))",
+          },
+        ]
+      : []),
+    { svg: layers.baseSvg, opacity: useBiomech ? 0.16 : 1 },
+    { svg: layers.lowSvg, opacity: useBiomech ? 0.72 : 0.9 },
+    { svg: layers.secondarySvg, opacity: useBiomech ? 0.82 : 0.94 },
+    { svg: layers.primarySvg, opacity: useBiomech ? 0.88 : 0.98 },
     {
       svg: layers.latestGlowOutlineSvg,
       opacity: 0.72,
@@ -433,6 +471,8 @@ export async function AnatomyFigure({
   latestHighlights = [],
   className,
   mode = "svg",
+  assetStyle = "biomech",
+  motionMode = "charged",
 }: AnatomyFigureProps) {
   const {
     baseSvg,
@@ -451,12 +491,41 @@ export async function AnatomyFigure({
   });
 
   const isInstrumentMode = mode === "instrument";
+  const isBiomechMode = assetStyle === "biomech";
+  const isCharged = motionMode === "charged";
 
   return (
     <div
       aria-hidden="true"
-      className={`cinematic-anatomy relative ${isInstrumentMode ? "instrument-muscle-map" : ""}`}
+      className={`cinematic-anatomy relative ${isInstrumentMode ? "instrument-muscle-map" : ""} ${
+        isBiomechMode ? "biomech-anatomy" : "clinical-anatomy"
+      } ${isCharged ? "biomech-anatomy-charged" : "biomech-anatomy-static"}`}
     >
+      {isBiomechMode ? (
+        <div className="anatomy-layer anatomy-layer-biomech absolute inset-0">
+          <div className="biomech-body-pair">
+            <Image
+              src={BIOMECH_ASSET_FRONT}
+              alt=""
+              width={620}
+              height={1040}
+              className="biomech-body biomech-body-front"
+              priority={false}
+              unoptimized
+            />
+            <Image
+              src={BIOMECH_ASSET_BACK}
+              alt=""
+              width={620}
+              height={1040}
+              className="biomech-body biomech-body-back"
+              priority={false}
+              unoptimized
+            />
+          </div>
+          <div className="biomech-core-scan" />
+        </div>
+      ) : null}
       <div
         className="anatomy-layer anatomy-layer-base"
         dangerouslySetInnerHTML={{ __html: baseSvg }}

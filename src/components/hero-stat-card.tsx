@@ -32,9 +32,9 @@ function compactValue(label: string, value: string) {
 }
 
 function tone(label: string) {
-  if (label === "Strain") return { line: "#ff9f1c", soft: "rgba(255,159,28,0.34)", text: "text-[#ffcf8a]" };
-  if (label === "Sleep") return { line: "#a873ff", soft: "rgba(168,115,255,0.34)", text: "text-[#d8c8ff]" };
-  return { line: "#39f8ff", soft: "rgba(57,248,255,0.32)", text: "text-[#bafffb]" };
+  if (label === "Strain") return { line: "#ffb02e", soft: "rgba(255,176,46,0.36)", text: "text-[#ffd48a]" };
+  if (label === "Sleep") return { line: "#b96cff", soft: "rgba(185,108,255,0.36)", text: "text-[#e0ccff]" };
+  return { line: "#32fff4", soft: "rgba(50,255,244,0.34)", text: "text-[#c7fffb]" };
 }
 
 function trendLabel(label: string, point: number | null) {
@@ -72,7 +72,7 @@ export function HeroStatCard({
       data-premium-surface
       data-premium-tone="hud"
       data-premium-enter
-      className="hud-frame overflow-hidden text-white"
+      className="hud-frame aqua-metric-pod overflow-hidden text-white"
     >
       <button
         aria-expanded={expanded}
@@ -82,7 +82,7 @@ export function HeroStatCard({
       >
         <div className="min-w-[4.25rem]">
           <div className="hud-micro-label">{label}</div>
-          <div className={`mt-0.5 text-3xl font-semibold leading-none tracking-[-0.055em] ${colors.text}`}>
+          <div className={`mt-0.5 text-3xl font-semibold leading-none tracking-[-0.04em] ${colors.text}`}>
             {compactValue(label, value)}
           </div>
         </div>

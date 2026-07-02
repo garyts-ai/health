@@ -6,28 +6,33 @@ product
 
 ## Users
 
-Health OS is a personal training and health command center for one power user: Gary. The app is used on desktop for deeper review and on mobile for quick checks, nutrition logging, and sync actions while away from the desk.
+Health OS is a personal cinematic health command deck for one power user: Gary. It is used on desktop for immersive training/recovery review and on mobile for quick checks, nutrition logging, and sync actions.
 
 ## Product Purpose
 
-Health OS turns WHOOP, Hevy, nutrition targets, body weight, activity context, and daily recommendations into one fast decision surface. Success means the user can answer today's core questions without interpretation work: what split to train, how hard to push, what recovery modifiers matter, what muscles have been trained this week, and what nutrition gap remains.
+Health OS turns WHOOP, Hevy, nutrition targets, body weight, activity context, and daily recommendations into one decisive cockpit. Success means Gary can immediately answer: what split to train, how hard to push, what recovery modifiers matter, which muscles have been exposed this week, and what nutrition gap remains.
 
 ## Brand Personality
 
-Precise, athletic, composed. The product should feel like a premium personal performance instrument, not a generic AI wellness dashboard.
+Immersive, athletic, precise, and strange in a good way. The product should feel like a personal sci-fi health cockpit: part starship bridge, part aquarium observatory, part performance lab.
+
+## North Star
+
+The Today surface is allowed to be cinematic and environmental. The preferred lane is an “Aquarium Starship” command deck: deep ocean-space blues, curved bridge architecture, luminous containment tanks, bioluminescent particles, coral/jellyfish set dressing, and real data panels embedded into the scene.
 
 ## Anti-references
 
-Avoid superhero cosplay, overdone cinematic dashboards, glassmorphism as default, vague AI recommendation panels, decorative charts, and imagegen realism that compromises data accuracy. Avoid interfaces that look impressive for one screenshot but become slower or less trustworthy during daily use.
+Avoid flat SaaS dashboards, generic card grids, timid HUD skins, and safe “premium” styling that only changes borders and glows. Avoid rasterizing real data, fake metrics, or generated anatomy that breaks highlight alignment.
 
 ## Design Principles
 
-- Trust the data geometry. The body map must stay anatomically aligned with the underlying workout logic.
-- Motion serves comprehension. Animation can reveal weekly training state and latest-session context, but it must never delay the task.
-- Density is earned. Keep high-signal metrics visible, but remove visual mass that does not help a decision.
-- Recovery is a modifier, not the whole product. Training progression and nutrition context should stay visible beside readiness.
-- Mobile is a real operating surface. Sync, intake logging, and review must remain usable from the phone.
+- Build a world first, then embed the app into it.
+- Data stays semantic, deterministic, and readable even when the environment is cinematic.
+- Environmental/generated imagery is allowed as set design behind real UI.
+- The body map must remain anatomically aligned with workout logic.
+- Motion should feel alive—particles, light, water, scan, glow—but reduced motion must preserve a static usable cockpit.
+- Mobile remains a real operating surface, but it can simplify the world while keeping the same atmosphere.
 
 ## Accessibility & Inclusion
 
-Respect reduced-motion preferences, maintain keyboard focus states, preserve touch targets on mobile, and keep text contrast readable on saturated indigo/coral surfaces. The dashboard is personal-use, but it should still meet practical WCAG AA expectations where possible.
+Maintain readable contrast on glass and image-backed surfaces, keep keyboard focus visible, preserve touch targets, and respect reduced-motion preferences. Cinematic atmosphere is encouraged; unreadable data is not.

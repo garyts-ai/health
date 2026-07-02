@@ -20,16 +20,16 @@ type TrainingMapProps = {
 };
 
 const LEGEND = [
-  { label: "1x", color: "bg-[#7c5cff]" },
-  { label: "2x", color: "bg-[#ff9f1c]" },
-  { label: "3x+", color: "bg-[#b026ff]" },
-  { label: "Latest", color: "bg-[#39f8ff]" },
+  { label: "1x", color: "bg-[#8a5cff]" },
+  { label: "2x", color: "bg-[#ffb02e]" },
+  { label: "3x+", color: "bg-[#f04cff]" },
+  { label: "Latest", color: "bg-[#32fff4]" },
 ];
 
 function tierColor(hits: number) {
-  if (hits >= 3) return "bg-[#b026ff]";
-  if (hits >= 2) return "bg-[#ff9f1c]";
-  return "bg-[#7c5cff]";
+  if (hits >= 3) return "bg-[#f04cff]";
+  if (hits >= 2) return "bg-[#ffb02e]";
+  return "bg-[#8a5cff]";
 }
 
 export async function TrainingMap({
@@ -53,9 +53,9 @@ export async function TrainingMap({
     <section
       data-premium-surface
       data-premium-tone="command"
-      className="hud-frame training-map-compact text-white"
+      className="hud-frame aqua-training-map training-map-compact text-white"
     >
-      <div className="hud-content flex flex-wrap items-center justify-between gap-2 border-b border-[#39f8ff]/24 px-4 py-3">
+      <div className="hud-content aqua-training-header flex flex-wrap items-center justify-between gap-2 px-4 py-3">
         <div className="min-w-0">
           <h3 className="hud-micro-label text-[#39f8ff]">This week&apos;s training map</h3>
           <p className="mt-0.5 truncate text-[12px] text-white/70">
@@ -66,18 +66,19 @@ export async function TrainingMap({
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-white/86" aria-label="Training map legend">
           {LEGEND.map((item) => (
             <span key={item.label} className="inline-flex min-h-6 items-center gap-1.5">
-              <span className={`h-2.5 w-2.5 rounded-full ${item.color} shadow-[0_0_18px_currentColor]`} />
+              <span className={`aqua-legend-dot h-2.5 w-2.5 rounded-full ${item.color}`} />
               {item.label}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="hud-content grid lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="min-w-0 border-b border-[#39f8ff]/20 p-3 lg:border-b-0 lg:border-r">
-          <div className={`relative flex ${figureHeight} items-center justify-center overflow-hidden border border-[#39f8ff]/58 bg-[#010711] px-1 shadow-[inset_0_0_96px_rgba(0,140,255,0.32),0_0_54px_rgba(57,248,255,0.18)]`}>
-            <div className="pointer-events-none absolute inset-x-4 bottom-1 h-20 rounded-[50%] border border-[#39f8ff]/62 bg-[radial-gradient(ellipse_at_center,_rgba(57,248,255,0.32),_rgba(124,92,255,0.13)_38%,_transparent_68%)] shadow-[0_0_76px_rgba(57,248,255,0.42)]" />
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(57,248,255,0.095)_1px,_transparent_1px),linear-gradient(90deg,rgba(0,180,255,0.075)_1px,_transparent_1px)] [background-size:26px_26px]" />
+      <div className="hud-content aqua-training-grid grid lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="aqua-map-shell min-w-0 p-3">
+          <div className={`aqua-tank-stage relative flex ${figureHeight} items-center justify-center overflow-hidden border border-[#39f8ff]/58 bg-[#010711] px-1 shadow-[inset_0_0_96px_rgba(0,140,255,0.32),0_0_54px_rgba(57,248,255,0.18)]`}>
+            <div className="aqua-tank-lid pointer-events-none absolute inset-x-4 top-8 h-10 rounded-[50%] border border-[#8ffcff]/60 bg-[radial-gradient(ellipse_at_center,_rgba(57,248,255,0.26),_transparent_68%)] shadow-[0_0_70px_rgba(57,248,255,0.46)]" />
+            <div className="aqua-tank-floor pointer-events-none absolute inset-x-4 bottom-1 h-20 rounded-[50%] border border-[#39f8ff]/62 bg-[radial-gradient(ellipse_at_center,_rgba(57,248,255,0.32),_rgba(124,92,255,0.13)_38%,_transparent_68%)] shadow-[0_0_76px_rgba(57,248,255,0.42)]" />
+            <div className="aqua-tank-grid pointer-events-none absolute inset-0" />
             <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[#39f8ff]/56 to-transparent shadow-[0_0_30px_rgba(57,248,255,0.9)]" />
             <div className="pointer-events-none absolute inset-x-[18%] top-6 h-px bg-gradient-to-r from-transparent via-[#8c4dff]/76 to-transparent shadow-[0_0_28px_rgba(140,77,255,0.72)]" />
             <AnatomyFigure
@@ -94,7 +95,7 @@ export async function TrainingMap({
           </div>
         </div>
 
-        <aside className="min-w-0 bg-[#031126]/80 px-4 py-3 shadow-[inset_1px_0_0_rgba(57,248,255,0.2)]">
+        <aside className="aqua-volume-panel min-w-0 px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="hud-micro-label text-[#39f8ff]">Weekly muscle volume</h3>
             <span className="text-[11px] text-white/56">sets / freq</span>
@@ -114,7 +115,7 @@ export async function TrainingMap({
               ))}
             </div>
           ) : (
-            <p className="mt-3 border border-dashed border-[#39f8ff]/26 bg-white/[0.045] px-3 py-2.5 text-[12px] leading-5 text-white/68">
+            <p className="aqua-empty-volume mt-3 px-3 py-2.5 text-[12px] leading-5 text-white/72">
               {emptyMessage}
             </p>
           )}
