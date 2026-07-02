@@ -147,7 +147,8 @@ export function DailyBriefExport({
           <h2 className="text-xl font-semibold tracking-[-0.03em] text-[#19162a]">LLM context packet</h2>
         </div>
         <p className="max-w-xl text-[13px] leading-5 text-[#645c7d]">
-          Copy one prompt with today&apos;s actions, metric drivers, and a next-week plan request.
+          Copy a data-only HealthMax packet, then ask your own question in the other model. It does not include
+          HealthMax recommendations or planned actions.
         </p>
       </div>
 

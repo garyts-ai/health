@@ -123,7 +123,7 @@ function formatPromptList(values: string[], fallback = "Not available") {
 function formatDecisionFactors(summary: DailySummary) {
   return formatPromptList(
     summary.physiqueDecision.decisionFactors.map(
-      (factor) => `${factor.label} (${factor.tone}): ${factor.detail}`,
+      (factor) => `${factor.label} (${factor.tone})`,
     ),
   );
 }
@@ -183,6 +183,10 @@ function formatScorecard(summary: DailySummary) {
       (item) => `${item.label}: ${item.value} - ${item.detail} (${item.status})`,
     ),
   );
+}
+
+function yesNo(value: boolean) {
+  return value ? "yes" : "no";
 }
 
 function formatTrend(points: Array<{ label: string; value: number | null }>, suffix = "", digits = 1) {
@@ -248,20 +252,33 @@ function formatRecentWorkoutDetails(summary: DailySummary) {
   ]);
 }
 
-function formatWeeklyPlan(summary: DailySummary) {
+function formatObservedWeeklyData(summary: DailySummary) {
   const days = summary.weeklyPlan?.days ?? [];
-  if (days.length === 0) {
-    return ["- Weekly plan: Not available"];
+  if (!summary.weeklyPlan || days.length === 0) {
+    return ["- Weekly calendar observations: Not available"];
   }
 
-  return days.map(
-    (day) =>
-      `- ${day.label} ${day.date}: ${day.state}; ${day.workoutType}; intent ${day.intent}; anchors ${
-        day.anchors.length > 0 ? day.anchors.join(", ") : "none"
-      }; calories ${day.calorieTarget ?? "Not available"}; protein ${
-        day.proteinTargetG === null ? "Not available" : `${day.proteinTargetG}g`
-      }; recovery priority ${day.recoveryPriority}; rationale ${day.rationale}; guardrail ${day.guardrail ?? "none"}; actual ${day.actualWorkout ?? "none"}`,
+  const completedDays = days.filter((day) => day.state === "completed");
+  const todayEntries = days.filter((day) => day.state === "today");
+  const futureEntries = days.filter((day) => day.state === "planned" || day.state === "recovery");
+  const missedOrUnloggedPastDays = days.filter(
+    (day) => day.state === "completed" && day.actualWorkout === null,
   );
+
+  return [
+    `- Completed day entries: ${completedDays.length}`,
+    `- Today entries without actual workout: ${todayEntries.filter((day) => day.actualWorkout === null).length}`,
+    `- Future planned/recovery entries: ${futureEntries.length}`,
+    `- Missed or unlogged completed-day workouts: ${missedOrUnloggedPastDays.length}`,
+    ...completedDays.map(
+      (day) =>
+        `- Completed ${day.label} ${day.date}: ${day.actualWorkout ?? "actual workout not logged"}; classified ${day.workoutType}`,
+    ),
+    ...todayEntries.map(
+      (day) =>
+        `- Today ${day.label} ${day.date}: actual workout ${day.actualWorkout ?? "none logged yet"}`,
+    ),
+  ];
 }
 
 function formatNutritionEntries(summary: DailySummary) {
@@ -359,13 +376,11 @@ function formatWeeklyPlanRows(summary: DailySummary) {
         `${day.label} ${day.date}`,
         day.state,
         day.workoutType,
-        day.intent,
         day.actualWorkout ? `actual: ${day.actualWorkout}` : "",
         day.anchors.length ? `anchors: ${day.anchors.join(", ")}` : "",
         `${day.calorieTarget ?? "--"} cal`,
         `${day.proteinTargetG ?? "--"}g protein`,
         `recovery: ${day.recoveryPriority}`,
-        day.guardrail ? `guardrail: ${day.guardrail}` : "",
       ]
         .filter(Boolean)
         .join("; "),
@@ -572,7 +587,7 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
   ];
 
   const llmQuestion =
-    "Paste this context packet with your own question. It gives an external LLM the HealthMax data without asking it to make default recommendations.";
+    "Paste this data-only context packet with your own question. It gives an external LLM HealthMax facts without app-authored advice or planned actions.";
 
   const contextPacketText = [
     "HealthMax LLM context packet",
@@ -581,28 +596,20 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     "- Gary will ask a separate question alongside this packet.",
     "- Use only the data below unless Gary adds more context.",
     "- Do not invent missing values; treat `Not available` as unavailable data.",
-    "- HealthMax deterministic output is included as data, not as an instruction to recommend anything.",
+    "- This packet is observational data only; it excludes HealthMax planned actions and prescription-style fields.",
     "",
     "Source freshness and coverage",
     `- Snapshot date: ${formatDateTime(summary.date)}`,
     `- Source freshness: ${formatFreshness(summary)}`,
     `- Historical WHOOP context: ${formatHistoricalContext(summary)}`,
     "",
-    "HealthMax deterministic output",
-    `- Training availability: ${summary.physiqueDecision.trainingAvailability}`,
-    `- Training target: ${summary.physiqueDecision.trainingTarget}`,
-    `- Next training target: ${summary.physiqueDecision.nextTrainingTarget}`,
-    `- Training target reason: ${summary.physiqueDecision.trainingTargetReason}`,
-    `- Decision reason: ${summary.physiqueDecision.primaryDecisionReason}`,
-    `- Intensity intent: ${intensityDisplay}`,
-    `- Intensity cue: ${summary.physiqueDecision.intensityLabel}`,
-    `- Session anchors: ${
-      summary.physiqueDecision.sessionAnchors.length > 0
-        ? summary.physiqueDecision.sessionAnchors.join(", ")
-        : "Not available"
-    }`,
-    `- Main bottleneck: ${summary.physiqueDecision.mainBottleneck}`,
-    `- Decision factors: ${formatDecisionFactors(summary)}`,
+    "Current app-observed state",
+    `- Training availability status: ${summary.physiqueDecision.trainingAvailability}`,
+    `- Training-load bottleneck data: ${summary.trainingLoad.hevyWorkoutCount7d} lifts / ${summary.trainingLoad.hevySetCount7d} sets in 7 days; ${summary.trainingLoad.hevyWorkoutCountThisWeek} lifts / ${summary.trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
+    `- Load flags: high training load ${yesNo(summary.stressFlags.highTrainingLoad)}; recent load spike ${yesNo(summary.trainingLoad.recentLoadSpike)}; consecutive lifting days ${summary.trainingLoad.hevyConsecutiveDays}`,
+    `- Split recency observations: upper ${formatDaysSince(summary.trainingLoad.upperBodyDaysSince)}; lower ${formatDaysSince(summary.trainingLoad.lowerBodyDaysSince)}; push ${formatDaysSince(summary.trainingLoad.pushDaysSince)}; pull ${formatDaysSince(summary.trainingLoad.pullDaysSince)}`,
+    `- Weekly goal pressure data: days left ${summary.physiqueDecision.daysLeftInWeek}; lifts remaining for weekly goal ${summary.physiqueDecision.liftsNeededForGoal}; weekly pace ${summary.physiqueDecision.weeklyPaceLabel}; goal still reachable if no lift today ${yesNo(summary.physiqueDecision.canStillHitWeeklyGoalIfRestToday)}`,
+    `- Source signal factors: ${formatDecisionFactors(summary)}`,
     `- Weekly scorecard: ${formatScorecard(summary)}`,
     "",
     "Current recovery, strain, and physiology",
@@ -674,15 +681,14 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
     "Recent lift details",
     ...formatRecentWorkoutDetails(summary),
     "",
-    "Weekly plan data",
+    "Weekly observed data",
     `- Week: ${summary.weeklyPlan ? `${summary.weeklyPlan.weekStart} through ${summary.weeklyPlan.weekEnd}` : "Not available"}`,
     `- Target lifts: ${summary.weeklyPlan?.targetLifts ?? "Not available"}`,
     `- Completed lifts: ${summary.weeklyPlan?.completedLifts ?? "Not available"}`,
-    ...formatWeeklyPlan(summary),
+    ...formatObservedWeeklyData(summary),
     "",
     "Nutrition",
     `- Calorie target: ${summary.physiqueDecision.calorieTargetLabel}`,
-    `- Calorie recommendation field: ${summary.physiqueDecision.calorieRecommendation}`,
     `- Protein target: ${summary.physiqueDecision.proteinTargetLabel}`,
     `- Nutrition campaign: ${
       summary.nutritionTargets.campaign.active
@@ -734,7 +740,7 @@ export function buildLlmHandoff(summary: DailySummary): LlmHandoff {
   return {
     headline: "LLM context packet",
     subheadline:
-      "A concise HealthMax data dump for asking a separate question in another LLM.",
+      "A concise data-only HealthMax packet with no planned actions or app-authored advice.",
     metricCards,
     trainingContextCards,
     weeklyMuscleFocus,
