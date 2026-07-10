@@ -128,7 +128,7 @@ export async function BodySummaryCard({
               {formatPounds(summary.bodyCard.weightLb)}
             </p>
             <p className="mt-3 text-[10px] text-white/42">
-              Muscle figure adapted from Luca Wahlen, MIT License
+              Biomech body map with deterministic training-region overlays.
             </p>
           </div>
         </div>

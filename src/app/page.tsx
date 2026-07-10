@@ -11,8 +11,11 @@ export const revalidate = 0;
 
 type HomePageProps = {
   searchParams?: Promise<{
+    anatomy?: string;
     hevy?: string;
     intake?: string;
+    import?: string;
+    reason?: string;
     targets?: string;
     utilities?: string;
     whoop?: string;
@@ -34,8 +37,11 @@ export default async function Home({ searchParams }: HomePageProps) {
       hevy={hevyStatus}
       isDiscordConfigured={hasDiscordWebhookUrl()}
       summary={summary}
+      anatomyDebug={resolvedSearchParams.anatomy === "qa"}
       utilityBannerMessage={getSettingsBannerMessage(resolvedSearchParams)}
       whoop={whoopStatus}
+      whoopImportReason={resolvedSearchParams.reason}
+      whoopImportState={resolvedSearchParams.import}
     />
   );
 }

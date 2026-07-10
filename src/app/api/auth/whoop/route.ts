@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   if (!hasWhoopEnv()) {
     return NextResponse.redirect(
-      buildRequestRedirectUrl(request, "/?utilities=open&whoop=not-configured"),
+      buildRequestRedirectUrl(request, "/?utilities=open&whoop=not-configured#utilities"),
     );
   }
 

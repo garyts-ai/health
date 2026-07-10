@@ -18,19 +18,19 @@ import {
 } from "@/lib/whoop-export/chart-ranges";
 
 const tones = {
-  green: { line: "#78e08f", fill: "#78e08f", text: "text-[#4f8e60]" },
-  violet: { line: "#8e80e8", fill: "#8e80e8", text: "text-[#6258a8]" },
-  cyan: { line: "#35cfc0", fill: "#35cfc0", text: "text-[#237f78]" },
-  coral: { line: "#ef8069", fill: "#ef8069", text: "text-[#a54f3e]" },
-  amber: { line: "#d9a93f", fill: "#d9a93f", text: "text-[#8b681e]" },
-  rose: { line: "#d77f98", fill: "#d77f98", text: "text-[#984c63]" },
+  green: { line: "#78e08f", fill: "#78e08f", text: "text-[#9af0ac]" },
+  violet: { line: "#8e80e8", fill: "#8e80e8", text: "text-[#d2ccff]" },
+  cyan: { line: "#35cfc0", fill: "#35cfc0", text: "text-[#9afff6]" },
+  coral: { line: "#ef8069", fill: "#ef8069", text: "text-[#ffb6a6]" },
+  amber: { line: "#d9a93f", fill: "#d9a93f", text: "text-[#f9dc98]" },
+  rose: { line: "#d77f98", fill: "#d77f98", text: "text-[#f1bac9]" },
 };
 
 const impactStyles = {
-  favorable: { text: "text-[#257d4b]", line: "#4fbf78", label: "Favorable" },
-  unfavorable: { text: "text-[#a14938]", line: "#e07863", label: "Unfavorable" },
-  neutral: { text: "text-[#686178]", line: "#8a8297", label: "Neutral" },
-  unknown: { text: "text-[#8a8498]", line: "#aaa3b5", label: "No signal" },
+  favorable: { text: "text-[#78e08f]", line: "#4fbf78", label: "Favorable" },
+  unfavorable: { text: "text-[#ff8b72]", line: "#e07863", label: "Unfavorable" },
+  neutral: { text: "text-white/60", line: "#8a8297", label: "Neutral" },
+  unknown: { text: "text-white/42", line: "#aaa3b5", label: "No signal" },
 };
 
 function formatDate(value: string | null) {
@@ -98,7 +98,7 @@ type ChartPoint = {
   originalIndex: number;
 };
 
-function chartGeometry(
+export function chartGeometry(
   values: Array<{ date: string; value: number | null }>,
   baseline: number | null,
   floor = 12,
@@ -119,13 +119,25 @@ function chartGeometry(
     x: values.length <= 1 ? 50 : (point.originalIndex / (values.length - 1)) * 100,
     y: ceiling - (((point.value as number) - min) / span) * (ceiling - floor),
   }));
+  const coordinateByIndex = new Map(coordinates.map((point) => [point.originalIndex, point]));
+  const segments: ChartPoint[][] = [];
+  let currentSegment: ChartPoint[] = [];
+  values.forEach((point, index) => {
+    const coordinate = point.value === null ? undefined : coordinateByIndex.get(index);
+    if (!coordinate) {
+      if (currentSegment.length) segments.push(currentSegment);
+      currentSegment = [];
+      return;
+    }
+    currentSegment.push(coordinate);
+  });
+  if (currentSegment.length) segments.push(currentSegment);
+
   return {
     present,
     coordinates,
-    points: coordinates.map((point) => `${point.x},${point.y}`).join(" "),
-    area: coordinates.length
-      ? `0,${ceiling + 4} ${coordinates.map((point) => `${point.x},${point.y}`).join(" ")} 100,${ceiling + 4}`
-      : "",
+    segments,
+    areaFloor: ceiling + 4,
     latest: coordinates.at(-1),
     baselineY: baseline === null ? null : ceiling - ((baseline - min) / span) * (ceiling - floor),
     min,
@@ -138,6 +150,29 @@ function nearestPoint(points: ChartPoint[], x: number) {
     if (!best) return point;
     return Math.abs(point.x - x) < Math.abs(best.x - x) ? point : best;
   }, null);
+}
+
+export function sampleChartValues<T>(values: T[], limit = 120) {
+  if (values.length <= limit) return values;
+
+  const sampled: T[] = [];
+  const lastIndex = values.length - 1;
+  for (let index = 0; index < limit; index += 1) {
+    sampled.push(values[Math.round((index / (limit - 1)) * lastIndex)]);
+  }
+  return sampled;
+}
+
+export function chartPointIndexForKey(
+  key: "ArrowLeft" | "ArrowRight" | "Home" | "End",
+  length: number,
+  currentIndex: number | null,
+) {
+  if (length <= 0) return null;
+  if (key === "Home") return 0;
+  if (key === "End") return length - 1;
+  const index = currentIndex ?? length - 1;
+  return Math.max(0, Math.min(length - 1, index + (key === "ArrowLeft" ? -1 : 1)));
 }
 
 function InteractiveSeriesChart({
@@ -156,7 +191,8 @@ function InteractiveSeriesChart({
   dark?: boolean;
 }) {
   const summary = summarizeWhoopChartRange(series, range);
-  const geometry = chartGeometry(summary.values, series.baseline, compact ? 20 : 16, compact ? 80 : 88);
+  const displayValues = sampleChartValues(summary.values);
+  const geometry = chartGeometry(displayValues, series.baseline, compact ? 20 : 16, compact ? 80 : 88);
   const tone = tones[series.tone];
   const gradientSeed = useId().replace(/:/g, "");
   const gradientId = `whoop-chart-${series.key}-${range}-${gradientSeed}`;
@@ -192,7 +228,29 @@ function InteractiveSeriesChart({
   }
 
   return (
-    <div className="relative">
+    <div
+      className="relative rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-[#ffd45a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#10131b]"
+      tabIndex={0}
+      role="group"
+      aria-label={`${series.label} trend for ${rangeLabel}. Use left and right arrow keys to inspect points.`}
+      onBlur={() => setActivePoint(null)}
+      onKeyDown={(event) => {
+        if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+          event.preventDefault();
+          const currentIndex = activePoint
+            ? geometry.coordinates.findIndex(
+                (point) => point.originalIndex === activePoint.originalIndex,
+              )
+            : null;
+          const nextIndex = chartPointIndexForKey(
+            event.key as "ArrowLeft" | "ArrowRight" | "Home" | "End",
+            geometry.coordinates.length,
+            currentIndex,
+          );
+          setActivePoint(nextIndex === null ? null : geometry.coordinates[nextIndex] ?? null);
+        }
+      }}
+    >
       {!compact ? (
         <div className={`mb-2 flex items-center justify-between gap-3 text-[11px] ${textTone}`}>
           <span>max {formatChartValue(geometry.max, series.unit)}</span>
@@ -223,8 +281,27 @@ function InteractiveSeriesChart({
         {geometry.baselineY !== null ? (
           <line x1="0" y1={geometry.baselineY} x2="100" y2={geometry.baselineY} stroke={baselineLine} strokeWidth="1" strokeDasharray="3 3" />
         ) : null}
-        <polygon points={geometry.area} fill={`url(#${gradientId})`} />
-        <polyline points={geometry.points} fill="none" stroke={tone.line} strokeWidth={compact ? "1.8" : "2.2"} vectorEffect="non-scaling-stroke" />
+        {geometry.segments.map((segment, index) => {
+          const points = segment.map((point) => `${point.x},${point.y}`).join(" ");
+          const first = segment[0];
+          const last = segment.at(-1);
+          if (!first || !last) return null;
+          return (
+            <g key={`${series.key}-segment-${index}`}>
+              <polygon
+                points={`${first.x},${geometry.areaFloor} ${points} ${last.x},${geometry.areaFloor}`}
+                fill={`url(#${gradientId})`}
+              />
+              <polyline
+                points={points}
+                fill="none"
+                stroke={tone.line}
+                strokeWidth={compact ? "1.8" : "2.2"}
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
+          );
+        })}
         {latestPoint && !displayPoint ? (
           <circle cx={latestPoint.x} cy={latestPoint.y} r={compact ? "2" : "2.5"} fill={tone.line} vectorEffect="non-scaling-stroke" />
         ) : null}
@@ -241,11 +318,6 @@ function InteractiveSeriesChart({
             cy={point.y}
             r={compact ? "5" : "4.8"}
             fill="transparent"
-            tabIndex={0}
-            role="button"
-            aria-label={`${series.label} on ${formatDate(point.date)}: ${formatChartValue(point.value, series.unit)}, ${formatChartDelta(point.value, series.baseline, series.unit)}`}
-            onFocus={() => setActivePoint(point)}
-            onBlur={() => setActivePoint(null)}
             onPointerEnter={() => setActivePoint(point)}
           />
         ))}
@@ -272,7 +344,7 @@ function InteractiveSeriesChart({
       ) : null}
       <div className={`mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] ${textTone}`}>
         <span>{formatShortDate(geometry.coordinates[0]?.date ?? null)}</span>
-        <span className={`tabular-nums ${strongTone}`}>
+        <span className={`tabular-nums ${strongTone}`} aria-live="polite">
           {activePoint
             ? `${formatShortDate(activePoint.date)} ${formatChartValue(activePoint.value, series.unit)}`
             : latestPoint
@@ -298,7 +370,7 @@ function TrendChart({
   const summary = summarizeWhoopChartRange(series, range);
 
   return (
-    <section data-premium-surface data-premium-tone="dark" data-premium-enter className="min-w-0 bg-[#171126] p-5 text-white">
+    <section data-premium-surface data-premium-tone="dark" data-premium-enter className="min-w-0 bg-[#07101c] p-5 text-white">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold">{series.label}</h3>
@@ -332,8 +404,8 @@ function DeltaBar({ metric }: { metric: WhoopMetric }) {
   const impact = impactStyles[metric.healthImpact];
   return (
     <div className="mt-2">
-      <div className="relative h-1 bg-[#ddd7e5]">
-        <span className="absolute left-1/2 top-[-3px] h-2.5 w-px bg-[#938ba1]" />
+      <div className="relative h-1 bg-white/12">
+        <span className="absolute left-1/2 top-[-3px] h-2.5 w-px bg-white/42" />
         <span
           className="absolute top-0 h-1"
           style={{
@@ -367,48 +439,48 @@ function InstrumentRow({
   const delta = summary.average === null || series.baseline === null ? null : summary.average - series.baseline;
 
   return (
-    <section data-premium-surface data-premium-tone="light" data-premium-enter className="grid gap-5 border-t border-[#ded8e7] px-5 py-5 first:border-t-0 lg:grid-cols-[11rem_minmax(14rem,1fr)_12rem_minmax(20rem,1.4fr)] lg:items-center">
+    <section data-premium-surface data-premium-tone="dark" data-premium-enter className="grid gap-5 border-t border-white/10 px-5 py-5 text-white first:border-t-0 lg:grid-cols-[11rem_minmax(14rem,1fr)_12rem_minmax(20rem,1.4fr)] lg:items-center">
       <div>
-        <h3 className="text-lg font-semibold text-[#171329]">{title}</h3>
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
         <div className={`mt-2 flex items-center gap-2 text-sm font-medium ${impact.text}`}>
           <span className="text-xl leading-none">{directionArrow(direction)}</span>
           <span>{impact.label}</span>
         </div>
-        <div className="mt-1 text-xs text-[#7b7492]">{directionLabel(direction)}</div>
+        <div className="mt-1 text-xs text-white/42">{directionLabel(direction)}</div>
       </div>
 
-      <InteractiveSeriesChart series={series} range={range} rangeLabel={rangeLabel} compact />
+      <InteractiveSeriesChart series={series} range={range} rangeLabel={rangeLabel} compact dark />
 
       <div>
-        <div className="text-xs text-[#746d87]">{series.label} average</div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums text-[#171329]">
+        <div className="text-xs text-white/48">{series.label} average</div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums text-white">
           {summary.average === null ? "--" : `${Number(summary.average.toFixed(1))}${series.unit}`}
         </div>
         <div className={`mt-1 text-sm font-medium tabular-nums ${impact.text}`}>
           {delta === null ? "No baseline delta" : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}${series.unit}`}
         </div>
-        <div className="text-xs text-[#8a8498]">baseline {series.baseline ?? "--"}{series.unit}</div>
+        <div className="text-xs text-white/38">baseline {series.baseline ?? "--"}{series.unit}</div>
       </div>
 
       <div className="grid gap-x-5 gap-y-4 sm:grid-cols-3">
         {rows.slice(0, 3).map((row) => (
           <div key={row.label} className="min-w-0">
-            <div className="truncate text-xs text-[#746d87]">{row.label}</div>
+            <div className="truncate text-xs text-white/48">{row.label}</div>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-base font-semibold tabular-nums text-[#312c49]">{row.recent}</span>
+              <span className="text-base font-semibold tabular-nums text-white/88">{row.recent}</span>
               <span className={`text-base ${impactStyles[row.healthImpact].text}`}>{directionArrow(row.direction)}</span>
             </div>
-            <div className="text-[11px] text-[#8a8498]">28d vs {row.value}</div>
+            <div className="text-[11px] text-white/38">28d vs {row.value}</div>
             <DeltaBar metric={row} />
           </div>
         ))}
       </div>
 
       <details className="lg:col-start-2 lg:col-span-3">
-        <summary className="cursor-pointer text-sm font-medium text-[#554d70]">Full baseline detail</summary>
-        <div className="mt-3 overflow-x-auto border-t border-[#e8e3ed]">
+        <summary className="cursor-pointer text-sm font-medium text-[#39f8ff]">Full baseline detail</summary>
+        <div className="mt-3 overflow-x-auto border-t border-white/10">
           <table className="w-full min-w-[34rem] text-left text-sm">
-            <thead className="text-[#6d6785]">
+            <thead className="text-white/46">
               <tr>
                 <th className="py-3 pr-5 font-medium">Metric</th>
                 <th className="px-5 py-3 font-medium">Full baseline</th>
@@ -418,13 +490,13 @@ function InstrumentRow({
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.label} className="border-t border-[#eeeaf3]">
-                  <td className="py-3 pr-5 font-medium text-[#312c49]">
+                <tr key={row.label} className="border-t border-white/8">
+                  <td className="py-3 pr-5 font-medium text-white/84">
                     {row.label}
-                    {row.note ? <div className="mt-1 text-xs font-normal text-[#7b7492]">{row.note}</div> : null}
+                    {row.note ? <div className="mt-1 text-xs font-normal text-white/42">{row.note}</div> : null}
                   </td>
-                  <td className="px-5 py-3 tabular-nums text-[#171329]">{row.value}</td>
-                  <td className="px-5 py-3 tabular-nums text-[#4f4965]">{row.recent}</td>
+                  <td className="px-5 py-3 tabular-nums text-white/84">{row.value}</td>
+                  <td className="px-5 py-3 tabular-nums text-white/64">{row.recent}</td>
                   <td className={`py-3 pl-5 ${impactStyles[row.healthImpact].text}`}>
                     {directionArrow(row.direction)} {directionLabel(row.direction)}
                   </td>
@@ -446,9 +518,9 @@ function FindingVisual({ finding }: { finding: WhoopFinding }) {
       <div className="space-y-2">
         {[["Actual", visual.actual, "#8e80e8"], ["Need", visual.target, "#e07863"]].map(([label, value, color]) => (
           <div key={String(label)} className="grid grid-cols-[3rem_1fr_3.5rem] items-center gap-2 text-xs">
-            <span className="text-[#746d87]">{label}</span>
-            <span className="h-2 bg-[#e8e3ed]"><span className="block h-2" style={{ width: `${(Number(value) / max) * 100}%`, backgroundColor: String(color) }} /></span>
-            <span className="text-right font-medium tabular-nums text-[#312c49]">{Number(value).toFixed(1)}{visual.unit}</span>
+            <span className="text-white/48">{label}</span>
+            <span className="h-2 bg-white/12"><span className="block h-2" style={{ width: `${(Number(value) / max) * 100}%`, backgroundColor: String(color) }} /></span>
+            <span className="text-right font-medium tabular-nums text-white/84">{Number(value).toFixed(1)}{visual.unit}</span>
           </div>
         ))}
       </div>
@@ -459,11 +531,11 @@ function FindingVisual({ finding }: { finding: WhoopFinding }) {
     const threshold = Math.min(100, (visual.threshold / Math.max(visual.value, visual.threshold * 2)) * 100);
     return (
       <div>
-        <div className="relative h-3 bg-[#e8e3ed]">
+        <div className="relative h-3 bg-white/12">
           <span className="block h-3 bg-[#d9a93f]" style={{ width: `${width}%` }} />
-          <span className="absolute top-[-3px] h-5 w-px bg-[#5f576d]" style={{ left: `${threshold}%` }} />
+          <span className="absolute top-[-3px] h-5 w-px bg-white/48" style={{ left: `${threshold}%` }} />
         </div>
-        <div className="mt-2 flex justify-between text-xs text-[#746d87]">
+        <div className="mt-2 flex justify-between text-xs text-white/48">
           <span>{visual.value.toFixed(0)} {visual.unit} variation</span>
           <span>{visual.threshold} {visual.unit} reference</span>
         </div>
@@ -472,16 +544,16 @@ function FindingVisual({ finding }: { finding: WhoopFinding }) {
   }
   if (visual.kind === "autonomic") {
     return (
-      <div className="grid grid-cols-2 gap-px bg-[#ded8e7]">
-        <div className="bg-[#fbf9fd] py-2 pr-3">
-          <div className="text-xs text-[#746d87]">HRV</div>
-          <div className={`mt-1 text-lg font-semibold ${selectedImpact("hrv_rmssd_milli", visual.hrvDelta === null ? "missing" : visual.hrvDelta > 0 ? "up" : visual.hrvDelta < 0 ? "down" : "flat") === "favorable" ? "text-[#257d4b]" : "text-[#a14938]"}`}>
+      <div className="grid grid-cols-2 gap-px bg-[#39f8ff]/12">
+        <div className="bg-[#07101c] py-2 pr-3">
+          <div className="text-xs text-white/48">HRV</div>
+          <div className={`mt-1 text-lg font-semibold ${selectedImpact("hrv_rmssd_milli", visual.hrvDelta === null ? "missing" : visual.hrvDelta > 0 ? "up" : visual.hrvDelta < 0 ? "down" : "flat") === "favorable" ? "text-[#78e08f]" : "text-[#ff8b72]"}`}>
             {visual.hrvDelta === null ? "—" : `${visual.hrvDelta >= 0 ? "↗ +" : "↘ "}${visual.hrvDelta.toFixed(1)} ms`}
           </div>
         </div>
-        <div className="bg-[#fbf9fd] py-2 pl-3">
-          <div className="text-xs text-[#746d87]">Resting HR</div>
-          <div className={`mt-1 text-lg font-semibold ${selectedImpact("resting_heart_rate", visual.rhrDelta === null ? "missing" : visual.rhrDelta > 0 ? "up" : visual.rhrDelta < 0 ? "down" : "flat") === "favorable" ? "text-[#257d4b]" : "text-[#a14938]"}`}>
+        <div className="bg-[#07101c] py-2 pl-3">
+          <div className="text-xs text-white/48">Resting HR</div>
+          <div className={`mt-1 text-lg font-semibold ${selectedImpact("resting_heart_rate", visual.rhrDelta === null ? "missing" : visual.rhrDelta > 0 ? "up" : visual.rhrDelta < 0 ? "down" : "flat") === "favorable" ? "text-[#78e08f]" : "text-[#ff8b72]"}`}>
             {visual.rhrDelta === null ? "—" : `${visual.rhrDelta >= 0 ? "↗ +" : "↘ "}${visual.rhrDelta.toFixed(1)} bpm`}
           </div>
         </div>
@@ -491,8 +563,8 @@ function FindingVisual({ finding }: { finding: WhoopFinding }) {
   const magnitude = Math.min(100, Math.abs(visual.recoveryDelta) / 40 * 100);
   return (
     <div>
-      <div className="relative h-3 bg-[#e8e3ed]">
-        <span className="absolute left-1/2 top-[-3px] h-5 w-px bg-[#6f687d]" />
+      <div className="relative h-3 bg-white/12">
+        <span className="absolute left-1/2 top-[-3px] h-5 w-px bg-white/48" />
         <span
           className="absolute top-0 h-3"
           style={{
@@ -502,9 +574,9 @@ function FindingVisual({ finding }: { finding: WhoopFinding }) {
           }}
         />
       </div>
-      <div className="mt-2 flex justify-between text-xs text-[#746d87]">
+      <div className="mt-2 flex justify-between text-xs text-white/48">
         <span>{visual.yesCount} yes / {visual.noCount} no</span>
-        <span className={visual.recoveryDelta >= 0 ? "text-[#257d4b]" : "text-[#a14938]"}>
+        <span className={visual.recoveryDelta >= 0 ? "text-[#78e08f]" : "text-[#ff8b72]"}>
           {visual.recoveryDelta >= 0 ? "↗ +" : "↘ "}{visual.recoveryDelta.toFixed(1)} recovery
         </span>
       </div>
@@ -516,34 +588,36 @@ function EvidenceLeaderboard({ findings }: { findings: WhoopFinding[] }) {
   return (
     <section>
       <div className="mb-3 flex items-end justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#171329]">Patterns worth attention</h2>
-        <span className="text-xs text-[#8a8498]">Ranked by confidence and effect</span>
+        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">Patterns worth attention</h2>
+        <span className="text-xs text-white/42">Ranked by confidence and effect</span>
       </div>
-      <div className="border-y border-[#d8d2e4] bg-[#fbf9fd]">
+      <div className="hud-frame overflow-hidden text-white">
+        <div className="hud-content">
         {findings.map((finding, index) => (
           <article
             key={`${finding.title}-${finding.evidence}`}
             data-premium-surface
-            data-premium-tone={finding.confidence === "High" ? "caution" : "light"}
+            data-premium-tone={finding.confidence === "High" ? "caution" : "dark"}
             data-premium-enter
-            className="grid gap-4 border-t border-[#e4dfeb] px-5 py-5 first:border-t-0 lg:grid-cols-[2.5rem_minmax(14rem,1fr)_minmax(16rem,0.9fr)_7rem] lg:items-center"
+            className="grid gap-4 border-t border-white/10 px-5 py-5 first:border-t-0 lg:grid-cols-[2.5rem_minmax(14rem,1fr)_minmax(16rem,0.9fr)_7rem] lg:items-center"
           >
-            <div className="text-2xl font-semibold tabular-nums text-[#aaa2b7]">{String(index + 1).padStart(2, "0")}</div>
+            <div className="text-2xl font-semibold tabular-nums text-[#39f8ff]">{String(index + 1).padStart(2, "0")}</div>
             <div>
-              <h3 className="font-semibold text-[#312c49]">{finding.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-[#5f5871]">{finding.evidence}</p>
-              <details className="mt-2 text-sm text-[#6d6785]">
-                <summary className="cursor-pointer font-medium">Interpretation</summary>
+              <h3 className="font-semibold text-white">{finding.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-white/64">{finding.evidence}</p>
+              <details className="mt-2 text-sm text-white/52">
+                <summary className="cursor-pointer font-medium text-[#39f8ff]">Interpretation</summary>
                 <p className="mt-2 leading-6">{finding.interpretation}</p>
               </details>
             </div>
             <FindingVisual finding={finding} />
             <div className="lg:text-right">
-              <div className="text-xs text-[#8a8498]">Confidence</div>
-              <div className="mt-1 font-semibold text-[#4f4965]">{finding.confidence}</div>
+              <div className="text-xs text-white/42">Confidence</div>
+              <div className="mt-1 font-semibold text-white/76">{finding.confidence}</div>
             </div>
           </article>
         ))}
+        </div>
       </div>
     </section>
   );
@@ -577,10 +651,10 @@ export function WhoopVisualAnalysis({ report }: { report: WhoopAnalysisReport })
   return (
     <div className="space-y-7">
       <section>
-        <div className="flex flex-col gap-4 border-b border-[#d4cedf] pb-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 border-b border-[#2adfff]/20 pb-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#171329]">Visual analysis</h2>
-            <div className="mt-1 text-sm text-[#746d87]">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">Visual analysis</h2>
+            <div className="mt-1 text-sm text-white/54">
               {rangeLabel} ending {Number.isFinite(newestDate) ? formatDate(new Date(newestDate).toISOString()) : "at latest record"} · {visibleDates.length} recorded cycles
             </div>
           </div>
@@ -593,8 +667,8 @@ export function WhoopVisualAnalysis({ report }: { report: WhoopAnalysisReport })
                 onClick={() => updateRange(item.key)}
                 className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                   range === item.key
-                    ? "border-[#4f3b93] text-[#171329]"
-                    : "border-transparent text-[#746d87] hover:text-[#312c49]"
+                    ? "border-[#39f8ff] text-white"
+                    : "border-transparent text-white/52 hover:text-white"
                 }`}
               >
                 {item.label}
@@ -603,8 +677,8 @@ export function WhoopVisualAnalysis({ report }: { report: WhoopAnalysisReport })
           </div>
         </div>
 
-        <div className="mt-5 overflow-hidden border border-white/10 bg-white/10">
-          <div className="grid gap-px bg-white/10 md:grid-cols-2 xl:grid-cols-3">
+        <div className="hud-frame mt-5 overflow-hidden text-white">
+          <div className="hud-content grid gap-px bg-[#39f8ff]/12 md:grid-cols-2 xl:grid-cols-3">
             {report.series.map((item) => (
               <TrendChart key={item.key} series={item} range={range} rangeLabel={rangeLabel} />
             ))}
@@ -613,11 +687,13 @@ export function WhoopVisualAnalysis({ report }: { report: WhoopAnalysisReport })
       </section>
 
       <section>
-        <h2 className="mb-3 text-2xl font-semibold tracking-[-0.03em] text-[#171329]">Baseline instruments</h2>
-        <div className="border-y border-[#d8d2e4] bg-[#fbf9fd]">
+        <h2 className="mb-3 text-2xl font-semibold tracking-[-0.03em] text-white">Baseline instruments</h2>
+        <div className="hud-frame overflow-hidden text-white">
+          <div className="hud-content">
           {instruments.map(([title, rows, series]) =>
             series ? <InstrumentRow key={title} title={title} rows={rows} series={series} range={range} rangeLabel={rangeLabel} /> : null,
           )}
+          </div>
         </div>
       </section>
 

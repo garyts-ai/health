@@ -1,38 +1,37 @@
-# Product
+# HealthMaxer Product
 
-## Register
+## Purpose
 
-product
+HealthMaxer is Gary's private, deterministic training command center. It combines WHOOP, Hevy, nutrition targets, weight, activity context, and daily recommendations so the next action is obvious: what to train, how hard to train it, what recovery evidence matters, and what remains this week.
 
-## Users
+## Information architecture
 
-Health OS is a personal cinematic health command deck for one power user: Gary. It is used on desktop for immersive training/recovery review and on mobile for quick checks, nutrition logging, and sync actions.
+The product is one continuous page with four canonical anchors:
 
-## Product Purpose
+- `#today` — the immediate training decision and anatomy profile.
+- `#weekly` — the complete Monday-to-Sunday plan and muscle-volume ledger.
+- `#whoop` — import state, range analysis, ranked findings, trends, and protocol.
+- `#utilities` — connections, quick intake, nutrition targets, and daily brief controls.
 
-Health OS turns WHOOP, Hevy, nutrition targets, body weight, activity context, and daily recommendations into one decisive cockpit. Success means Gary can immediately answer: what split to train, how hard to push, what recovery modifiers matter, which muscles have been exposed this week, and what nutrition gap remains.
+Legacy `/weekly`, `/whoop`, and `/settings` entry points redirect to the matching root anchor while preserving query parameters.
 
-## Brand Personality
+## Product principles
 
-Immersive, athletic, precise, and strange in a good way. The product should feel like a personal sci-fi health cockpit: part starship bridge, part aquarium observatory, part performance lab.
+- The real training call is visible before secondary analysis.
+- Runtime recommendations remain model-free and reproducible.
+- Missing, stale, sparse, disconnected, and failed states are named honestly; no metric is invented.
+- Every mobile surface retains the full decision context available on desktop.
+- Anatomy geometry and intensity semantics remain data, not decoration.
+- Protected sync, import, nutrition, and delivery actions keep their existing API contracts.
 
-## North Star
+## Brand personality
 
-The Today surface is allowed to be cinematic and environmental. The preferred lane is an “Aquarium Starship” command deck: deep ocean-space blues, curved bridge architecture, luminous containment tanks, bioluminescent particles, coral/jellyfish set dressing, and real data panels embedded into the scene.
+Focused, nocturnal, athletic, and precise. HealthMaxer should feel like a training district after dark: hard-edged metal, sodium light, electric signals, rain, and a calibrated body instrument. It is cinematic without behaving like a game or obscuring the data.
 
-## Anti-references
+## Accessibility and performance
 
-Avoid flat SaaS dashboards, generic card grids, timid HUD skins, and safe “premium” styling that only changes borders and glows. Avoid rasterizing real data, fake metrics, or generated anatomy that breaks highlight alignment.
+Visible focus, semantic landmarks, 44px touch targets, readable contrast, static reduced-motion rendering, and keyboard-operable analysis are required. Ambient motion pauses in hidden documents. Today must render independently of the below-fold WHOOP report.
 
-## Design Principles
+## Anti-patterns
 
-- Build a world first, then embed the app into it.
-- Data stays semantic, deterministic, and readable even when the environment is cinematic.
-- Environmental/generated imagery is allowed as set design behind real UI.
-- The body map must remain anatomically aligned with workout logic.
-- Motion should feel alive—particles, light, water, scan, glow—but reduced motion must preserve a static usable cockpit.
-- Mobile remains a real operating surface, but it can simplify the world while keeping the same atmosphere.
-
-## Accessibility & Inclusion
-
-Maintain readable contrast on glass and image-backed surfaces, keep keyboard focus visible, preserve touch targets, and respect reduced-motion preferences. Cinematic atmosphere is encouraged; unreadable data is not.
+No glass-card grid, aquarium matte, global pointer tilt, fake metrics, decorative charts, ticker, CRT terminal styling, custom scrollbar, or essential information hidden only on mobile.

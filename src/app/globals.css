@@ -277,7 +277,6 @@ body {
     transform 220ms var(--ease-precision),
     border-color 200ms var(--ease-product),
     box-shadow 180ms var(--ease-product);
-  will-change: transform;
 }
 
 [data-premium-surface]::before,
@@ -420,7 +419,6 @@ body {
 }
 
 .cinematic-anatomy .anatomy-layer {
-  will-change: opacity, transform, filter, clip-path;
   transform-box: fill-box;
   transform-origin: center;
 }
@@ -1050,7 +1048,6 @@ body {
 
 .training-map-compact .biomech-anatomy.biomech-anatomy-charged .anatomy-layer-biomech {
   animation: biomech-body-materialize 760ms var(--ease-precision) both;
-  will-change: opacity, transform, filter;
 }
 
 .training-map-compact .biomech-anatomy.biomech-anatomy-charged .biomech-core-scan::before {
@@ -1060,7 +1057,6 @@ body {
 .training-map-compact .biomech-anatomy.biomech-anatomy-charged .anatomy-layer-weekly,
 .training-map-compact .biomech-anatomy.biomech-anatomy-charged .anatomy-region-plate {
   animation: muscle-plate-assembly 760ms var(--ease-precision) var(--region-delay, 140ms) both;
-  will-change: opacity, transform, filter;
 }
 
 .training-map-compact .biomech-anatomy.biomech-anatomy-charged .anatomy-layer-latest-glow,
@@ -1664,6 +1660,25 @@ body {
   background: linear-gradient(90deg, rgba(4, 32, 54, 0.3), rgba(1, 13, 28, 0.3));
 }
 
+.aquarium-cockpit .aqua-command-deck .aqua-training-map:not(.aqua-training-map-page) .aqua-training-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.aquarium-cockpit .aqua-command-deck .aqua-training-map:not(.aqua-training-map-page) .aqua-volume-panel {
+  margin-top: 0;
+}
+
+.aquarium-cockpit .aqua-command-deck .aqua-training-map:not(.aqua-training-map-page) .aqua-volume-panel > div + div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 0.75rem;
+}
+
+.aquarium-cockpit .aqua-command-deck .aqua-training-map:not(.aqua-training-map-page) .aqua-volume-panel > div + div > div {
+  min-height: 30px;
+  border-top: 1px solid rgba(143, 252, 255, 0.14);
+}
+
 .aquarium-cockpit .aqua-map-shell {
   position: relative;
   background:
@@ -1897,6 +1912,39 @@ body {
     0 0 18px rgba(50, 255, 244, 0.14);
 }
 
+.aquarium-cockpit .aqua-command-mini-strip > div {
+  min-width: 0;
+  border: 1px solid rgba(143, 252, 255, 0.22);
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  background:
+    linear-gradient(135deg, rgba(7, 68, 82, 0.36), rgba(2, 18, 34, 0.52)),
+    radial-gradient(circle at 0 0, rgba(143, 252, 255, 0.18), transparent 7rem);
+  box-shadow: inset 0 1px 0 rgba(234, 255, 255, 0.12);
+}
+
+.aquarium-cockpit .aqua-command-mini-strip span {
+  display: block;
+  color: rgba(202, 255, 251, 0.62);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.aquarium-cockpit .aqua-command-mini-strip strong {
+  display: block;
+  margin-top: 0.28rem;
+  overflow: hidden;
+  color: rgba(245, 255, 255, 0.95);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .aquarium-cockpit .aqua-action-chip {
   min-height: 28px;
   border-radius: 999px;
@@ -1945,6 +1993,34 @@ body {
   }
 }
 
+@media (min-width: 1024px) {
+  .aquarium-layout-grid {
+    grid-template-columns: minmax(250px, 0.27fr) minmax(0, 1fr);
+  }
+
+  .aquarium-layout-main {
+    order: 2;
+  }
+
+  .aqua-left-rail {
+    order: 1;
+  }
+
+  .aquarium-command-grid {
+    grid-template-columns: minmax(300px, 0.58fr) minmax(520px, 1.42fr);
+    align-items: start;
+  }
+
+  .aquarium-cockpit .hud-command,
+  .aquarium-cockpit .aqua-command-deck {
+    min-height: clamp(470px, 49vw, 640px);
+  }
+
+  .aquarium-cockpit .aqua-training-map {
+    align-self: stretch;
+  }
+}
+
 @media (min-width: 1400px) {
   .aquarium-layout-grid {
     grid-template-columns: minmax(310px, 330px) minmax(0, 1fr);
@@ -1978,5 +2054,522 @@ body {
   .aquarium-cockpit .aqua-tank-lid,
   .aquarium-cockpit .aqua-tank-floor {
     animation: none !important;
+  }
+}
+
+.precision-anatomy {
+  --precision-cyan: 57 248 255;
+  --precision-violet: 138 92 255;
+  --precision-amber: 255 176 46;
+  --precision-magenta: 240 76 255;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1240 / 1040;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.precision-static-export {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.precision-anatomy-base-pair,
+.precision-anatomy-plates,
+.precision-anatomy-scan,
+.precision-anatomy-contact {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.precision-anatomy-contact {
+  z-index: 0;
+  inset: auto 5% 0;
+  height: 8%;
+  background:
+    radial-gradient(ellipse at 25% 50%, rgba(114, 255, 242, 0.34), transparent 42%),
+    radial-gradient(ellipse at 75% 50%, rgba(114, 255, 242, 0.34), transparent 42%);
+  filter: blur(8px);
+  opacity: 0.62;
+}
+
+.precision-anatomy-base-pair {
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.precision-anatomy-body {
+  --body-mask: none;
+  position: relative;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.98;
+  filter:
+    saturate(1.18)
+    contrast(1.14)
+    brightness(1.05)
+    drop-shadow(0 0 5px rgba(255, 255, 255, 0.22))
+    drop-shadow(0 0 18px rgba(57, 248, 255, 0.4))
+    drop-shadow(0 0 42px rgba(124, 92, 255, 0.2));
+}
+
+.precision-anatomy-body::before,
+.precision-anatomy-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+  -webkit-mask-image: var(--body-mask);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-image: var(--body-mask);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.precision-anatomy-body::before {
+  z-index: 1;
+  background:
+    linear-gradient(
+      108deg,
+      transparent 25%,
+      rgba(226, 252, 255, 0.04) 39%,
+      rgba(255, 255, 255, 0.38) 48%,
+      rgba(114, 255, 242, 0.12) 54%,
+      transparent 67%
+    );
+  background-size: 260% 100%;
+  background-position: 120% 0;
+  mix-blend-mode: screen;
+  opacity: 0.18;
+}
+
+.precision-anatomy-body::after {
+  z-index: 0;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(231, 251, 255, 0.2), transparent 28%),
+    linear-gradient(180deg, rgba(57, 248, 255, 0.06), transparent 44%, rgba(124, 92, 255, 0.1));
+  mix-blend-mode: screen;
+  opacity: 0.7;
+}
+
+.precision-anatomy-active.precision-anatomy-charged .precision-anatomy-body::before {
+  animation: precision-body-specular 7.2s var(--ease-precision) 1.2s infinite;
+}
+
+.precision-anatomy-body-front {
+  --body-mask: url("/images/anatomy-biomech-front.png");
+}
+
+.precision-anatomy-body-back {
+  --body-mask: url("/images/anatomy-biomech-back.png");
+}
+
+.precision-anatomy-raster {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.aqua-training-map-empty .precision-anatomy-body {
+  opacity: 0.9;
+  filter:
+    saturate(0.82)
+    contrast(1.1)
+    brightness(0.92)
+    drop-shadow(0 0 4px rgba(223, 250, 255, 0.16))
+    drop-shadow(0 0 14px rgba(57, 248, 255, 0.24));
+}
+
+.aqua-training-map-empty .precision-anatomy-contact {
+  opacity: 0.34;
+}
+
+.precision-anatomy-dormant .precision-anatomy-scan {
+  opacity: 0.12;
+}
+
+.precision-anatomy-dormant .precision-anatomy-scan::before {
+  animation: none;
+  opacity: 0.24;
+}
+
+.precision-anatomy-plates {
+  z-index: 3;
+  overflow: visible;
+}
+
+.precision-dormant-plate {
+  fill: transparent;
+  stroke: rgba(166, 239, 255, 0.035);
+  stroke-width: 0.55;
+  vector-effect: non-scaling-stroke;
+  paint-order: stroke fill;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.precision-plate,
+.precision-plate-halo,
+.precision-plate-trace {
+  --plate-rgb: var(--precision-violet);
+  --plate-edge-rgb: 226 236 255;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.precision-plate {
+  fill: rgb(var(--plate-rgb) / 0.34);
+  stroke: rgb(var(--plate-rgb) / 0.68);
+  fill-opacity: var(--plate-fill-opacity, 0.24);
+  stroke-width: 1.15;
+  vector-effect: non-scaling-stroke;
+  paint-order: stroke fill;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter:
+    drop-shadow(0 0 1px rgb(var(--plate-rgb) / 0.82))
+    drop-shadow(0 0 calc(7px * var(--plate-glow-scale, 1)) rgb(var(--plate-rgb) / 0.72))
+    drop-shadow(0 0 calc(17px * var(--plate-glow-scale, 1)) rgb(var(--plate-rgb) / 0.24));
+}
+
+.precision-plate-halo {
+  fill: rgb(var(--plate-rgb) / 0.09);
+  stroke: rgb(var(--plate-rgb) / 0.32);
+  stroke-width: 6;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: blur(5px);
+}
+
+.precision-plate-trace {
+  fill: none;
+  stroke: rgb(var(--plate-edge-rgb) / 0.9);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 0.18 0.82;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 4px rgb(var(--plate-rgb) / 0.96));
+}
+
+.precision-plate-low,
+.precision-plate-halo.precision-plate-low,
+.precision-plate-trace.precision-plate-low {
+  --plate-rgb: var(--precision-violet);
+  --plate-edge-rgb: 225 233 255;
+}
+
+.precision-plate.precision-plate-low {
+  fill: url("#precisionPlateLow");
+}
+
+.precision-plate-medium,
+.precision-plate-halo.precision-plate-medium,
+.precision-plate-trace.precision-plate-medium {
+  --plate-rgb: var(--precision-amber);
+  --plate-edge-rgb: 255 242 196;
+}
+
+.precision-plate.precision-plate-medium {
+  fill: url("#precisionPlateMedium");
+}
+
+.precision-plate-high,
+.precision-plate-halo.precision-plate-high,
+.precision-plate-trace.precision-plate-high {
+  --plate-rgb: var(--precision-magenta);
+  --plate-edge-rgb: 255 228 255;
+}
+
+.precision-plate.precision-plate-high {
+  fill: url("#precisionPlateHigh");
+}
+
+.precision-plate-latest {
+  --plate-rgb: var(--precision-cyan);
+  --plate-edge-rgb: 57 248 255;
+  fill: transparent;
+  stroke: rgba(57, 248, 255, 0.56);
+  stroke-width: 1.15;
+  filter:
+    drop-shadow(0 0 2px rgba(57, 248, 255, 0.62))
+    drop-shadow(0 0 8px rgba(57, 248, 255, 0.48))
+    drop-shadow(0 0 18px rgba(57, 248, 255, 0.18));
+}
+
+.precision-latest-halo {
+  fill: transparent;
+  stroke: rgba(57, 248, 255, 0.2);
+  stroke-width: 5;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  mix-blend-mode: screen;
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: blur(6px);
+}
+
+.precision-latest-trace {
+  fill: none;
+  stroke: rgba(57, 248, 255, 0.88);
+  stroke-width: 1.35;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.12 0.88;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter:
+    drop-shadow(0 0 2px rgba(57, 248, 255, 0.78))
+    drop-shadow(0 0 6px rgba(57, 248, 255, 0.62));
+}
+
+.precision-anatomy-charged .precision-plate,
+.precision-anatomy-charged .precision-plate-halo {
+  animation:
+    precision-plate-charge 520ms var(--ease-precision) var(--plate-delay, 120ms) both,
+    precision-plate-breathe 3.4s ease-in-out calc(var(--plate-delay, 120ms) + 640ms) infinite;
+}
+
+.precision-anatomy-charged .precision-plate-trace {
+  animation: precision-panel-route 860ms var(--ease-precision) var(--plate-delay, 120ms) both;
+}
+
+.precision-anatomy-charged .precision-plate-latest {
+  animation:
+    precision-latest-trace 680ms var(--ease-precision) var(--plate-delay, 80ms) both,
+    precision-latest-pulse 2.8s ease-in-out calc(var(--plate-delay, 80ms) + 760ms) infinite;
+}
+
+.precision-anatomy-charged .precision-latest-halo {
+  animation:
+    precision-latest-trace 680ms var(--ease-precision) var(--plate-delay, 80ms) both,
+    precision-latest-pulse 2.8s ease-in-out calc(var(--plate-delay, 80ms) + 760ms) infinite;
+}
+
+.precision-anatomy-charged .precision-latest-trace {
+  animation:
+    precision-latest-route 760ms var(--ease-precision) var(--plate-delay, 80ms) both,
+    precision-route-idle 2.8s ease-in-out calc(var(--plate-delay, 80ms) + 780ms) infinite;
+}
+
+.precision-anatomy-scan {
+  z-index: 4;
+  inset: 3% 10% 7%;
+  overflow: hidden;
+  border-radius: 46% / 10%;
+  opacity: 0.44;
+  mix-blend-mode: screen;
+}
+
+.precision-anatomy-scan::before {
+  content: "";
+  position: absolute;
+  inset-inline: 2%;
+  top: -8%;
+  height: 28%;
+  background:
+    linear-gradient(180deg, transparent, rgba(114, 255, 242, 0.42), transparent),
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.68), transparent);
+  filter: blur(8px);
+  animation: biomech-core-scan 4.4s var(--ease-precision) 760ms infinite;
+}
+
+.aquarium-cockpit .aqua-tank-stage .precision-anatomy {
+  flex: 0 0 auto;
+  width: auto;
+  height: 100%;
+  max-width: none;
+  translate: 0 0;
+}
+
+@media (min-width: 640px) {
+  .aquarium-cockpit .aqua-tank-stage .precision-anatomy {
+    width: auto;
+    height: 100%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .aquarium-cockpit .aqua-tank-stage .precision-anatomy {
+    width: auto;
+    height: 100%;
+  }
+}
+
+.aquarium-cockpit .aqua-training-map-page .aqua-tank-stage .precision-anatomy {
+  width: min(100%, calc(100% - 1.5rem));
+  height: auto;
+}
+
+@keyframes precision-plate-charge {
+  0% {
+    opacity: 0;
+    transform: translate(var(--plate-charge-x, 0), var(--plate-charge-y, -4px)) scale(0.975);
+  }
+  58% {
+    opacity: 0.92;
+    transform: translate(0, 0) scale(1.01);
+  }
+  100% {
+    opacity: 0.82;
+    transform: scale(1);
+  }
+}
+
+@keyframes precision-body-specular {
+  0%,
+  62%,
+  100% {
+    background-position: 120% 0;
+    opacity: 0.12;
+  }
+  74% {
+    opacity: 0.42;
+  }
+  86% {
+    background-position: -120% 0;
+    opacity: 0.16;
+  }
+}
+
+@keyframes precision-panel-route {
+  0% {
+    opacity: 0;
+    stroke-dasharray: 0.01 0.99;
+    stroke-dashoffset: 1;
+  }
+  38% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.12;
+    stroke-dasharray: 1 0;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes precision-latest-route {
+  0% {
+    opacity: 0;
+    stroke-dasharray: 0.01 0.99;
+    stroke-dashoffset: 1;
+  }
+  42% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.78;
+    stroke-dasharray: 1 0;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes precision-route-idle {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  50% {
+    opacity: 0.68;
+  }
+}
+
+@keyframes precision-plate-breathe {
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.98;
+  }
+}
+
+@keyframes precision-latest-trace {
+  0% {
+    opacity: 0;
+    stroke-dasharray: 1 260;
+    stroke-dashoffset: 190;
+    transform: scale(0.99);
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.9;
+    stroke-dasharray: 260 0;
+    stroke-dashoffset: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes precision-latest-pulse {
+  0%,
+  100% {
+    opacity: 0.46;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .precision-anatomy .precision-plate,
+  .precision-anatomy .precision-plate-halo,
+  .precision-anatomy .precision-plate-trace,
+  .precision-anatomy .precision-latest-halo,
+  .precision-anatomy .precision-latest-trace,
+  .precision-anatomy-body::before,
+  .precision-anatomy-scan::before {
+    animation: none !important;
+  }
+
+  .precision-anatomy .precision-plate,
+  .precision-anatomy .precision-plate-latest {
+    opacity: 0.76;
+  }
+
+  .precision-anatomy .precision-plate-halo {
+    opacity: 0.28;
+  }
+
+  .precision-anatomy .precision-plate-trace {
+    opacity: 0.12;
+    stroke-dasharray: 1 0;
+    stroke-dashoffset: 0;
+  }
+
+  .precision-anatomy .precision-latest-halo {
+    opacity: 0.2;
+  }
+
+  .precision-anatomy .precision-latest-trace {
+    opacity: 0.56;
+    stroke-dasharray: 1 0;
+    stroke-dashoffset: 0;
   }
 }
