@@ -1,12 +1,97 @@
-import Link from "next/link";
+"use client";
 
-export type ProductRoute = "today" | "weekly" | "whoop";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  APP_SECTION_ITEMS,
+  APP_SECTIONS,
+  sectionFromHash,
+  urlForSection,
+  type AppSection,
+} from "@/lib/product-navigation";
 
-const items: Array<{ key: ProductRoute; label: string; href: string }> = [
-  { key: "today", label: "Today", href: "/" },
-  { key: "weekly", label: "Weekly", href: "/weekly" },
-  { key: "whoop", label: "WHOOP", href: "/whoop" },
-];
+export type { AppSection } from "@/lib/product-navigation";
+
+// Kept as an alias while the legacy route shells migrate to anchored sections.
+export type ProductRoute = AppSection;
+
+const OBSERVER_ROOT_MARGIN = "-30% 0px -55% 0px";
+
+function useObservedSection(fallback: AppSection, isRootPage: boolean) {
+  const [activeSection, setActiveSection] = useState<AppSection>(fallback);
+
+  useEffect(() => {
+    if (!isRootPage) {
+      return;
+    }
+
+    const sections = APP_SECTIONS.map((section) => ({
+      section,
+      element: document.getElementById(section),
+    })).filter(
+      (entry): entry is { section: AppSection; element: HTMLElement } =>
+        entry.element !== null,
+    );
+
+    if (sections.length === 0 || !("IntersectionObserver" in window)) {
+      return;
+    }
+
+    const sectionByElement = new Map<Element, AppSection>(
+      sections.map(({ section, element }) => [element, section] as const),
+    );
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const intersecting = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort(
+            (a, b) =>
+              Math.abs(a.boundingClientRect.top - window.innerHeight * 0.375) -
+              Math.abs(b.boundingClientRect.top - window.innerHeight * 0.375),
+          );
+        const section = intersecting[0]
+          ? sectionByElement.get(intersecting[0].target)
+          : undefined;
+
+        if (!section) {
+          return;
+        }
+
+        setActiveSection(section);
+        if (window.location.hash !== `#${section}`) {
+          window.history.replaceState(
+            window.history.state,
+            "",
+            urlForSection(window.location.href, section),
+          );
+        }
+      },
+      { rootMargin: OBSERVER_ROOT_MARGIN, threshold: 0 },
+    );
+
+    sections.forEach(({ element }) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [isRootPage]);
+
+  useEffect(() => {
+    if (!isRootPage) return;
+
+    const syncFromLocation = () => {
+      const section = sectionFromHash(window.location.hash);
+      if (section) setActiveSection(section);
+    };
+
+    syncFromLocation();
+    window.addEventListener("hashchange", syncFromLocation);
+    window.addEventListener("popstate", syncFromLocation);
+    return () => {
+      window.removeEventListener("hashchange", syncFromLocation);
+      window.removeEventListener("popstate", syncFromLocation);
+    };
+  }, [isRootPage]);
+
+  return [activeSection, setActiveSection] as const;
+}
 
 export function ProductNav({
   current,
@@ -15,30 +100,37 @@ export function ProductNav({
   current: ProductRoute;
   dark?: boolean;
 }) {
+  const pathname = usePathname();
+  const isRootPage = pathname === "/";
+  const [observedSection, setObservedSection] = useObservedSection(
+    current,
+    isRootPage,
+  );
+  const activeSection = isRootPage ? observedSection : current;
+
   return (
-    <nav aria-label="Primary navigation" className="flex flex-wrap items-center gap-1">
-      {items.map((item) => {
-        const active = item.key === current;
+    <nav
+      aria-label="Primary navigation"
+      className="district-nav"
+      data-theme={dark ? "dark" : "light"}
+    >
+      {APP_SECTION_ITEMS.map((item) => {
+        const active = item.key === activeSection;
         return (
-          <Link
+          <a
             key={item.key}
             href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={`group relative inline-flex h-10 items-center border-b-2 px-3.5 text-[12px] font-semibold uppercase tracking-[0.11em] transition-all ${
-              active
-                ? dark
-                  ? "border-[#39f8ff] text-white drop-shadow-[0_0_16px_rgba(57,248,255,0.7)]"
-                  : "border-[#4f3b93] text-[#171329]"
-                : dark
-                  ? "border-transparent text-white/60 hover:border-[#39f8ff]/60 hover:text-white"
-                  : "border-transparent text-[#6d6785] hover:text-[#171329]"
-            }`}
+            aria-current={active ? "location" : undefined}
+            className="district-nav__link"
+            data-active={active ? "true" : "false"}
+            onClick={() => {
+              if (isRootPage) {
+                setObservedSection(item.key);
+              }
+            }}
           >
-            {dark && active ? (
-              <span className="pointer-events-none absolute inset-x-2 bottom-0 h-px bg-[#39f8ff] shadow-[0_0_18px_rgba(57,248,255,0.96)]" />
-            ) : null}
             {item.label}
-          </Link>
+          </a>
         );
       })}
     </nav>

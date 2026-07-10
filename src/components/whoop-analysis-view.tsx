@@ -66,35 +66,37 @@ function DeltaComparison({
 export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
   if (report.empty) {
     return (
-      <section className="border border-[#d8d2e4] bg-[#fbf9fd] px-6 py-12 text-center">
-        <h2 className="text-xl font-semibold text-[#171329]">No WHOOP export uploaded</h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#645c7d]">
+      <section data-premium-surface data-premium-tone="dark" data-premium-enter className="hud-frame px-6 py-12 text-center text-white">
+        <div className="hud-content">
+        <h2 className="text-xl font-semibold text-white">No WHOOP export uploaded</h2>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/62">
           Upload the full WHOOP export ZIP above to populate this private long-range report.
         </p>
+        </div>
       </section>
     );
   }
 
   return (
     <div className="grid gap-4">
-      <section data-premium-surface data-premium-tone="dark" data-premium-enter className="overflow-hidden rounded-[10px] border border-white/10 bg-[#171126] text-white">
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_23rem]">
+      <section data-premium-surface data-premium-tone="hud" data-premium-enter className="hud-frame overflow-hidden text-white">
+        <div className="hud-content grid xl:grid-cols-[minmax(0,1fr)_23rem]">
           <div className="border-b border-white/10 p-4 sm:p-5 xl:border-b-0 xl:border-r">
-            <div className="text-[12px] text-white/48">Recovery system</div>
+            <div className="hud-micro-label">Recovery system</div>
             <h2 className="mt-2 max-w-2xl text-2xl font-semibold leading-tight tracking-[-0.04em] sm:text-3xl">
               {report.overview.title}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-5 text-white/64">{report.overview.detail}</p>
-            <div className="mt-4 grid gap-px overflow-hidden rounded-[8px] bg-white/10 sm:grid-cols-3">
-              <div className="bg-[#171126] px-3 py-3">
+            <div className="mt-4 grid gap-px overflow-hidden bg-[#39f8ff]/12 sm:grid-cols-3">
+              <div className="bg-[#07101c] px-3 py-3">
                 <div className="text-[11px] text-white/42">Coverage</div>
                 <div className="mt-1 text-lg font-semibold">{report.inventory.days} days</div>
               </div>
-              <div className="bg-[#171126] px-3 py-3">
+              <div className="bg-[#07101c] px-3 py-3">
                 <div className="text-[11px] text-white/42">Continuity</div>
                 <div className="mt-1 text-lg font-semibold">{report.inventory.gaps} gaps</div>
               </div>
-              <div className="bg-[#171126] px-3 py-3">
+              <div className="bg-[#07101c] px-3 py-3">
                 <div className="text-[11px] text-white/42">Confidence</div>
                 <div className="mt-1 text-lg font-semibold">{report.overview.confidence}</div>
               </div>
@@ -117,41 +119,44 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
       <WhoopVisualAnalysis report={report} />
 
       <section>
-        <h2 className="text-xl font-semibold tracking-[-0.03em] text-[#171329]">Highest-leverage changes</h2>
-        <div data-premium-surface data-premium-tone="light" data-premium-enter className="mt-3 overflow-hidden rounded-[10px] border border-[#d8d2e4] bg-[#fbf9fd]">
+        <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">Highest-leverage changes</h2>
+        <div data-premium-surface data-premium-tone="dark" data-premium-enter className="hud-frame mt-3 overflow-hidden text-white">
+          <div className="hud-content">
           {report.leveragePoints.length ? report.leveragePoints.map((point, index) => (
-            <article key={point.title} className="grid gap-3 border-t border-[#e7e1ec] px-4 py-4 first:border-t-0 lg:grid-cols-[2rem_14rem_1fr]">
-              <div className="text-xl font-semibold text-[#5d54a3]">{index + 1}</div>
+            <article key={point.title} className="grid gap-3 border-t border-white/10 px-4 py-4 first:border-t-0 lg:grid-cols-[2rem_14rem_1fr]">
+              <div className="text-xl font-semibold text-[#39f8ff]">{index + 1}</div>
               <div>
-                <h3 className="font-semibold text-[#171329]">{point.title}</h3>
-                <p className="mt-2 text-xs leading-5 text-[#7b7492]">{point.impact}</p>
+                <h3 className="font-semibold text-white">{point.title}</h3>
+                <p className="mt-2 text-xs leading-5 text-white/48">{point.impact}</p>
               </div>
               <div>
-                <p className="text-sm leading-5 text-[#4f4965]">{point.evidence}</p>
-                <ul className="mt-3 grid gap-2 text-sm text-[#312c49] sm:grid-cols-2">
+                <p className="text-sm leading-5 text-white/66">{point.evidence}</p>
+                <ul className="mt-3 grid gap-2 text-sm text-white/78 sm:grid-cols-2">
                   {point.actions.slice(0, 2).map((action) => (
                     <li key={action} className="border-l-2 border-[#ff8b72] pl-3">{action}</li>
                   ))}
                 </ul>
-                <details className="mt-3 text-sm text-[#6d6785]">
-                  <summary className="cursor-pointer font-medium">Why this matters</summary>
+                <details className="mt-3 text-sm text-white/54">
+                  <summary className="cursor-pointer font-medium text-[#39f8ff]">Why this matters</summary>
                   <p className="mt-2 leading-5">{point.why}</p>
                 </details>
               </div>
             </article>
-          )) : <p className="px-5 py-8 text-sm text-[#645c7d]">No leverage point met the evidence threshold.</p>}
+          )) : <p className="px-5 py-8 text-sm text-white/62">No leverage point met the evidence threshold.</p>}
+          </div>
         </div>
       </section>
 
-      <section data-premium-surface data-premium-tone="dark" data-premium-enter className="overflow-hidden rounded-[10px] border border-white/10 bg-[#171126] text-white">
+      <section data-premium-surface data-premium-tone="hud" data-premium-enter className="hud-frame overflow-hidden text-white">
+        <div className="hud-content">
         <h2 className="border-b border-white/10 px-4 py-3 text-lg font-semibold">Protocol this week</h2>
-        <div className="grid gap-px bg-white/10 md:grid-cols-3">
+        <div className="grid gap-px bg-[#39f8ff]/12 md:grid-cols-3">
           {[
             ["Non-negotiables", report.protocol.nonNegotiables, "border-[#ff8b72]"],
             ["Quick wins", report.protocol.quickWins, "border-[#71fff1]"],
             ["Watch closely", report.protocol.watch, "border-[#b5abff]"],
           ].map(([title, items, border]) => (
-            <div key={title as string} className="bg-[#171126] p-4">
+            <div key={title as string} className="bg-[#07101c] p-4">
               <h3 className={`border-l-2 pl-3 font-semibold ${border as string}`}>{title as string}</h3>
               <ul className="mt-3 space-y-2 text-sm leading-5 text-white/70">
                 {(items as string[]).map((item, index) => <li key={`${title}-${index}-${item}`}>{item}</li>)}
@@ -167,6 +172,7 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
             </ul>
           </div>
         ) : null}
+        </div>
       </section>
     </div>
   );

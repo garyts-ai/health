@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Manrope } from "next/font/google";
-import { PremiumSurfaceController } from "@/components/premium-surface-controller";
+import { Big_Shoulders, Geist_Mono, Manrope } from "next/font/google";
 import "./globals.css";
+import "./district.css";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -13,15 +13,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const bigShoulders = Big_Shoulders({
+  variable: "--font-big-shoulders",
+  subsets: ["latin"],
+  weight: "variable",
+  adjustFontFallback: false,
+});
+
 export const metadata: Metadata = {
-  title: "Health OS",
+  title: "HealthMaxer — Neon Training District",
   description:
     "A private health command center that blends WHOOP and Hevy into daily decisions, trends, and delivery tools.",
-  applicationName: "Health OS",
+  applicationName: "HealthMaxer",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Health OS",
+    title: "HealthMaxer",
   },
   icons: {
     icon: "/health-os-icon.svg",
@@ -31,7 +38,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#5d54a3",
+  colorScheme: "dark",
+  themeColor: "#07070b",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -42,10 +51,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${geistMono.variable} ${bigShoulders.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <PremiumSurfaceController />
         {children}
       </body>
     </html>

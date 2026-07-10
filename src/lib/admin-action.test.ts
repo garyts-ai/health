@@ -40,6 +40,7 @@ test("WHOOP sync redirects back to local settings without an unauthorized state"
     /^http:\/\/localhost\/\?utilities=open&whoop=/,
   );
   assert.doesNotMatch(response.headers.get("location") ?? "", /unauthorized/);
+  assert.equal(new URL(response.headers.get("location") ?? "http://localhost").hash, "#utilities");
 });
 
 test("Hevy sync redirects back to local settings without an unauthorized state", async () => {
@@ -58,4 +59,5 @@ test("Hevy sync redirects back to local settings without an unauthorized state",
     /^http:\/\/localhost\/\?utilities=open&hevy=/,
   );
   assert.doesNotMatch(response.headers.get("location") ?? "", /unauthorized/);
+  assert.equal(new URL(response.headers.get("location") ?? "http://localhost").hash, "#utilities");
 });

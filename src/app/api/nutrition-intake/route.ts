@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const redirectUrl = buildRequestRedirectUrl(request, "/?utilities=open");
+  const redirectUrl = buildRequestRedirectUrl(request, "/?utilities=open#utilities");
 
   try {
     const formData = await request.formData();

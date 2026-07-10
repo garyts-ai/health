@@ -1,12 +1,12 @@
 {
-  "name": "Health OS",
-  "short_name": "Health OS",
-  "description": "Private WHOOP, Hevy, and nutrition dashboard.",
+  "name": "HealthMaxer",
+  "short_name": "HealthMaxer",
+  "description": "Private training, recovery, and nutrition command center.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f5f2fb",
-  "theme_color": "#5d54a3",
+  "background_color": "#07070b",
+  "theme_color": "#ff3c9d",
   "icons": [
     {
       "src": "/health-os-icon.svg",

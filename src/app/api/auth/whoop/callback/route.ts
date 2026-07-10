@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   const error = url.searchParams.get("error");
   const dashboardUrl = new URL("/", url);
   dashboardUrl.searchParams.set("utilities", "open");
+  dashboardUrl.hash = "utilities";
 
   if (error) {
     dashboardUrl.searchParams.set("whoop", "oauth-denied");

@@ -167,6 +167,8 @@ export function ProtectedSettingsActions({
 
   return (
     <>
+      <fieldset className="district-utility-fieldset">
+        <legend>Connections</legend>
       <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
           <div>
@@ -251,7 +253,10 @@ export function ProtectedSettingsActions({
           );
         })}
       </section>
+      </fieldset>
 
+      <fieldset className="district-utility-fieldset">
+        <legend>Quick Intake</legend>
       <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-5 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -418,7 +423,10 @@ export function ProtectedSettingsActions({
           )}
         </div>
       </section>
+      </fieldset>
 
+      <fieldset className="district-utility-fieldset">
+        <legend>Nutrition Targets</legend>
       <section data-premium-surface data-premium-tone="light" data-premium-enter className="rounded-[12px] bg-[linear-gradient(180deg,_rgba(248,245,255,0.88)_0%,_rgba(255,255,255,0.82)_100%)] p-6 shadow-[0_10px_30px_rgba(22,20,35,0.08)] ring-1 ring-[rgba(77,67,119,0.12)]">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
           <div>
@@ -543,13 +551,17 @@ export function ProtectedSettingsActions({
           </button>
         </form>
       </section>
+      </fieldset>
 
+      <fieldset className="district-utility-fieldset">
+        <legend>Daily Brief</legend>
       <DailyBriefExport
         deliveryStatus={deliveryStatus}
         isDiscordConfigured={isDiscordConfigured}
         preview={preview}
         summary={summary}
       />
+      </fieldset>
     </>
   );
 }

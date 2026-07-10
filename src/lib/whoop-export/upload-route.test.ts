@@ -14,7 +14,8 @@ test("WHOOP export upload route rejects missing files with redirect state", asyn
 
   assert.equal(response.status, 303);
   const location = response.headers.get("location") ?? "";
-  assert.match(location, /^http:\/\/localhost\/whoop\?/);
+  assert.match(location, /^http:\/\/localhost\/\?/);
+  assert.equal(new URL(location).hash, "#whoop");
   assert.match(location, /import=failed/);
   assert.match(location, /Choose\+a\+WHOOP\+export\+ZIP\+file/);
 });

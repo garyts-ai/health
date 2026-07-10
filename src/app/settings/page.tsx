@@ -1,24 +1,14 @@
 import { redirect } from "next/navigation";
+import { legacySectionUrl, type LegacySearchParamValue } from "@/lib/product-navigation";
 
 type SettingsPageProps = {
-  searchParams?: Promise<{
-    whoop?: string;
-    hevy?: string;
-  }>;
+  searchParams?: Promise<Record<string, LegacySearchParamValue>>;
 };
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
-  const resolvedSearchParams = (await searchParams) ?? {};
-  const nextParams = new URLSearchParams();
-  nextParams.set("utilities", "open");
-
-  if (resolvedSearchParams.whoop) {
-    nextParams.set("whoop", resolvedSearchParams.whoop);
-  }
-
-  if (resolvedSearchParams.hevy) {
-    nextParams.set("hevy", resolvedSearchParams.hevy);
-  }
-
-  redirect(`/?${nextParams.toString()}`);
+  redirect(
+    legacySectionUrl("utilities", (await searchParams) ?? {}, {
+      utilities: "open",
+    }),
+  );
 }

@@ -6,7 +6,7 @@ import { syncWhoopData } from "@/lib/whoop/provider";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const redirectUrl = buildRequestRedirectUrl(request, "/?utilities=open");
+  const redirectUrl = buildRequestRedirectUrl(request, "/?utilities=open#utilities");
   const wantsJson = request.headers.get("accept")?.includes("application/json") ?? false;
 
   try {
