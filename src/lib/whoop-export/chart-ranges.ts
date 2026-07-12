@@ -1,4 +1,5 @@
 import type { WhoopAnalysisReport, WhoopMetric } from "@/lib/whoop-export/analysis";
+import { calendarDaysIntervalEnding, isInCalendarInterval } from "@/lib/calendar";
 
 export type WhoopChartRange = "week" | "30d" | "3m" | "1y" | "all";
 
@@ -43,8 +44,8 @@ export function filterWhoopChartValues(
   if (!days) return values;
 
   const newestTime = Math.max(...values.map((point) => new Date(point.date).getTime()));
-  const cutoff = newestTime - (days - 1) * 86_400_000;
-  return values.filter((point) => new Date(point.date).getTime() >= cutoff);
+  const interval = calendarDaysIntervalEnding(new Date(newestTime), days);
+  return values.filter((point) => isInCalendarInterval(point.date, interval));
 }
 
 export function summarizeWhoopChartRange(

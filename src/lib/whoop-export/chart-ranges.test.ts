@@ -7,6 +7,7 @@ import {
   parseWhoopChartRange,
   summarizeWhoopChartRange,
 } from "@/lib/whoop-export/chart-ranges";
+import { windowConfidence } from "@/lib/whoop-export/analysis";
 import type { WhoopAnalysisReport } from "@/lib/whoop-export/analysis";
 
 const values = Array.from({ length: 400 }, (_, index) => ({
@@ -61,4 +62,18 @@ test("invalid stored chart range falls back to 30 days", () => {
   assert.equal(parseWhoopChartRange("3m"), "3m");
   assert.equal(parseWhoopChartRange("nonsense"), DEFAULT_WHOOP_CHART_RANGE);
   assert.equal(parseWhoopChartRange(null), DEFAULT_WHOOP_CHART_RANGE);
+});
+
+test("calendar chart windows include DST transition days once", () => {
+  const dstValues = Array.from({ length: 10 }, (_, index) => ({
+    date: new Date(Date.parse("2026-03-02T05:00:00.000Z") + index * 86_400_000).toISOString(),
+    value: index,
+  }));
+  assert.equal(filterWhoopChartValues(dstValues, "week").length, 7);
+});
+
+test("sparse WHOOP windows cannot claim high confidence", () => {
+  assert.equal(windowConfidence(28, 28), "High");
+  assert.equal(windowConfidence(7, 7), "Moderate");
+  assert.equal(windowConfidence(2, 12), "Suggestive");
 });

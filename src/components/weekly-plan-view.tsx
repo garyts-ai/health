@@ -3,12 +3,14 @@ import type { DailySummary, WeeklyPlanDay } from "@/lib/insights/types";
 function statusLabel(day: WeeklyPlanDay) {
   if (day.state === "completed") return "Done";
   if (day.state === "today") return "Today";
+  if (day.state === "unobserved") return "Unobserved";
   return day.intent;
 }
 
 function dayTone(day: WeeklyPlanDay) {
   if (day.state === "completed") return "complete";
   if (day.state === "today") return "today";
+  if (day.state === "unobserved") return "unobserved";
   if (day.workoutType === "Rest" || day.workoutType === "Recovery") return "recovery";
   return "planned";
 }
@@ -25,6 +27,8 @@ export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
         <div><dt>Done</dt><dd>{plan.completedLifts}</dd></div>
         <div><dt>Left</dt><dd>{Math.max(0, plan.targetLifts - plan.completedLifts)}</dd></div>
       </dl>
+
+      <p className="week-ledger__forecast">Forecast generated {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(plan.generatedAt))}</p>
 
       <ol className="week-ledger__days">
         {plan.days.map((day) => (
@@ -51,12 +55,12 @@ export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
 
       <div className="week-ledger__evidence">
         <section aria-labelledby="muscle-volume-title">
-          <h3 id="muscle-volume-title">Muscle volume</h3>
+          <h3 id="muscle-volume-title">Estimated muscle volume</h3>
           {summary.trainingLoad.weeklyMuscleVolume.length ? (
             <dl>
               {summary.trainingLoad.weeklyMuscleVolume.slice(0, 8).map((item) => (
                 <div key={item.label}>
-                  <dt>{item.label}</dt>
+                  <dt>{item.label} (estimated)</dt>
                   <dd>{item.effectiveSets} · {item.hits}×</dd>
                 </div>
               ))}

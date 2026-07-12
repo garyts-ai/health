@@ -270,7 +270,7 @@ export type DecisionEvidence = {
 export type WeeklyPlanDay = {
   date: string;
   label: string;
-  state: "completed" | "today" | "planned" | "recovery";
+  state: "completed" | "today" | "planned" | "recovery" | "unobserved";
   workoutType: "Upper" | "Lower" | "Rest" | "Recovery";
   intent: "Push" | "Maintain" | "Back off" | "Recover";
   anchors: string[];
@@ -281,6 +281,7 @@ export type WeeklyPlanDay = {
 };
 
 export type WeeklyPlan = {
+  generatedAt: string;
   weekStart: string;
   weekEnd: string;
   targetLifts: number;
