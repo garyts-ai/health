@@ -53,7 +53,7 @@ export function buildLlmContextPacket(summary: DailySummary) {
     "- Distinguish observation from inference and avoid diagnosing illness.",
     "",
     "Snapshot and freshness",
-    `- Snapshot: ${summary.date}`,
+    `- Snapshot: ${summary.physiologicalDate} (generated ${summary.date})`,
     `- Sources: ${freshness(summary)}`,
     `- Historical context: ${summary.historicalContext?.qualifier ?? "Not available"}`,
     "",

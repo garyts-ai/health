@@ -3,6 +3,7 @@ import type {
   WhoopRecoverySummary,
   WhoopSleepSummary,
 } from "@/lib/whoop/types";
+import { calendarDateKey } from "@/lib/calendar";
 
 export const READINESS_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
 export const READINESS_BASELINE_MAX_SAMPLES = 7;
@@ -20,6 +21,7 @@ export type ReadinessValidityReason =
   | "stale"
   | "invalid"
   | "future_observation"
+  | "different_date"
   | "insufficient_samples";
 
 export type ObservationEnvelope<T> = {
@@ -41,6 +43,8 @@ export type ReadinessBaseline = {
 
 export type ReadinessSnapshot = {
   decisionAt: string;
+  selectedDate: string;
+  physiologicalDate: string | null;
   status: "available" | "unavailable";
   reasons: ReadinessValidityReason[];
   cycleId: number | null;
@@ -64,6 +68,18 @@ export type ReadinessSnapshotInput = {
   recoveryRows: WhoopRecoverySummary[];
   cycleRows: WhoopCycleSummary[];
 };
+
+function validPhysiologicalTimestamp(value: string | null | undefined) {
+  const parsed = parseTime(value);
+  return parsed !== null && parsed > Date.UTC(2000, 0, 1) ? value! : null;
+}
+
+/** WHOOP cycles may omit `end` while the current cycle is still open. The cycle start
+ * remains the transport-safe observation timestamp; sleep end determines the displayed
+ * physiological day for the Today snapshot. */
+function cycleObservationAt(cycle: WhoopCycleSummary) {
+  return validPhysiologicalTimestamp(cycle.end) ?? validPhysiologicalTimestamp(cycle.start);
+}
 
 function average(values: Array<number | null>) {
   const present = values.filter((value): value is number => typeof value === "number");
@@ -143,7 +159,7 @@ function validPriorCycleRows(
 ) {
   const cycles = [...input.cycleRows]
     .filter((cycle) => cycle.id !== selectedCycleId && scoreIsValid(cycle.scoreState))
-    .sort((left, right) => Date.parse(right.end) - Date.parse(left.end));
+    .sort((left, right) => Date.parse(cycleObservationAt(right) ?? "") - Date.parse(cycleObservationAt(left) ?? ""));
   const seen = new Set<number>();
   const rows: Array<{
     cycle: WhoopCycleSummary;
@@ -195,6 +211,7 @@ function invalidEnvelope<T>(reason: ReadinessValidityReason): ObservationEnvelop
 
 export function buildReadinessSnapshot(input: ReadinessSnapshotInput): ReadinessSnapshot {
   const decisionAt = input.decisionAt.getTime();
+  const selectedDate = calendarDateKey(input.decisionAt);
   const sleeps = [...input.sleepRows].sort((left, right) => Date.parse(right.end) - Date.parse(left.end));
   const cycles = new Map(input.cycleRows.map((row) => [row.id, row]));
   const recoveries = new Map(input.recoveryRows.map((row) => [row.cycleId, row]));
@@ -223,10 +240,23 @@ export function buildReadinessSnapshot(input: ReadinessSnapshotInput): Readiness
     }
 
     const sleepAgeReason = ageReason(sleep.end, decisionAt);
-    const cycleAgeReason = ageReason(cycle.end, decisionAt);
-    const recoveryAgeReason = ageReason(recovery.updatedAt || recovery.createdAt, decisionAt);
-    if (sleepAgeReason || cycleAgeReason || recoveryAgeReason) {
-      reasons.add(sleepAgeReason ?? cycleAgeReason ?? recoveryAgeReason ?? "invalid");
+    if (sleepAgeReason) {
+      reasons.add(sleepAgeReason);
+      continue;
+    }
+    const sleepDate = validPhysiologicalTimestamp(sleep.end)
+      ? calendarDateKey(sleep.end)
+      : null;
+    if (sleepDate !== selectedDate) {
+      reasons.add("different_date");
+      continue;
+    }
+    const cycleObservedAt = cycleObservationAt(cycle);
+    const recoveryObservedAt = recovery.updatedAt || recovery.createdAt;
+    const cycleAgeReason = ageReason(cycleObservedAt, decisionAt);
+    const recoveryAgeReason = ageReason(recoveryObservedAt, decisionAt);
+    if (cycleAgeReason || recoveryAgeReason) {
+      reasons.add(cycleAgeReason ?? recoveryAgeReason ?? "invalid");
       continue;
     }
     if (recovery.recoveryScore === null || !hasMainSleepDuration(sleep)) {
@@ -236,6 +266,8 @@ export function buildReadinessSnapshot(input: ReadinessSnapshotInput): Readiness
 
     return {
       decisionAt: input.decisionAt.toISOString(),
+      selectedDate,
+      physiologicalDate: sleepDate,
       status: "available",
       reasons: [],
       cycleId: cycle.id,
@@ -255,7 +287,7 @@ export function buildReadinessSnapshot(input: ReadinessSnapshotInput): Readiness
       }),
       cycle: envelope({
         value: cycle,
-        observedAt: cycle.end,
+        observedAt: cycleObservedAt,
         recordId: String(cycle.id),
         cycleId: cycle.id,
         status: "valid",
@@ -270,10 +302,12 @@ export function buildReadinessSnapshot(input: ReadinessSnapshotInput): Readiness
     (left, right) => Date.parse(right.updatedAt || right.createdAt) - Date.parse(left.updatedAt || left.createdAt),
   )[0] ?? null;
   const latestCycle = [...input.cycleRows].sort(
-    (left, right) => Date.parse(right.end) - Date.parse(left.end),
+    (left, right) => Date.parse(cycleObservationAt(right) ?? "") - Date.parse(cycleObservationAt(left) ?? ""),
   )[0] ?? null;
   return {
     decisionAt: input.decisionAt.toISOString(),
+    selectedDate,
+    physiologicalDate: null,
     status: "unavailable",
     reasons: [...reasons].length ? [...reasons] : ["missing"],
     cycleId: null,
@@ -300,7 +334,7 @@ export function buildReadinessSnapshot(input: ReadinessSnapshotInput): Readiness
     cycle: latestCycle
       ? envelope<WhoopCycleSummary>({
           value: null,
-          observedAt: latestCycle.end,
+          observedAt: cycleObservationAt(latestCycle),
           recordId: String(latestCycle.id),
           cycleId: latestCycle.id,
           status: reason === "stale" ? "stale" : "invalid",

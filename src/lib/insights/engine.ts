@@ -12,6 +12,7 @@ import { applyHistoricalModifier, buildHistoricalContext } from "@/lib/insights/
 import { buildWeeklyPlan } from "@/lib/insights/weekly-plan";
 import { buildReadinessSnapshot, type ReadinessSnapshot } from "@/lib/insights/readiness-snapshot";
 import { buildDecisionEvidence } from "@/lib/insights/decision-evidence";
+import { warnTodayDateAlignment } from "@/lib/insights/today-date-alignment";
 import { calendarDateKey, calendarWeekInterval } from "@/lib/calendar";
 import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
@@ -1318,7 +1319,10 @@ async function buildTrendSeries() {
   const latestSleepByDay = new Map<string, number | null>();
   const latestSleepWindowByDay = new Map<string, DailySleepWindow>();
   for (const row of sleepRows) {
-    const key = getDateKey(row.start);
+    // Sleep is physiologically assigned to the day it ends, matching the
+    // readiness snapshot and preventing a late-night sleep from shifting Today.
+    const physiologicalEnd = row.end || row.start;
+    const key = getDateKey(physiologicalEnd);
     if (!latestSleepByDay.has(key)) {
       const sleepRow = {
         start: row.start,
@@ -1340,7 +1344,7 @@ async function buildTrendSeries() {
       latestSleepByDay.set(key, sleepHours);
       latestSleepWindowByDay.set(key, {
         dateKey: key,
-        label: NEW_YORK_WEEKDAY.format(new Date(row.start)),
+        label: NEW_YORK_WEEKDAY.format(new Date(physiologicalEnd)),
         start: row.start,
         end: row.end ?? null,
         sleepHours,
@@ -2534,6 +2538,7 @@ function buildPromptText(summary: DailySummary) {
     "- Planned actions and prescription-style HealthMax fields are excluded.",
     "",
     "Current app-observed state",
+    `- Physiological date: ${summary.physiologicalDate}`,
     `- Training availability status: ${summary.physiqueDecision.trainingAvailability}`,
     `- Training-load bottleneck data: ${summary.trainingLoad.hevyWorkoutCount7d} lifts / ${summary.trainingLoad.hevySetCount7d} sets in 7 days; ${summary.trainingLoad.hevyWorkoutCountThisWeek} lifts / ${summary.trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
     `- Load flags: high training load ${summary.stressFlags.highTrainingLoad ? "yes" : "no"}; recent load spike ${summary.trainingLoad.recentLoadSpike ? "yes" : "no"}; consecutive lifting days ${summary.trainingLoad.hevyConsecutiveDays}`,
@@ -2641,6 +2646,7 @@ export async function getDailySummary(): Promise<DailySummary> {
 
   const summary: DailySummary = {
     date: now.toISOString(),
+    physiologicalDate: readinessSnapshot.selectedDate,
     contextLine: "Training and recovery data dashboard.",
     miniTrends,
     trendSeries,
@@ -2661,6 +2667,18 @@ export async function getDailySummary(): Promise<DailySummary> {
     weeklyPlan,
     llmPromptText: "",
   };
+
+  warnTodayDateAlignment({
+    selectedDate: summary.physiologicalDate,
+    snapshotDate: readinessSnapshot.physiologicalDate,
+    chartDates: {
+      recovery: trendSeries.recovery7d[trendSeries.recovery7d.length - 1]?.dateKey ?? null,
+      sleep: trendSeries.sleep7d[trendSeries.sleep7d.length - 1]?.dateKey ?? null,
+      strain: trendSeries.strain7d[trendSeries.strain7d.length - 1]?.dateKey ?? null,
+    },
+    recommendationDate: summary.physiologicalDate,
+    llmDate: summary.physiologicalDate,
+  });
 
   summary.llmPromptText = buildPromptText(summary);
   return summary;

@@ -5,6 +5,7 @@ import { buildLlmContextPacket, LLM_QUESTION_PLACEHOLDER } from "@/lib/llm-conte
 
 const summary = {
   date: "2026-07-11T12:00:00.000Z",
+  physiologicalDate: "2026-07-11",
   freshness: {
     whoop: { connected: true, isStale: false, lastSyncCompletedAt: "2026-07-11T11:00:00.000Z" },
     hevy: { connected: true, isStale: false, lastSyncCompletedAt: "2026-07-11T10:00:00.000Z" },
@@ -50,6 +51,7 @@ test("context packet is bounded, data-led, and includes the minimal recommendati
   const packet = buildLlmContextPacket(summary).contextPacketText;
   assert.match(packet, /Maintain upper day/);
   assert.match(packet, /Recovery: 76%/);
+  assert.match(packet, /Snapshot: 2026-07-11/);
   assert.match(packet, /Lats 8 sets/);
   assert.ok(packet.includes(LLM_QUESTION_PLACEHOLDER));
   assert.doesNotMatch(packet, /2450|meal entr|protein floor|calorie target/i);
