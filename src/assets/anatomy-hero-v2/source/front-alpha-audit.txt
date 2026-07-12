@@ -1,0 +1,12 @@
+interactive_layers=19
+mounted_visual_layers=20
+source_candidate_overlap_pixels=499
+interactive_overlap_pixels=0
+base_interactive_overlap_pixels=0
+reconstruction_error_pixels=0
+hit_path_area_error_pixels=0
+encoded_interactive_overlap_pixels=0
+encoded_base_interactive_overlap_pixels=0
+encoded_reconstruction_error_pixels=0
+output_asset_count=20
+output_asset_bytes=330410

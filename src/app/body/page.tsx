@@ -1,8 +1,6 @@
 import Link from "next/link";
 
-import {
-  renderAnatomyFigureImageLayers,
-} from "@/components/anatomy-figure";
+import { renderAnatomyFigureImageLayers } from "@/components/anatomy-figure-export";
 import { TrainingMap } from "@/components/training-map";
 import {
   ANATOMY_QA_REGIONS,
@@ -14,6 +12,7 @@ import {
   isAnatomyQaRegion,
 } from "@/lib/anatomy-qa";
 import { getDailySummary } from "@/lib/insights/engine";
+import { anatomyRegionView } from "@/lib/anatomy-regions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,6 +35,7 @@ export default async function BodyPage({ searchParams }: BodyPageProps) {
     : null;
   const showIsolatedScan = isolatedRegion !== null && resolvedSearchParams.scan === "1";
   const staticPreview = resolvedSearchParams.render === "static";
+  const backArtworkPending = isolatedRegion !== null && anatomyRegionView(isolatedRegion) === "back";
 
   const weeklyHighlights = isolatedRegion
     ? [anatomyQaHighlight(isolatedRegion)]
@@ -57,7 +57,7 @@ export default async function BodyPage({ searchParams }: BodyPageProps) {
         weeklyHighlights,
         latestHighlights,
         className: "precision-static-export",
-        motionMode: "static",
+        view: backArtworkPending ? "back" : "front",
       })
     : [];
 
@@ -110,10 +110,14 @@ export default async function BodyPage({ searchParams }: BodyPageProps) {
                 <div className="aqua-tank-stage relative flex h-[330px] items-center justify-center overflow-hidden border border-[#39f8ff]/45 bg-[#010711] sm:h-[460px] lg:h-[500px]">
                   <div className="aqua-tank-lid pointer-events-none absolute inset-x-4 top-8 h-10 rounded-[50%] border border-[#8ffcff]/45" />
                   <div className="aqua-tank-floor pointer-events-none absolute inset-x-4 bottom-1 h-20 rounded-[50%] border border-[#39f8ff]/48" />
-                  {staticLayers.map((layer, index) => (
+                  {backArtworkPending ? (
+                    <p className="relative z-[2] max-w-xs text-center text-sm text-white/70">
+                      Premium back artwork is the next anatomy asset pass. Canonical region data remains available for QA.
+                    </p>
+                  ) : staticLayers.map((layer, index) => (
                     <div
                       key={`static-anatomy-layer-${index}`}
-                      className="relative z-[1] h-full w-auto max-w-full aspect-[1240/1040]"
+                      className="relative z-[1] h-full w-auto max-w-full aspect-[2/3]"
                       style={{ filter: layer.filter, opacity: layer.opacity }}
                       dangerouslySetInnerHTML={{ __html: layer.svg }}
                     />
@@ -128,7 +132,7 @@ export default async function BodyPage({ searchParams }: BodyPageProps) {
               weeklyVolume={weeklyVolume}
               latestWorkout={
                 isolatedRegion
-                  ? `Isolated plate: ${isolatedRegion}`
+                  ? `${backArtworkPending ? "Back artwork pending" : "Isolated layer"}: ${isolatedRegion}`
                   : anatomyDebug
                     ? "QA: powered back + arms"
                     : summary.bodyCard.latestWorkoutName ?? "No latest workout"

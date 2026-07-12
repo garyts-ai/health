@@ -1,5 +1,4 @@
-import { AnatomyProfileSwitcher } from "@/components/anatomy-profile-switcher";
-import { anatomyRegionView } from "@/lib/anatomy-regions";
+import { AnatomyFigure } from "@/components/anatomy-figure";
 import type { BodyHighlight } from "@/lib/insights/types";
 
 type WeeklyVolume = {
@@ -41,21 +40,9 @@ export async function TrainingMap({
   const hasLatestOverlay = latestHighlights.length > 0;
   const hasActiveRegions = hasWeeklyExposure || hasLatestOverlay;
   const visibleVolume = weeklyVolume.slice(0, variant === "preview" ? 4 : 7);
-  const backLatestCount = latestHighlights.filter(
-    (highlight) => anatomyRegionView(highlight.regionId) === "back",
-  ).length;
-  const defaultView = backLatestCount > latestHighlights.length / 2 ? "back" : "front";
   const statusLine = hasWeeklyExposure
     ? `${typeof workoutCount === "number" ? `${workoutCount} lifts` : "Monday–Sunday"} · latest ${latestSessionAge ?? "session"}`
     : "Waiting for this week’s first lift";
-
-  const figureProps = {
-    weeklyHighlights,
-    latestHighlights,
-    motionMode: hasActiveRegions ? "charged" as const : "static" as const,
-    className: "training-profile-figure",
-    preload: variant === "profile",
-  };
 
   return (
     <section
@@ -69,16 +56,18 @@ export async function TrainingMap({
           <h2 id="training-profile-title">Training core / profile</h2>
           <p>{statusLine}</p>
         </div>
-        <span className="training-profile__online">
-          {hasActiveRegions ? "Online" : "Standby"}
-        </span>
+        <span className="training-profile__online">{hasActiveRegions ? "Online" : "Standby"}</span>
       </header>
 
       <div className="training-profile__visual">
         <div className="training-profile__rings" aria-hidden="true" />
-        <AnatomyProfileSwitcher
-          defaultView={defaultView}
-          figureProps={figureProps}
+        <AnatomyFigure
+          weeklyHighlights={weeklyHighlights}
+          latestHighlights={latestHighlights}
+          motionMode={hasActiveRegions ? "charged" : "static"}
+          className="training-profile-figure"
+          preload={variant === "profile"}
+          view="front"
         />
       </div>
 
@@ -109,9 +98,7 @@ export async function TrainingMap({
               </div>
             ))}
           </dl>
-        ) : (
-          <p className="training-profile__empty">{emptyMessage}</p>
-        )}
+        ) : <p className="training-profile__empty">{emptyMessage}</p>}
       </div>
     </section>
   );

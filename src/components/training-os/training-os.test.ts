@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { regionsForWeeklyMuscleGroup } from "@/lib/insights/body-map";
 import type { BodyHighlight } from "@/lib/insights/types";
-import { bestRegionForView, defaultAnatomyView, visibleCalloutRegions } from "./anatomy-viewer-model";
+import { bestFrontRegion, defaultAnatomyView, projectedHeroCallout, regionsForTrainingTarget, visibleCalloutRegions } from "./anatomy-viewer-model";
 import { bestTelemetryIndex, chartSummary, formatInstrumentValue, indexFromPointer, nextTelemetryIndex, resolveTelemetryIndex } from "./telemetry-model";
 import { mapTodayTelemetry } from "./today-telemetry";
 
@@ -76,8 +76,20 @@ test("maps weekly muscle groups to canonical regions", () => {
 test("chooses anatomy defaults and active regions deterministically", () => {
   const weekly: BodyHighlight[] = [{ regionId: "chest", intensity: "medium" }, { regionId: "lats", intensity: "high" }];
   const latest: BodyHighlight[] = [{ regionId: "triceps", intensity: "high" }];
-  assert.equal(defaultAnatomyView(weekly, latest), "back");
-  assert.equal(bestRegionForView("back", weekly, latest), "triceps");
-  assert.equal(bestRegionForView("front", weekly, latest), "chest");
-  assert.deepEqual(visibleCalloutRegions("back", weekly, latest), ["triceps", "lats"]);
+  assert.equal(defaultAnatomyView(), "front");
+  assert.equal(bestFrontRegion(weekly, latest), "triceps");
+  assert.deepEqual(visibleCalloutRegions(weekly, latest), ["triceps", "chest", "lats"]);
+});
+
+test("maps deterministic Today targets without changing health contracts", () => {
+  assert.deepEqual(regionsForTrainingTarget("Upper", "Train"), ["chest", "frontDelts", "sideDelts", "biceps", "triceps", "forearms", "lats"]);
+  assert.deepEqual(regionsForTrainingTarget("Lower", "Train"), ["quads", "adductors", "calves"]);
+  assert.deepEqual(regionsForTrainingTarget("Either", "Train"), []);
+  assert.deepEqual(regionsForTrainingTarget("Upper", "Rest"), []);
+});
+
+test("projects callouts from the illustrated asset geometry", () => {
+  const fullBody = projectedHeroCallout("chest");
+  assert.ok(fullBody.xPercent > 0 && fullBody.xPercent < 100);
+  assert.ok(fullBody.yPercent > 0 && fullBody.yPercent < 100);
 });

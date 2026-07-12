@@ -7,7 +7,7 @@ These primitives power the connected Today composition and are the migration tar
 - `PageHero` composes prescription, anatomy instrument, status, and telemetry without widening the client boundary.
 - `GlassPanel` exposes `base`, `raised`, and `overlay`; only overlay may blur.
 - `MetricInstrument` and `DataRail` render real values, progress, and null-preserving line/bar series in one continuous surface.
-- `AnatomyViewer` links accessible callout and muscle-volume controls to the existing `aria-hidden` anatomy figure.
+- `AnatomyViewer` links accessible callout and muscle-volume controls to the illustrated, real-layer `aria-hidden` anatomy hero.
 - `MuscleVolumeRow` consumes explicit canonical regions from the body-map mapper.
 - `EvidenceDrawer` opens a controlled native disclosure and moves focus to the revealed evidence.
 - `PageTransition` is visible by default and uses CSS-only entry/target feedback with a static reduced-motion mode.
@@ -18,4 +18,4 @@ These primitives power the connected Today composition and are the migration tar
 - WHOOP: use `AppShell`, surface levels, and instruments while retaining the dedicated accessible chart interaction and full-data calculations.
 - Utilities: replace legacy premium wrappers with the three surface levels while retaining native forms, feedback, endpoints, and protected actions.
 
-Exact next step: migrate Weekly's summary and muscle-volume area to `DataRail` and `MuscleVolumeRow`, leaving the day-ledger logic and data unchanged.
+Exact next anatomy step: build the matching premium back-layer pack for rear delts, upper back, traps, glutes, and hamstrings with the same exclusive-mask, hit-path, energy, and assembly contracts. Weekly's broader Training-OS migration remains a separate task.
