@@ -7,6 +7,11 @@ import {
 } from "@/lib/whoop-export/importer";
 
 export const WHOOP_EXPORT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const WHOOP_EXPORT_MAX_ENTRIES = 128;
+export const WHOOP_EXPORT_MAX_ENTRY_BYTES = 16 * 1024 * 1024;
+export const WHOOP_EXPORT_MAX_EXPANDED_BYTES = 64 * 1024 * 1024;
+export const WHOOP_EXPORT_MAX_COMPRESSION_RATIO = 100;
+export const WHOOP_EXPORT_MAX_PROCESSING_MS = 5_000;
 
 export class WhoopExportUploadError extends Error {
   constructor(message: string) {
@@ -42,6 +47,30 @@ export async function validateWhoopExportZip(buffer: Buffer, sourceName: string)
     zip = await JSZip.loadAsync(buffer);
   } catch {
     throw new WhoopExportUploadError("The uploaded file is not a readable ZIP archive.");
+  }
+
+  const entries = Object.values(zip.files).filter((entry) => !entry.dir);
+  if (entries.length > WHOOP_EXPORT_MAX_ENTRIES) {
+    throw new WhoopExportUploadError("The WHOOP export contains too many archive entries.");
+  }
+  const startedAt = Date.now();
+  let expandedBytes = 0;
+  for (const entry of entries) {
+    const bytes = await entry.async("uint8array");
+    if (bytes.byteLength > WHOOP_EXPORT_MAX_ENTRY_BYTES) {
+      throw new WhoopExportUploadError("A WHOOP export archive entry is too large.");
+    }
+    expandedBytes += bytes.byteLength;
+    if (expandedBytes > WHOOP_EXPORT_MAX_EXPANDED_BYTES) {
+      throw new WhoopExportUploadError("The expanded WHOOP export is larger than the processing limit.");
+    }
+    const compressedSize = (entry as unknown as { _data?: { compressedSize?: number } })._data?.compressedSize;
+    if (typeof compressedSize === "number" && (compressedSize === 0 ? bytes.byteLength > 0 : bytes.byteLength / compressedSize > WHOOP_EXPORT_MAX_COMPRESSION_RATIO)) {
+      throw new WhoopExportUploadError("The WHOOP export compression ratio is unsafe.");
+    }
+    if (Date.now() - startedAt > WHOOP_EXPORT_MAX_PROCESSING_MS) {
+      throw new WhoopExportUploadError("The WHOOP export took too long to process.");
+    }
   }
 
   const missing = REQUIRED_WHOOP_EXPORT_FILES.filter((name) => !zip.file(name));

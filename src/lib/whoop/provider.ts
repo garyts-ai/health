@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { dbAll, dbGet, dbInsert, dbRun } from "@/lib/db";
 import { getWhoopEnv, hasWhoopEnv } from "@/lib/env";
+import { createSingleFlight } from "@/lib/single-flight";
 import {
   WHOOP_API_BASE_URL,
   WHOOP_AUTH_URL,
@@ -37,6 +38,8 @@ type WhoopTokenPayload = {
 
 const STATE_COOKIE_NAME = "whoop_oauth_state";
 const STALE_SYNC_MS = 1000 * 60 * 60 * 18;
+const MAX_RETRY_AFTER_MS = 5_000;
+const refreshSingleFlight = createSingleFlight<string>();
 
 function nowIso() {
   return new Date().toISOString();
@@ -69,9 +72,30 @@ function buildWhoopAuthUrl(state: string) {
   return url.toString();
 }
 
+export function parseRetryAfterMilliseconds(value: string | null, now = Date.now()) {
+  if (!value) return 0;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.min(MAX_RETRY_AFTER_MS, Math.max(0, seconds * 1_000));
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.min(MAX_RETRY_AFTER_MS, Math.max(0, timestamp - now)) : 0;
+}
+
+function retryAfterMilliseconds(response: Response) {
+  return parseRetryAfterMilliseconds(response.headers.get("retry-after"));
+}
+
+async function fetchWithRetryAfter(input: RequestInfo | URL, init?: RequestInit) {
+  let response = await fetch(input, init);
+  if (response.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, retryAfterMilliseconds(response)));
+    response = await fetch(input, init);
+  }
+  return response;
+}
+
 async function exchangeCodeForToken(code: string) {
   const whoopEnv = getWhoopEnv();
-  const response = await fetch(WHOOP_TOKEN_URL, {
+  const response = await fetchWithRetryAfter(WHOOP_TOKEN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -95,7 +119,7 @@ async function exchangeCodeForToken(code: string) {
 
 async function refreshAccessToken(refreshToken: string) {
   const whoopEnv = getWhoopEnv();
-  const response = await fetch(WHOOP_TOKEN_URL, {
+  const response = await fetchWithRetryAfter(WHOOP_TOKEN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -155,7 +179,7 @@ async function saveTokenPayload(payload: WhoopTokenPayload) {
     "connected",
     existing?.user_id ?? null,
     existing?.email ?? null,
-    payload.scope ?? WHOOP_SCOPE_STRING,
+    payload.scope ?? "",
     payload.token_type ?? "Bearer",
     payload.access_token,
     payload.refresh_token ?? null,
@@ -182,7 +206,7 @@ async function fetchWhoopCollection<T extends Record<string, unknown>>(
     url.searchParams.set("start", new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString());
     if (nextToken) url.searchParams.set("nextToken", nextToken);
 
-    const response = await fetch(url, {
+    const response = await fetchWithRetryAfter(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: "no-store",
     });
@@ -205,7 +229,7 @@ async function fetchWhoopCollection<T extends Record<string, unknown>>(
 }
 
 async function fetchWhoopProfile(accessToken: string, retryOnUnauthorized = true) {
-  const response = await fetch(`${WHOOP_API_BASE_URL}/user/profile/basic`, {
+  const response = await fetchWithRetryAfter(`${WHOOP_API_BASE_URL}/user/profile/basic`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -228,7 +252,7 @@ async function fetchWhoopProfile(accessToken: string, retryOnUnauthorized = true
 }
 
 async function fetchWhoopBodyMeasurement(accessToken: string, retryOnUnauthorized = true) {
-  const response = await fetch(`${WHOOP_API_BASE_URL}/user/measurement/body`, {
+  const response = await fetchWithRetryAfter(`${WHOOP_API_BASE_URL}/user/measurement/body`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -281,13 +305,14 @@ async function ensureValidAccessToken(forceRefresh = false) {
     return connection.access_token;
   }
 
-  const refreshed = await refreshAccessToken(connection.refresh_token);
-  await saveTokenPayload({
-    ...refreshed,
-    refresh_token: refreshed.refresh_token ?? connection.refresh_token,
+  return refreshSingleFlight(async () => {
+    const refreshed = await refreshAccessToken(connection.refresh_token!);
+    await saveTokenPayload({
+      ...refreshed,
+      refresh_token: refreshed.refresh_token ?? connection.refresh_token ?? undefined,
+    });
+    return refreshed.access_token;
   });
-
-  return refreshed.access_token;
 }
 
 async function markSyncStarted() {
@@ -848,6 +873,7 @@ export async function getWhoopConnectionStatus(): Promise<WhoopConnectionStatus>
     connected: isConfigured && row?.status === "connected",
     isConfigured,
     status: isConfigured ? row?.status ?? "disconnected" : "not_configured",
+    scopes: getScopesFromString(row?.scopes ?? null),
     hasOfflineAccess: getScopesFromString(row?.scopes ?? null).includes("offline"),
     userId: row?.user_id === null || row?.user_id === undefined ? null : Number(row.user_id),
     email: row?.email ?? null,
