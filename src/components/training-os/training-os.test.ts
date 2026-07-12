@@ -74,8 +74,13 @@ test("maps weekly muscle groups to canonical regions", () => {
 });
 
 test("chooses anatomy defaults and active regions deterministically", () => {
-  const weekly: BodyHighlight[] = [{ regionId: "chest", intensity: "medium" }, { regionId: "lats", intensity: "high" }];
-  const latest: BodyHighlight[] = [{ regionId: "triceps", intensity: "high" }];
+  const weekly: BodyHighlight[] = [
+    { regionId: "chest", intensity: "medium", view: "front" },
+    { regionId: "lats", intensity: "high", view: "back" },
+  ];
+  const latest: BodyHighlight[] = [
+    { regionId: "triceps", intensity: "high", view: "back" },
+  ];
   assert.equal(defaultAnatomyView(), "front");
   assert.equal(bestFrontRegion(weekly, latest), "triceps");
   assert.deepEqual(visibleCalloutRegions(weekly, latest), ["triceps", "chest", "lats"]);
