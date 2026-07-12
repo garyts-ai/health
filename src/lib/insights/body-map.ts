@@ -247,6 +247,12 @@ const WEEKLY_GROUP_REGIONS: Record<WeeklyMuscleGroup, BodyRegionId[]> = {
   "Abs / obliques": ["abs", "obliques"],
 };
 
+export function regionsForWeeklyMuscleGroup(label: string): BodyRegionId[] {
+  return label in WEEKLY_GROUP_REGIONS
+    ? [...WEEKLY_GROUP_REGIONS[label as WeeklyMuscleGroup]]
+    : [];
+}
+
 function getExerciseEntries(rawJson: string) {
   try {
     const parsed = JSON.parse(rawJson) as HevyWorkoutShape;

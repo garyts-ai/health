@@ -104,7 +104,7 @@ NEXTAUTH_URL=https://healthmax-two.vercel.app
 AUTH_TRUST_HOST=true
 ```
 
-## 6. Add WHOOP, Hevy, And Discord Variables
+## 6. Add WHOOP And Hevy Variables
 
 Add these in Vercel:
 
@@ -113,7 +113,6 @@ WHOOP_CLIENT_ID=...
 WHOOP_CLIENT_SECRET=...
 WHOOP_REDIRECT_URI=https://healthmax-two.vercel.app/api/auth/whoop/callback
 HEVY_API_KEY=...
-DISCORD_WEBHOOK_URL=...
 ```
 
 Then update the WHOOP developer app redirect URI to exactly match:
@@ -150,7 +149,7 @@ The script reads:
 data/health-dashboard.sqlite
 ```
 
-It migrates provider tokens, WHOOP records, Hevy workouts, nutrition targets/intake, and Discord delivery history.
+It migrates provider tokens, WHOOP records, Hevy workouts, and preserved legacy nutrition history. Nutrition history is retained for data compatibility but is not loaded or exposed by the product.
 
 ## 9. Verify The Deployed App
 
@@ -161,9 +160,8 @@ Open the Vercel URL on desktop first:
 3. Open Utilities.
 4. Sync WHOOP.
 5. Sync Hevy.
-6. Add a test nutrition entry.
-7. Refresh and confirm it persists.
-8. Send or preview the Discord/LLM handoff.
+6. Copy the LLM context packet and confirm it contains current training and recovery data.
+7. Paste it into a text editor and verify the optional goal replaces the packet placeholder.
 
 Then open the same Vercel URL on iPhone Safari and use Share -> Add to Home Screen.
 

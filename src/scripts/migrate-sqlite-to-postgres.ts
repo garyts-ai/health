@@ -14,7 +14,6 @@ const TABLES = [
   "whoop_workouts",
   "hevy_sync_runs",
   "hevy_workouts",
-  "discord_delivery_runs",
   "nutrition_targets",
   "nutrition_intake_entries",
 ] as const;

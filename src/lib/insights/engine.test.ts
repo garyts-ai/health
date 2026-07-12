@@ -8,12 +8,9 @@ import {
   classifyWhoopActivity,
   inferBuckets,
 } from "@/lib/insights/engine";
-import type { CancunCampaign } from "@/lib/insights/nutrition-campaign";
 import type {
   DailyActivityContext,
   DailyLateNightDisruption,
-  DailyNutritionActuals,
-  DailyNutritionTargets,
   DailyReadiness,
   DailyStressFlags,
   DailyTrainingLoad,
@@ -47,6 +44,7 @@ function makeReadiness(overrides: Partial<DailyReadiness> = {}): DailyReadiness 
     restingHeartRateVs7d: 0,
     hrvRmssd: 70,
     hrvVs7d: 0,
+    spo2Percentage: 98,
     respiratoryRate: 15,
     respiratoryRateVs7d: 0,
     skinTempCelsius: 0,
@@ -107,7 +105,7 @@ function makeLateNight(
     active: false,
     severity: "low",
     confidence: "low",
-    likelyLane: "none",
+    likelyLane: "normal",
     headline: "No late-night disruption",
     blurb: "Sleep and physiology do not suggest a major overnight disruption.",
     supportingMetrics: [],
@@ -134,55 +132,6 @@ function makeActivityContext(overrides: Partial<DailyActivityContext> = {}): Dai
     ...overrides,
   };
 }
-
-const nutritionTargets: DailyNutritionTargets = {
-  calorieTarget: 2450,
-  proteinTargetG: 160,
-  effectiveCalorieTarget: 2450,
-  effectiveProteinTargetG: 160,
-  smartCalorieTarget: 2450,
-  smartProteinTargetG: 160,
-  targetSource: "smart",
-  smartReason: "Smart target from body weight and training goal.",
-  updatedAt: null,
-  campaign: {
-    active: false,
-    name: "Cancun wedding cut",
-    phase: "inactive",
-    endDate: "2026-07-17",
-    daysRemaining: 0,
-    proteinTargetG: 160,
-    proteinMinimumG: 140,
-    averageCalorieTarget: null,
-    trainingDayCalorieTarget: null,
-    restDayCalorieTarget: null,
-    dayType: "rest",
-    qualifiedLossRateLbPerWeek: null,
-    currentAverageWeightLb: null,
-    previousAverageWeightLb: null,
-    currentWindowCount: 0,
-    previousWindowCount: 0,
-    goalRangeStableDays: 0,
-    calorieAdjustment: 0,
-    evidence: "",
-    plateauCue: null,
-    finalWeek: false,
-  } satisfies CancunCampaign,
-};
-
-const nutritionActuals: DailyNutritionActuals = {
-  dateKey: "2026-04-27",
-  calories: 0,
-  proteinG: 0,
-  carbsG: 0,
-  fatG: 0,
-  remainingCalories: 2450,
-  remainingProteinG: 160,
-  calorieTarget: 2450,
-  proteinTargetG: 160,
-  hasLoggedIntake: false,
-  entries: [],
-};
 
 test("readiness fixture defaults to supportive recovery", () => {
   const readiness = makeReadiness();
@@ -354,8 +303,6 @@ test("physique decision rests on poor recovery when the weekly goal is still rea
     makeStressFlags({ lowRecovery: true, poorSleepTrend: true, elevatedRestingHeartRate: true }),
     makeLateNight({ active: true, severity: "medium", confidence: "medium", likelyLane: "hangover_like" }),
     makeActivityContext(),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-04-27T14:00:00.000Z"),
   );
@@ -377,8 +324,6 @@ test("physique decision trains with a back-off intent when poor recovery meets s
     makeStressFlags({ lowRecovery: true, poorSleepTrend: true }),
     makeLateNight({ active: true, severity: "medium", confidence: "medium", likelyLane: "hangover_like" }),
     makeActivityContext(),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-05-02T14:00:00.000Z"),
   );
@@ -396,8 +341,6 @@ test("physique decision rests for illness-like physiology regardless of weekly p
     makeStressFlags({ illnessRisk: true }),
     makeLateNight({ active: true, severity: "high", confidence: "high", likelyLane: "illness_like" }),
     makeActivityContext(),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-05-02T14:00:00.000Z"),
   );
@@ -417,8 +360,6 @@ test("physique decision pushes when readiness is good and the 4x target is behin
     makeStressFlags(),
     makeLateNight(),
     makeActivityContext(),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-05-02T14:00:00.000Z"),
   );
@@ -440,8 +381,6 @@ test("physique decision maintains when readiness is good and the week is on pace
     makeStressFlags(),
     makeLateNight(),
     makeActivityContext(),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-04-29T14:00:00.000Z"),
   );
@@ -474,8 +413,6 @@ test("physique decision rests when high current-week tennis load combines with p
         distanceMeter: null,
       },
     }),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-04-27T14:00:00.000Z"),
   );
@@ -508,8 +445,6 @@ test("physique decision ignores previous-week fallback activity for today's fati
         distanceMeter: null,
       },
     }),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-04-27T14:00:00.000Z"),
   );
@@ -566,8 +501,6 @@ test("strong recovery plus walking strain does not become a systemic rest recomm
         distanceMeter: 1600,
       },
     }),
-    nutritionTargets,
-    nutritionActuals,
     [],
     new Date("2026-06-25T14:00:00.000Z"),
   );

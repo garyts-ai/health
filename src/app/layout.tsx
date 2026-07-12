@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Big_Shoulders, Geist_Mono, Manrope } from "next/font/google";
+import "./training-os-tokens.css";
 import "./globals.css";
 import "./district.css";
 
@@ -23,7 +24,7 @@ const bigShoulders = Big_Shoulders({
 export const metadata: Metadata = {
   title: "HealthMaxer — Neon Training District",
   description:
-    "A private health command center that blends WHOOP and Hevy into daily decisions, trends, and delivery tools.",
+    "A private training and recovery dashboard that blends WHOOP and Hevy into daily decisions, interactive trends, and a portable context packet.",
   applicationName: "HealthMaxer",
   appleWebApp: {
     capable: true,

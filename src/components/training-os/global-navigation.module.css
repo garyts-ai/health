@@ -1,0 +1,7 @@
+.nav { display: flex; justify-content: center; min-width: 0; }
+.link { position: relative; display: inline-flex; min-height: 44px; align-items: center; padding-inline: 16px; color: var(--os-text-secondary); font-size: .78rem; font-weight: 650; text-decoration: none; transition: color var(--os-duration-fast) ease; }
+.link::after { position: absolute; right: 16px; bottom: -12px; left: 16px; height: 1px; content: ""; background: var(--os-signal-current); transform: scaleX(0); transform-origin: left; transition: transform var(--os-duration-fast) var(--os-ease-out); }
+.link:hover, .link[data-active="true"] { color: var(--os-text-primary); }
+.link[data-active="true"]::after { transform: scaleX(1); }
+@media (max-width: 680px) { .link { padding-inline: 10px; font-size: .7rem; } .link::after { right: 10px; left: 10px; } }
+@media (max-width: 560px) { .nav { width: 100%; } .link { min-width: 0; flex: 1 1 0; justify-content: center; padding-inline: 2px; font-size: .64rem; } .link::after { right: 4px; bottom: 0; left: 4px; } }

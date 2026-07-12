@@ -14,6 +14,7 @@ export type AnatomyFigureProps = {
   motionMode?: "static" | "charged";
   preload?: boolean;
   view?: "front" | "back" | "both";
+  activeRegionId?: BodyRegionId | null;
 };
 
 export type AnatomyFigureImageLayer = {
@@ -304,6 +305,7 @@ export function AnatomyFigure({
   motionMode = "charged",
   preload = false,
   view = "both",
+  activeRegionId = null,
 }: AnatomyFigureProps) {
   const effectiveWeeklyHighlights = weeklyHighlights ?? highlights;
   const resolvedWeeklyRegions = resolveRegionHighlights(effectiveWeeklyHighlights);
@@ -407,6 +409,8 @@ export function AnatomyFigure({
                 className="precision-dormant-plate"
                 d={path}
                 data-region-id={regionId}
+                data-inspected={activeRegionId === regionId || undefined}
+                data-muted={activeRegionId !== null && activeRegionId !== regionId || undefined}
               />
             )),
           )}
@@ -431,6 +435,8 @@ export function AnatomyFigure({
                     className={`precision-plate-halo precision-plate-${intensity}`}
                     d={path}
                     data-region-id={regionId}
+                    data-inspected={activeRegionId === regionId || undefined}
+                    data-muted={activeRegionId !== null && activeRegionId !== regionId || undefined}
                     style={style}
                   />
                   <path
@@ -438,6 +444,8 @@ export function AnatomyFigure({
                     d={path}
                     data-region-id={regionId}
                     data-intensity={intensity}
+                    data-inspected={activeRegionId === regionId || undefined}
+                    data-muted={activeRegionId !== null && activeRegionId !== regionId || undefined}
                     style={style}
                   />
                   <path
@@ -445,6 +453,8 @@ export function AnatomyFigure({
                     d={path}
                     pathLength="1"
                     data-region-id={regionId}
+                    data-inspected={activeRegionId === regionId || undefined}
+                    data-muted={activeRegionId !== null && activeRegionId !== regionId || undefined}
                     style={style}
                   />
                 </Fragment>
@@ -472,12 +482,16 @@ export function AnatomyFigure({
                     className="precision-latest-halo"
                     d={path}
                     data-region-id={regionId}
+                    data-inspected={activeRegionId === regionId || undefined}
+                    data-muted={activeRegionId !== null && activeRegionId !== regionId || undefined}
                     style={style}
                   />
                   <path
                     className="precision-plate precision-plate-latest"
                     d={path}
                     data-region-id={regionId}
+                    data-inspected={activeRegionId === regionId || undefined}
+                    data-muted={activeRegionId !== null && activeRegionId !== regionId || undefined}
                     style={style}
                   />
                   <path
@@ -485,6 +499,8 @@ export function AnatomyFigure({
                     d={path}
                     pathLength="1"
                     data-region-id={regionId}
+                    data-inspected={activeRegionId === regionId || undefined}
+                    data-muted={activeRegionId !== null && activeRegionId !== regionId || undefined}
                     style={style}
                   />
                 </Fragment>

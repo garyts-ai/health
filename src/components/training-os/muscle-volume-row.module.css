@@ -1,0 +1,11 @@
+.row { --tone: var(--os-signal-volume-low); display: grid; grid-template-columns: minmax(110px,1fr) minmax(120px,1.8fr) auto; width: 100%; min-height: 44px; align-items: center; gap: 12px; border: 0; border-top: 1px solid var(--os-line-subtle); background: transparent; padding: 6px 4px; color: var(--os-text-secondary); text-align: left; cursor: pointer; transition: color var(--os-duration-fast),background var(--os-duration-fast); }
+.row[data-intensity="medium"] { --tone: var(--os-signal-caution); }
+.row[data-intensity="high"] { --tone: var(--os-signal-emphasis); }
+.row:hover,.row:focus-visible,.row[data-active="true"] { color: var(--os-text-primary); background: color-mix(in srgb,var(--tone) 7%,transparent); }
+.row:focus-visible { outline: 0; box-shadow: inset 3px 0 var(--tone); }
+.label { font-size: .72rem; }
+.segments { display: flex; gap: 2px; }
+.segments i { height: 6px; flex: 1; background: var(--os-line-subtle); }
+.segments i[data-filled="true"] { background: var(--tone); }
+.value { color: var(--os-text-primary); font: .66rem var(--font-geist-mono),monospace; white-space: nowrap; }
+@media (max-width: 520px) { .row { grid-template-columns: 1fr auto; } .segments { grid-column: 1/-1; grid-row: 2; } }

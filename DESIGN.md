@@ -34,10 +34,11 @@ Nightmarket informs the restrained rain, light activation, and visibility-pausin
 ## Composition
 
 - A sticky four-tab rail maps directly to `#today`, `#weekly`, `#whoop`, and `#utilities`.
-- Today fills at least `100svh` and uses a 58/42 decision-to-anatomy split on desktop.
+- Today fills at least `100svh` and uses a connected 44/56 prescription-to-anatomy split on desktop.
 - Mobile puts the full decision first and begins the anatomy instrument immediately afterward.
 - Weekly is seven aligned columns on desktop and a complete vertical timeline on narrow screens.
 - WHOOP and Utilities use ruled sections and field groupings, not floating card grids.
+- Today ends with one continuous three-column telemetry rail for Recovery, Sleep, and Strain; no nutrition instruments appear in the product UI.
 
 ## Type
 
@@ -64,6 +65,8 @@ Use 2–6px corners, thin rules, inset plates, a subtle scan texture, and a mask
 
 The visible-by-default hero ignition and anatomy activation finish within 500ms and never flash. Standard hover, focus, disclosure, and tab feedback completes within 250ms using transform or opacity. `prefers-reduced-motion: reduce` produces a fully static interface. Ambient rain pauses while the document is hidden.
 
+The Today telemetry rail has one shared interaction state. Pointer, touch, and keyboard input scrub the same seven-day index across all three charts, with a visible exact-date readout and explicit null states. Charts never autoplay or interpolate missing observations.
+
 ## Accessibility
 
 Every section has a landmark and heading. Anchor targets account for the sticky rail. Current navigation exposes `aria-current="location"`; manual scrolling uses history replacement while deliberate tab clicks create history entries. Focus is visible, touch targets are at least 44px, charts expose one keyboard interaction with a current-point readout, and all detail remains available at 200% zoom.
@@ -71,3 +74,11 @@ Every section has a landmark and heading. Anchor targets account for the sticky 
 ## Performance
 
 The aquarium background is absent from the rendered experience. Anatomy images have fixed geometry, animations avoid global `will-change`, trend rendering is capped at 120 visual points, and the full data series remains available for calculation. WHOOP analysis streams below a stable section shell so Today is not blocked.
+
+## Training-OS primitives
+
+The reusable foundation lives in `src/components/training-os/`. Global semantic values live in `src/app/training-os-tokens.css`; component layout and states remain in CSS Modules. `AppShell`, `GlobalNavigation`, `PageHero`, `GlassPanel`, `MetricInstrument`, `DataRail`, `AnatomyViewer`, `MuscleVolumeRow`, `EvidenceDrawer`, and `PageTransition` are the shared contracts. Today uses the three semantic surface levels (base, raised, and overlay), with localized blur permitted only on overlay.
+
+Today's anatomy callouts and volume rows share hover, focus, and pinned state; Escape clears inspection. Utilities contains only provider connections and the compact LLM context packet. The packet is visually secondary to the dashboard and never presents external-model advice as app-authored evidence.
+
+The next implementation step is to migrate Weekly's summary and muscle-volume area to `DataRail` and `MuscleVolumeRow`, leaving the day-ledger logic and data unchanged.

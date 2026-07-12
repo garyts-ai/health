@@ -1,0 +1,5 @@
+.container { position: relative; z-index: 2; width: min(1440px,calc(100% - 48px)); margin-inline: auto; }
+.today { min-height: 100svh; border-top: 0; padding: 0; }
+.scrollCue { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; color: var(--os-text-secondary); font: .68rem var(--font-geist-mono),monospace; text-decoration: none; }
+.scrollCue:hover { color: var(--os-signal-current); }
+@media (max-width:780px) { .container { width: min(100% - 24px,1440px); } }

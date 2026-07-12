@@ -1,14 +1,9 @@
 import type {
   DailyStressFlags,
   DailySummary,
-  DiscordDeliveryStatus,
 } from "@/lib/insights/types";
-
-type ProviderStatus = {
-  connected: boolean;
-  isStale: boolean;
-  lastSyncCompletedAt?: string | null;
-};
+import { regionsForWeeklyMuscleGroup } from "@/lib/insights/body-map";
+import { mapTodayTelemetry } from "@/components/training-os/today-telemetry";
 
 const ACTIVE_SIGNAL_LABELS: Array<{
   key: keyof DailyStressFlags;
@@ -36,10 +31,6 @@ function formatPercent(value: number | null) {
 
 function formatPoundsValue(value: number | null) {
   return value === null ? "--" : `${value.toFixed(1)} lb`;
-}
-
-function formatMacroGrams(value: number) {
-  return `${Math.round(value)}g`;
 }
 
 function formatMinutes(value: number) {
@@ -239,33 +230,8 @@ function buildReadinessQualifier(summary: DailySummary) {
   return "Split recency is the main constraint detected today; no systemic rest trigger was met.";
 }
 
-function getUtilityStatusLabel(
-  whoop: ProviderStatus,
-  hevy: ProviderStatus,
-  delivery: DiscordDeliveryStatus,
-) {
-  const providerIssues = [whoop, hevy].filter((status) => !status.connected || status.isStale).length;
-
-  if (providerIssues === 0 && delivery.today.hasSuccessfulSend) {
-    return "Connections healthy, Discord delivered";
-  }
-
-  if (providerIssues === 0) {
-    return "Connections healthy, Discord ready";
-  }
-
-  if (providerIssues === 1) {
-    return "One connection needs attention";
-  }
-
-  return "Connections need attention";
-}
-
 export function buildTodayViewModel(
   summary: DailySummary,
-  whoop: ProviderStatus,
-  hevy: ProviderStatus,
-  delivery: DiscordDeliveryStatus,
 ) {
   const recentDateLabels = buildRecentDateLabels(summary.date);
   const hasWeeklyTraining = summary.trainingLoad.weeklyMuscleFocus.length > 0;
@@ -288,7 +254,6 @@ export function buildTodayViewModel(
     header: {
       productName: "Health OS",
       dateLabel: formatDate(summary.date),
-      utilityLabel: getUtilityStatusLabel(whoop, hevy, delivery),
       freshnessNotice: buildFreshnessNotice(summary),
     },
     hero: {
@@ -305,21 +270,6 @@ export function buildTodayViewModel(
           summary.physiqueDecision.trainingIntent === "Push"
             ? "Progress"
             : summary.physiqueDecision.trainingIntent,
-        calories:
-          summary.nutritionTargets.campaign.active
-            ? `${summary.physiqueDecision.calorieTargetLabel} / ${summary.nutritionTargets.campaign.dayType}`
-            : summary.physiqueDecision.calorieRecommendation === "set target"
-            ? summary.physiqueDecision.calorieTargetLabel
-            : `${summary.physiqueDecision.calorieTargetLabel} / ${summary.physiqueDecision.calorieRecommendation}`,
-        protein: summary.physiqueDecision.proteinTargetLabel,
-        intake:
-          summary.nutritionActuals.hasLoggedIntake
-            ? `${summary.nutritionActuals.calories}/${summary.nutritionActuals.calorieTarget ?? "--"} cal`
-            : "Log first meal",
-        remaining:
-          summary.nutritionActuals.hasLoggedIntake
-            ? `${summary.nutritionActuals.remainingCalories ?? "--"} cal / ${summary.nutritionActuals.remainingProteinG ?? "--"}g protein`
-            : "No meals logged",
         bottleneck: summary.physiqueDecision.mainBottleneck,
         targetReason: summary.physiqueDecision.primaryDecisionReason,
         splitReason: summary.physiqueDecision.trainingTargetReason,
@@ -375,6 +325,20 @@ export function buildTodayViewModel(
           trendLabels: recentDateLabels,
         },
       ],
+      telemetry: mapTodayTelemetry({
+        recoveryScore: summary.readiness.recoveryScore,
+        sleepHours: summary.readiness.sleepHours,
+        sleepVsNeedHours: summary.readiness.sleepVsNeedHours,
+        sleepStageContext: buildSleepStageSegments(summary)
+          .filter((stage) => typeof stage.hours === "number")
+          .slice(0, 3)
+          .map((stage) => `${stage.label} ${stage.hours?.toFixed(1)}h`)
+          .join(" / ") || null,
+        strainScore: summary.strainSummary.score,
+        recovery7d: summary.trendSeries.recovery7d,
+        sleep7d: summary.trendSeries.sleep7d,
+        strain7d: summary.trendSeries.strain7d,
+      }),
       focusLabel:
         summary.trainingLoad.weeklyMuscleFocus.length > 0
           ? summary.trainingLoad.weeklyMuscleFocus
@@ -390,10 +354,11 @@ export function buildTodayViewModel(
       readinessQualifier: buildReadinessQualifier(summary),
       historicalQualifier: summary.historicalContext?.qualifier ?? null,
       weeklyFocus: summary.trainingLoad.weeklyMuscleVolume.length
-        ? summary.trainingLoad.weeklyMuscleVolume.slice(0, 12)
+        ? summary.trainingLoad.weeklyMuscleVolume.slice(0, 12).map((item) => ({ ...item, regions: regionsForWeeklyMuscleGroup(item.label) }))
         : summary.trainingLoad.weeklyMuscleFocus.slice(0, 12).map((item) => ({
             ...item,
             effectiveSets: item.hits,
+            regions: regionsForWeeklyMuscleGroup(item.label),
           })),
       weeklyMapNote: hasWeeklyTraining
         ? null
@@ -467,7 +432,7 @@ export function buildTodayViewModel(
       {
         label: "Weekly score",
         value: `${summary.trainingLoad.hevyWorkoutCountThisWeek} lifts`,
-        detail: `${summary.trainingLoad.hevySetCountThisWeek} sets Mon-Sun / ${summary.physiqueDecision.calorieRecommendation}`,
+        detail: `${summary.trainingLoad.hevySetCountThisWeek} sets Mon-Sun`,
       },
       {
         label: "Strength signal",
@@ -478,15 +443,6 @@ export function buildTodayViewModel(
           summary.physiqueDecision.strengthProgression[0]
             ? `${summary.physiqueDecision.strengthProgression[0].exercise} / ${summary.physiqueDecision.strengthProgression[0].confidenceLabel}`
             : "Auto-detecting repeat lifts",
-      },
-      {
-        label: "Nutrition",
-        value: summary.nutritionActuals.hasLoggedIntake
-          ? `${summary.nutritionActuals.calories} cal`
-          : "Log meals",
-        detail: summary.nutritionActuals.hasLoggedIntake
-          ? `${formatMacroGrams(summary.nutritionActuals.proteinG)} protein / ${summary.nutritionActuals.remainingCalories ?? "--"} cal left`
-          : `${summary.physiqueDecision.calorieTargetLabel} / ${summary.physiqueDecision.proteinTargetLabel} target`,
       },
     ],
     scorecard: summary.physiqueDecision.weeklyScorecard,

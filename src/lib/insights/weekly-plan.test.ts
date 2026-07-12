@@ -8,7 +8,6 @@ import type { DailyPhysiqueDecision, DailyReadiness, DailyTrainingLoad } from "@
 const decision = {
   trainingAvailability: "Train", trainingTarget: "Upper", nextTrainingTarget: "Upper",
   trainingTargetReason: "", trainingIntent: "Push", intensityLabel: "", sessionAnchors: [],
-  calorieRecommendation: "maintain", calorieTargetLabel: "", proteinTargetLabel: "",
   mainBottleneck: "", primaryDecisionReason: "Train upper today.", daysLeftInWeek: 7,
   liftsNeededForGoal: 4, canStillHitWeeklyGoalIfRestToday: true, weeklyPaceLabel: "",
   decisionFactors: [], weightTrend: { currentLb: null, average7dLb: null, weeklyDeltaLb: null },

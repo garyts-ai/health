@@ -2,7 +2,7 @@
 
 ## Purpose
 
-HealthMaxer is Gary's private, deterministic training command center. It combines WHOOP, Hevy, nutrition targets, weight, activity context, and daily recommendations so the next action is obvious: what to train, how hard to train it, what recovery evidence matters, and what remains this week.
+HealthMaxer is Gary's private, deterministic training and recovery dashboard. It combines WHOOP, Hevy, body-weight trends, activity context, and minimal recommendations so the next training decision and its evidence are obvious.
 
 ## Information architecture
 
@@ -11,7 +11,7 @@ The product is one continuous page with four canonical anchors:
 - `#today` — the immediate training decision and anatomy profile.
 - `#weekly` — the complete Monday-to-Sunday plan and muscle-volume ledger.
 - `#whoop` — import state, range analysis, ranked findings, trends, and protocol.
-- `#utilities` — connections, quick intake, nutrition targets, and daily brief controls.
+- `#utilities` — provider connections and a compact context packet for deeper analysis in an external LLM.
 
 Legacy `/weekly`, `/whoop`, and `/settings` entry points redirect to the matching root anchor while preserving query parameters.
 
@@ -22,7 +22,8 @@ Legacy `/weekly`, `/whoop`, and `/settings` entry points redirect to the matchin
 - Missing, stale, sparse, disconnected, and failed states are named honestly; no metric is invented.
 - Every mobile surface retains the full decision context available on desktop.
 - Anatomy geometry and intensity semantics remain data, not decoration.
-- Protected sync, import, nutrition, and delivery actions keep their existing API contracts.
+- Deterministic app recommendations stay limited to training, recovery, and safety cautions; detailed general or nutrition advice belongs in the external-LLM handoff.
+- Provider sync and import actions keep their existing API contracts.
 
 ## Brand personality
 

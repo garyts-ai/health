@@ -1,0 +1,12 @@
+.packet { padding: 22px; }
+.heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
+.heading h3 { margin: 0; font: 750 1.5rem var(--font-big-shoulders),sans-serif; }
+.heading p { max-width: 72ch; margin: 8px 0 0; color: var(--os-text-secondary); font-size: .82rem; line-height: 1.55; }
+.heading > span { color: var(--os-text-muted); font: .65rem var(--font-geist-mono),monospace; white-space: nowrap; }
+.goal { display: grid; gap: 8px; margin-top: 18px; }.goal > span { color: var(--os-text-secondary); font-size: .75rem; font-weight: 700; }
+.goal textarea { min-height: 92px; resize: vertical; border: 1px solid var(--os-line-strong); border-radius: var(--os-radius-md); background: var(--os-surface-base); padding: 12px; color: var(--os-text-primary); font: .82rem/1.5 var(--font-manrope),sans-serif; }
+.goal textarea::placeholder { color: var(--os-text-muted); opacity: 1; }.goal textarea:focus-visible { border-color: var(--os-signal-current); outline: 0; box-shadow: var(--os-focus-ring); }
+.toolbar { display: flex; align-items: center; gap: 14px; margin-top: 12px; }.toolbar button { min-height: 44px; border: 1px solid var(--os-signal-current); border-radius: var(--os-radius-md); background: color-mix(in srgb,var(--os-signal-current) 12%,var(--os-surface-raised)); padding-inline: 16px; color: var(--os-text-primary); font-weight: 750; cursor: pointer; }.toolbar button:hover { background: color-mix(in srgb,var(--os-signal-current) 18%,var(--os-surface-raised)); }
+.toolbar p { margin: 0; color: var(--os-text-muted); font-size: .72rem; }
+.preview { margin-top: 12px; border-top: 1px solid var(--os-line-subtle); }.preview summary { min-height: 44px; cursor: pointer; color: var(--os-text-secondary); font-size: .75rem; line-height: 44px; }.preview pre { max-height: 28rem; overflow: auto; margin: 0; background: var(--os-surface-base); padding: 14px; color: var(--os-text-secondary); font: .68rem/1.55 var(--font-geist-mono),monospace; white-space: pre-wrap; }
+@media (max-width: 560px) { .packet { padding: 14px; } .heading,.toolbar { align-items: stretch; flex-direction: column; } }

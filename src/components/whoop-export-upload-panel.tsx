@@ -139,7 +139,7 @@ export function WhoopExportUploadPanel({
             />
           </label>
           <button
-            className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-[#39f8ff] px-4 text-sm font-semibold text-[#06121f] transition hover:bg-[#8ffff8]"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[10px] bg-[#39f8ff] px-4 text-sm font-semibold text-[#06121f] transition hover:bg-[#8ffff8]"
             type="submit"
           >
             Import WHOOP export

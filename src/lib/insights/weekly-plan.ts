@@ -1,5 +1,5 @@
 import { dbAll } from "@/lib/db";
-import type { DailyNutritionTargets, DailyPhysiqueDecision, DailyReadiness, DailyTrainingLoad, WeeklyPlan, WeeklyPlanDay } from "@/lib/insights/types";
+import type { DailyPhysiqueDecision, DailyReadiness, DailyTrainingLoad, WeeklyPlan, WeeklyPlanDay } from "@/lib/insights/types";
 
 const TIME_ZONE = "America/New_York";
 const DAY_MS = 86_400_000;
@@ -88,8 +88,6 @@ export function buildWeeklyPlanFromInputs({
       date: key,
       label: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TIME_ZONE }).format(date),
       state, workoutType, intent, anchors,
-      calorieTarget: null,
-      proteinTargetG: null,
       recoveryPriority: workoutType === "Rest" || workoutType === "Recovery" ? "Sleep, walking, and low strain" : readiness.sleepVsNeedHours !== null && readiness.sleepVsNeedHours < -1 ? "Protect sleep after training" : "Normal recovery routine",
       rationale, guardrail, actualWorkout: actual?.title ?? null,
     });
@@ -102,22 +100,11 @@ export async function buildWeeklyPlan(
   decision: DailyPhysiqueDecision,
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
-  nutritionTargets: DailyNutritionTargets,
 ) {
   const start = monday(now);
   const completed = await dbAll<{ date: string; title: string | null }>(
     "SELECT start_time AS date, title FROM hevy_workouts WHERE start_time >= ? ORDER BY start_time",
     start.toISOString(),
   );
-  const plan = buildWeeklyPlanFromInputs({ now, decision, readiness, trainingLoad, completed });
-  plan.days.forEach((day) => {
-    const isLift = day.workoutType === "Upper" || day.workoutType === "Lower";
-    day.calorieTarget = nutritionTargets.campaign.active
-      ? isLift
-        ? nutritionTargets.campaign.trainingDayCalorieTarget
-        : nutritionTargets.campaign.restDayCalorieTarget
-      : nutritionTargets.effectiveCalorieTarget;
-    day.proteinTargetG = nutritionTargets.effectiveProteinTargetG;
-  });
-  return plan;
+  return buildWeeklyPlanFromInputs({ now, decision, readiness, trainingLoad, completed });
 }
