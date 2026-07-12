@@ -59,11 +59,11 @@ Use 2–6px corners, thin rules, inset plates, a subtle scan texture, and a mask
 
 ## Anatomy instrument
 
-`TRAINING_CORE / PROFILE` preserves the canonical 17-region geometry, low/medium/high weekly tiers, and cyan latest-session layer. Front and Back are explicit controls with no automatic rotation. The newest highlighted view is the default. Scan, plate activation, bounded lighting, and view crossfade are the only permitted anatomy motion. A textual workout and volume summary always accompanies the `aria-hidden` visual.
+`TRAINING_CORE / PROFILE` uses an original illustrated front-facing exosuit assembled from cropped alpha artwork layers. The actual chest, delt, arm, lat, core, quad, adductor, and calf assets carry weekly intensity, latest-session, preview, and pinned states; there is no disconnected highlight mask or procedural mannequin underneath. Canonical 17-region data remains unchanged, while back-only artwork is intentionally deferred until it meets the same visual bar. A textual workout and volume summary always accompanies the `aria-hidden` visual.
 
 ## Motion and interaction
 
-The visible-by-default hero ignition and anatomy activation finish within 500ms and never flash. Standard hover, focus, disclosure, and tab feedback completes within 250ms using transform or opacity. `prefers-reduced-motion: reduce` produces a fully static interface. Ambient rain pauses while the document is hidden.
+The visible-by-default hero is fully assembled before hydration. Standard hover, focus, disclosure, and tab feedback completes within 250ms using transform or opacity. The only long-form exception is the user-triggered anatomy Replay: a cancellable 2.2–2.45 second assembly built from the actual region layers, followed by a restrained lock-in signal. Weekly frequency controls violet/amber/magenta rims, latest-session regions carry a bounded cyan energy sweep, and Today targets receive static pre-emphasis. Pointer-fine depth response stays within 3px. `prefers-reduced-motion: reduce` resolves Replay instantly and produces a fully static interface. Ambient and anatomy motion pause while the document is hidden.
 
 The Today telemetry rail has one shared interaction state. Pointer, touch, and keyboard input scrub the same seven-day index across all three charts, with a visible exact-date readout and explicit null states. Charts never autoplay or interpolate missing observations.
 

@@ -6,6 +6,7 @@ import { AnatomyViewer, AppShell, DataRail, PageHero, PageTransition, TodayPresc
 import styles from "@/components/training-os/today-composition.module.css";
 import { ANATOMY_QA_LATEST_HIGHLIGHTS, ANATOMY_QA_WEEKLY_HIGHLIGHTS, ANATOMY_QA_WEEKLY_VOLUME } from "@/lib/anatomy-qa";
 import { regionsForWeeklyMuscleGroup } from "@/lib/insights/body-map";
+import { regionsForTrainingTarget } from "@/components/training-os/anatomy-viewer-model";
 import { buildTodayViewModel } from "@/lib/today-view-model";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
 import type { DailySummary } from "@/lib/insights/types";
@@ -28,6 +29,10 @@ export async function MasterDashboard({ anatomyDebug = false, hevy, summary, uti
   const workoutCount = anatomyDebug ? 4 : summary.trainingLoad.hevyWorkoutCountThisWeek;
   const latestWorkout = anatomyDebug ? "QA: powered back + arms" : vm.hero.workoutLabel;
   const latestAge = anatomyDebug ? "debug overlay" : vm.hero.latestSessionAgeLabel;
+  const targetRegions = anatomyDebug ? ["chest", "frontDelts", "sideDelts"] as const : regionsForTrainingTarget(
+    summary.physiqueDecision.trainingTarget,
+    summary.physiqueDecision.trainingAvailability,
+  );
 
   return <AppShell date={vm.header.dateLabel}>
     <PageTransition id="today" labelledBy="today-title" initial className={styles.today}>
@@ -35,7 +40,7 @@ export async function MasterDashboard({ anatomyDebug = false, hevy, summary, uti
         <PageHero
           status={utilityBannerMessage || vm.header.freshnessNotice ? <div role="status">{utilityBannerMessage ?? vm.header.freshnessNotice}</div> : undefined}
           prescription={<TodayPrescription date={vm.header.dateLabel} call={vm.hero.todayCall} intensityLabel={vm.hero.decision.intensityIntentLabel} intensity={vm.hero.decision.intensity} reason={vm.hero.decision.targetReason} recommendation={topRecommendation} remaining={vm.actionCards.slice(1)} changes={vm.contextBand.whyChanged} />}
-          instrument={<AnatomyViewer weeklyHighlights={weeklyHighlights} latestHighlights={latestHighlights} volume={weeklyVolume} latestWorkout={latestWorkout} latestSessionAge={latestAge} workoutCount={workoutCount} emptyMessage={anatomyDebug ? "QA fixture is forcing all major armor regions." : vm.hero.weeklyFocusEmptyMessage} note={anatomyDebug ? "QA fixture" : vm.hero.weeklyMapNote} />}
+          instrument={<AnatomyViewer weeklyHighlights={weeklyHighlights} latestHighlights={latestHighlights} targetRegionIds={[...targetRegions]} volume={weeklyVolume} latestWorkout={latestWorkout} latestSessionAge={latestAge} workoutCount={workoutCount} emptyMessage={anatomyDebug ? "QA fixture is forcing all major armor regions." : vm.hero.weeklyFocusEmptyMessage} note={anatomyDebug ? "QA fixture" : vm.hero.weeklyMapNote} />}
           rail={<DataRail metrics={vm.hero.telemetry} />}
         />
         <a className={styles.scrollCue} href="#weekly">View weekly plan ↓</a>

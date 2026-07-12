@@ -1,0 +1,199 @@
+.page {
+  min-height: 100svh;
+  padding: 1.25rem clamp(1rem, 3vw, 3rem) 3rem;
+  color: var(--os-text-primary);
+  background: var(--os-canvas);
+}
+
+.header {
+  max-width: 92rem;
+  min-height: 4.5rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--os-line-subtle);
+}
+
+.header h1,
+.dataHeading h2 {
+  margin: 0;
+  font-family: var(--font-big-shoulders), sans-serif;
+  text-wrap: balance;
+}
+
+.header h1 {
+  font-size: 1.75rem;
+  letter-spacing: -.02em;
+}
+
+.header p {
+  margin: .15rem 0 0;
+  color: var(--os-text-secondary);
+  font-size: .875rem;
+}
+
+.header a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--os-signal-current);
+  text-decoration: none;
+}
+
+.header a:focus-visible,
+.toolbar button:focus-visible,
+.volumeRow:focus-visible,
+.reset:focus-visible {
+  outline: none;
+  box-shadow: var(--os-focus-ring);
+}
+
+.toolbar {
+  max-width: 92rem;
+  margin: 1rem auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.toolbar button,
+.reset {
+  min-height: 44px;
+  padding: .55rem .8rem;
+  color: var(--os-text-secondary);
+  font: 600 .78rem/1 var(--font-manrope), sans-serif;
+  background: var(--os-surface-raised);
+  border: 1px solid var(--os-line-strong);
+  border-radius: var(--os-radius-md);
+  cursor: pointer;
+}
+
+.toolbar button:hover,
+.toolbar button[aria-pressed="true"],
+.reset:hover:not(:disabled) {
+  color: var(--os-text-primary);
+  border-color: var(--os-signal-current);
+}
+
+.workspace {
+  width: 100%;
+  max-width: 92rem;
+  min-height: calc(100svh - 10rem);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+  background: var(--os-surface-base);
+  border: 1px solid var(--os-line-subtle);
+  border-radius: var(--os-radius-lg);
+  overflow: hidden;
+}
+
+.visual {
+  min-width: 0;
+  min-height: 42rem;
+}
+
+.data {
+  align-self: end;
+  min-width: 0;
+  padding: 1.5rem;
+  background: rgb(10 12 18 / .94);
+  border-left: 1px solid var(--os-line-subtle);
+}
+
+.dataHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .75rem;
+}
+
+.dataHeading h2 {
+  font-size: 1.25rem;
+}
+
+.dataHeading span,
+.stateReadout {
+  color: var(--os-text-muted);
+  font: .7rem/1.4 var(--font-geist-mono), monospace;
+}
+
+.rows {
+  border-top: 1px solid var(--os-line-subtle);
+}
+
+.volumeRow {
+  width: 100%;
+  min-height: 52px;
+  padding: .65rem 0;
+  display: grid;
+  grid-template-columns: 5rem 1fr 6.5rem;
+  align-items: center;
+  gap: .75rem;
+  color: var(--os-text-secondary);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--os-line-subtle);
+  cursor: pointer;
+}
+
+.volumeRow:hover,
+.volumeRow[data-active] {
+  color: var(--os-text-primary);
+  background: rgb(69 232 255 / .04);
+}
+
+.volumeRow i {
+  height: 3px;
+  display: block;
+  background: color-mix(in srgb, var(--os-text-secondary) 16%, transparent);
+}
+
+.volumeRow b {
+  width: 72%;
+  height: 100%;
+  display: block;
+  background: var(--os-signal-volume-low);
+}
+
+.volumeRow[data-intensity="medium"] b { background: var(--os-signal-caution); }
+.volumeRow[data-intensity="high"] b { background: var(--os-signal-emphasis); }
+
+.volumeRow strong {
+  text-align: right;
+  font: 500 .72rem/1 var(--font-geist-mono), monospace;
+}
+
+.reset {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.reset:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.stateReadout {
+  min-height: 1rem;
+  margin: .75rem 0 0;
+}
+
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; }
+  .visual { min-height: 38rem; }
+  .data { border-top: 1px solid var(--os-line-subtle); border-left: 0; }
+}
+
+@media (max-width: 520px) {
+  .page { padding-inline: .75rem; }
+  .header { align-items: flex-start; padding-bottom: .75rem; }
+  .header p { max-width: 24ch; }
+  .visual { min-height: 31rem; }
+  .data { padding: 1rem; }
+  .volumeRow { grid-template-columns: 4.5rem 1fr 5.5rem; gap: .5rem; }
+}
