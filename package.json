@@ -13,7 +13,8 @@
     "db:migrate:postgres": "node --import tsx src/scripts/migrate-sqlite-to-postgres.ts",
     "whoop:seed-export": "node --import tsx src/scripts/import-whoop-export.ts",
     "lint": "eslint",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
