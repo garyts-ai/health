@@ -1,0 +1,83 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import { regionsForWeeklyMuscleGroup } from "@/lib/insights/body-map";
+import type { BodyHighlight } from "@/lib/insights/types";
+import { bestRegionForView, defaultAnatomyView, visibleCalloutRegions } from "./anatomy-viewer-model";
+import { bestTelemetryIndex, chartSummary, formatInstrumentValue, indexFromPointer, nextTelemetryIndex, resolveTelemetryIndex } from "./telemetry-model";
+import { mapTodayTelemetry } from "./today-telemetry";
+
+test("declares every semantic signal and surface level", () => {
+  const tokens = readFileSync(new URL("../../app/training-os-tokens.css", import.meta.url), "utf8");
+  for (const tone of ["current", "emphasis", "caution", "positive", "danger"]) {
+    assert.match(tokens, new RegExp(`--os-signal-${tone}:`));
+  }
+  for (const level of ["base", "raised", "overlay"]) {
+    assert.match(tokens, new RegExp(`--os-surface-${level}:`));
+  }
+});
+
+test("maps seven-day telemetry without removing null gaps", () => {
+  const recovery = Array.from({ length: 7 }, (_, index) => ({ label: `${index}`, value: index === 3 ? null : index + 60 }));
+  const sleep = recovery.map((point) => ({ ...point, value: point.value === null ? null : 7 }));
+  const strain = recovery.map((point) => ({ ...point, value: point.value === null ? null : 5 }));
+  const metrics = mapTodayTelemetry({ recoveryScore: 76, sleepHours: 7.7, sleepVsNeedHours: -0.8, sleepStageContext: "Deep 1.4h / REM 1.8h", strainScore: 4, recovery7d: recovery, sleep7d: sleep, strain7d: strain });
+  assert.equal(metrics[0].visual?.points.length, 7);
+  assert.equal(metrics[0].visual?.points[3].value, null);
+  assert.equal(metrics[1].visual?.points[3].value, null);
+  assert.equal(metrics[2].visual?.points[3].value, null);
+  assert.match(metrics[1].detail, /Deep 1.4h/);
+  assert.equal(metrics.length, 3);
+  assert.equal(metrics[0].visual && formatInstrumentValue(metrics[0].visual, 76), "76%");
+  assert.equal(metrics[1].visual && formatInstrumentValue(metrics[1].visual, 7.25), "7.3h");
+});
+
+test("telemetry never fabricates points when data is unavailable", () => {
+  const metrics = mapTodayTelemetry({ recoveryScore: null, sleepHours: null, sleepVsNeedHours: null, strainScore: null, recovery7d: [], sleep7d: [], strain7d: [] });
+  assert.equal(metrics.length, 3);
+  assert.deepEqual(metrics.map((metric) => metric.visual?.points), [[], [], []]);
+});
+
+test("telemetry pointer and keyboard selection remains bounded", () => {
+  assert.equal(indexFromPointer(150, 100, 300, 7), 1);
+  assert.equal(indexFromPointer(900, 100, 300, 7), 6);
+  assert.equal(nextTelemetryIndex("ArrowLeft", 0, 7), 0);
+  assert.equal(nextTelemetryIndex("ArrowRight", 6, 7), 6);
+  assert.equal(nextTelemetryIndex("Home", 4, 7), 0);
+  assert.equal(nextTelemetryIndex("End", 2, 7), 6);
+  assert.equal(nextTelemetryIndex("Escape", 2, 7), 6);
+});
+
+test("telemetry summaries exclude null observations", () => {
+  const summary = chartSummary({ kind: "line", points: [{ label: "M", value: 4 }, { label: "T", value: null }, { label: "W", value: 10 }], unit: "", valueFormat: "decimal" });
+  assert.deepEqual(summary, { min: 4, max: 10, average: 7 });
+});
+
+test("telemetry defaults to the newest day with the strongest data coverage", () => {
+  const visual = (values: Array<number | null>) => ({ kind: "line" as const, points: values.map((value, index) => ({ label: `${index}`, value })), unit: "", valueFormat: "decimal" as const });
+  assert.equal(bestTelemetryIndex([visual([1, 2, 3]), visual([1, 2, null]), visual([1, 2, null])]), 1);
+});
+
+test("telemetry selection falls back when refreshed data no longer contains the selected date", () => {
+  const refreshed = [
+    { label: "M", dateKey: "2026-07-06", value: 70 },
+    { label: "T", dateKey: "2026-07-07", value: 80 },
+  ];
+  assert.equal(resolveTelemetryIndex(refreshed, "2026-07-05", 1), 1);
+  assert.equal(resolveTelemetryIndex(refreshed, "2026-07-06", 1), 0);
+});
+
+test("maps weekly muscle groups to canonical regions", () => {
+  assert.deepEqual(regionsForWeeklyMuscleGroup("Upper back / traps"), ["upperBack", "traps"]);
+  assert.deepEqual(regionsForWeeklyMuscleGroup("Hamstrings / glutes"), ["hamstrings", "glutes"]);
+  assert.deepEqual(regionsForWeeklyMuscleGroup("Unknown"), []);
+});
+
+test("chooses anatomy defaults and active regions deterministically", () => {
+  const weekly: BodyHighlight[] = [{ regionId: "chest", intensity: "medium" }, { regionId: "lats", intensity: "high" }];
+  const latest: BodyHighlight[] = [{ regionId: "triceps", intensity: "high" }];
+  assert.equal(defaultAnatomyView(weekly, latest), "back");
+  assert.equal(bestRegionForView("back", weekly, latest), "triceps");
+  assert.equal(bestRegionForView("front", weekly, latest), "chest");
+  assert.deepEqual(visibleCalloutRegions("back", weekly, latest), ["triceps", "lats"]);
+});

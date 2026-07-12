@@ -1,0 +1,4 @@
+.panel { position: relative; border-radius: var(--os-radius-md); }
+.base { background: var(--os-surface-base); }
+.raised { background: var(--os-surface-raised); box-shadow: var(--os-elevation-raised); }
+.overlay { background: var(--os-surface-overlay); box-shadow: var(--os-elevation-overlay); backdrop-filter: blur(12px); }

@@ -38,9 +38,6 @@ export function WeeklyPlanView({ summary }: { summary: DailySummary }) {
               <p className="week-ledger__anchors">
                 {day.anchors.length ? day.anchors.slice(0, 2).join(" · ") : day.recoveryPriority}
               </p>
-              <p className="week-ledger__nutrition">
-                {day.calorieTarget ?? "--"} cal · {day.proteinTargetG ?? "--"}g protein
-              </p>
               <details>
                 <summary>Plan detail</summary>
                 <p>{day.rationale}</p>

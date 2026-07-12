@@ -9,17 +9,7 @@ import {
 } from "@/lib/insights/body-map";
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
 import { applyHistoricalModifier, buildHistoricalContext } from "@/lib/insights/historical-context";
-import {
-  activeCampaignCalorieTarget,
-  buildCancunCampaign,
-  detectBloatContext,
-  proteinCoachingStatus,
-  type CampaignWeightObservation,
-  type CancunCampaign,
-} from "@/lib/insights/nutrition-campaign";
 import { buildWeeklyPlan } from "@/lib/insights/weekly-plan";
-import { getNutritionIntakeSummary } from "@/lib/nutrition-intake";
-import { getNutritionTargets } from "@/lib/nutrition-targets";
 import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
 import type {
@@ -38,8 +28,6 @@ import type {
   DailySummary,
   DailyRecentWorkoutDetail,
   DailyTrainingLoad,
-  DailyNutritionTargets,
-  DailyNutritionActuals,
   DailyStrengthProgression,
   DailyWeightTrend,
   TrendPoint,
@@ -901,16 +889,6 @@ function poundsText(value: number | null, digits = 0) {
   return `${pounds.toFixed(digits)} lb`;
 }
 
-function signedPoundsText(value: number | null, digits = 1) {
-  const pounds = kilogramsToPounds(value);
-  if (pounds === null) {
-    return "--";
-  }
-
-  const prefix = pounds > 0 ? "+" : "";
-  return `${prefix}${pounds.toFixed(digits)} lb`;
-}
-
 async function buildFreshness(): Promise<DailyFreshness> {
   const [whoop, hevy] = await Promise.all([getWhoopConnectionStatus(), getHevyConnectionStatus()]);
 
@@ -1301,6 +1279,7 @@ async function buildTrendSeries() {
     labelKey: "weekday" | "monthDay",
   ): TrendPoint[] =>
     window.map((entry) => ({
+      dateKey: entry.key,
       label: entry[labelKey],
       value: values.get(entry.key) ?? null,
     }));
@@ -1310,6 +1289,7 @@ async function buildTrendSeries() {
     sleep7d: toTrendPoints(dateWindow7, latestSleepByDay, "weekday"),
     strain7d: toTrendPoints(dateWindow7, latestStrainByDay, "weekday"),
     load7d: dateWindow7.map((entry) => ({
+      dateKey: entry.key,
       label: entry.weekday,
       value: loadCountByDay.get(entry.key) ?? 0,
     })),
@@ -1779,159 +1759,12 @@ function buildDecisionFactors(
   return factors.slice(0, 6);
 }
 
-function formatSleepStagePrompt(readiness: DailyReadiness) {
-  const stages = readiness.sleepStageSummary;
-  if (!stages) {
-    return "unavailable";
-  }
-
-  return [
-    `Deep ${stages.deepHours ?? "--"}h`,
-    `REM ${stages.remHours ?? "--"}h`,
-    `Light ${stages.lightHours ?? "--"}h`,
-    `Awake ${stages.awakeHours ?? "--"}h`,
-    `In bed ${stages.inBedHours ?? "--"}h`,
-  ].join(", ");
-}
-
-function roundToNearest(value: number, step: number) {
-  return Math.round(value / step) * step;
-}
-
-function buildNutritionTargets(
-  manualTargets: Pick<DailyNutritionTargets, "calorieTarget" | "proteinTargetG" | "updatedAt">,
-  readiness: DailyReadiness,
-  trainingLoad: DailyTrainingLoad,
-  campaign: CancunCampaign,
-): DailyNutritionTargets {
-  const weightLb = kilogramsToPounds(readiness.bodyWeightKg);
-  const weightDeltaLb = kilogramsToPounds(readiness.bodyWeightDelta7dKg);
-
-  if (weightLb === null) {
-    return {
-      ...manualTargets,
-      effectiveCalorieTarget: activeCampaignCalorieTarget(campaign) ?? manualTargets.calorieTarget,
-      effectiveProteinTargetG: campaign.active ? campaign.proteinTargetG : manualTargets.proteinTargetG,
-      smartCalorieTarget: null,
-      smartProteinTargetG: null,
-      targetSource:
-        campaign.active
-          ? "campaign"
-          : manualTargets.calorieTarget !== null && manualTargets.proteinTargetG !== null
-          ? "manual"
-          : "missing",
-      smartReason: "Smart targets need a recent body-weight reading.",
-      campaign,
-    };
-  }
-
-  const activityMultiplier =
-    trainingLoad.hevyWorkoutCount7d >= 4
-      ? 15.7
-      : trainingLoad.hevyWorkoutCount7d >= 2
-        ? 15.1
-        : 14.5;
-  const setAdjustment = trainingLoad.hevySetCount7d >= 55 ? 100 : 0;
-  const trendAdjustment =
-    (weightDeltaLb ?? 0) <= -0.8 && trainingLoad.hevyWorkoutCount7d >= 3
-      ? 150
-      : (weightDeltaLb ?? 0) >= 1.2
-        ? -150
-        : 0;
-  const smartCalorieTarget = roundToNearest(weightLb * activityMultiplier + setAdjustment + trendAdjustment, 50);
-  const smartProteinTargetG = Math.max(130, Math.min(210, roundToNearest(weightLb, 5)));
-  const targetSource =
-    manualTargets.calorieTarget !== null && manualTargets.proteinTargetG !== null
-      ? "manual"
-      : "smart";
-  const trendPhrase =
-    trendAdjustment > 0
-      ? "weight is slipping while training demand is present"
-      : trendAdjustment < 0
-        ? "weight is rising faster than the lean-gain lane"
-        : "weight trend is controlled";
-
-  return {
-    ...manualTargets,
-    effectiveCalorieTarget:
-      activeCampaignCalorieTarget(campaign) ?? manualTargets.calorieTarget ?? smartCalorieTarget,
-    effectiveProteinTargetG:
-      campaign.active ? campaign.proteinTargetG : manualTargets.proteinTargetG ?? smartProteinTargetG,
-    smartCalorieTarget,
-    smartProteinTargetG,
-    targetSource: campaign.active ? "campaign" : targetSource,
-    smartReason: `Based on ${weightLb.toFixed(1)} lb, ${trainingLoad.hevyWorkoutCount7d} lifts, ${trainingLoad.hevySetCount7d} sets, and ${trendPhrase}.`,
-    campaign,
-  };
-}
-
-async function getCampaignWeightObservations(now = new Date()): Promise<CampaignWeightObservation[]> {
-  const start = new Date(now.getTime() - 21 * 86_400_000).toISOString().slice(0, 10);
-  const rows = await dbAll<Pick<WhoopBodyMeasurementRow, "observed_on" | "observed_at" | "weight_kilogram">>(
-    `
-      SELECT observed_on, observed_at, weight_kilogram
-      FROM whoop_body_measurements
-      WHERE observed_on >= ? AND weight_kilogram IS NOT NULL
-      ORDER BY observed_on, observed_at
-    `,
-    start,
-  );
-  return rows
-    .filter((row): row is typeof row & { weight_kilogram: number } => typeof row.weight_kilogram === "number")
-    .map((row) => ({
-      date: row.observed_on,
-      weightLb: kilogramsToPounds(row.weight_kilogram)!,
-    }));
-}
-
-function hasLiftToday(trainingLoad: DailyTrainingLoad, now: Date) {
-  if (!trainingLoad.hevyLastWorkoutAt) return false;
-  return getDateKey(new Date(trainingLoad.hevyLastWorkoutAt)) === getDateKey(now);
-}
-
-async function buildNutritionActuals(
-  dateKey: string,
-  nutritionTargets: DailyNutritionTargets,
-): Promise<DailyNutritionActuals> {
-  const intake = await getNutritionIntakeSummary(dateKey);
-  const calorieTarget = nutritionTargets.effectiveCalorieTarget;
-  const proteinTargetG = nutritionTargets.effectiveProteinTargetG;
-
-  return {
-    dateKey,
-    calories: intake.calories,
-    proteinG: intake.proteinG,
-    carbsG: intake.carbsG,
-    fatG: intake.fatG,
-    remainingCalories:
-      calorieTarget === null ? null : Math.max(0, calorieTarget - intake.calories),
-    remainingProteinG:
-      proteinTargetG === null ? null : Math.max(0, proteinTargetG - intake.proteinG),
-    calorieTarget,
-    proteinTargetG,
-    hasLoggedIntake: intake.hasLoggedIntake,
-    entries: intake.entries.map((entry) => ({
-      id: entry.id,
-      mealType: entry.mealType,
-      label: entry.label,
-      calories: entry.calories,
-      proteinG: entry.proteinG,
-      carbsG: entry.carbsG,
-      fatG: entry.fatG,
-      note: entry.note,
-      loggedAt: entry.loggedAt,
-    })),
-  };
-}
-
 export function buildPhysiqueDecision(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
   stressFlags: DailyStressFlags,
   lateNightDisruption: DailyLateNightDisruption,
   activityContext: DailyActivityContext,
-  nutritionTargets: DailyNutritionTargets,
-  nutritionActuals: DailyNutritionActuals,
   strengthProgression: DailyStrengthProgression[],
   now = new Date(),
 ): DailyPhysiqueDecision {
@@ -1966,14 +1799,6 @@ export function buildPhysiqueDecision(
   const lowWeeklyFrequency = trainingLoad.hevyWorkoutCountThisWeek < WEEKLY_LIFT_GOAL;
   const strengthDown = strengthProgression.some((item) => item.trend === "down");
   const strengthUp = strengthProgression.some((item) => item.trend === "up");
-  const proteinGap =
-    nutritionActuals.hasLoggedIntake &&
-    nutritionActuals.remainingProteinG !== null &&
-    nutritionActuals.remainingProteinG >= 45;
-  const calorieGap =
-    nutritionActuals.hasLoggedIntake &&
-    nutritionActuals.remainingCalories !== null &&
-    nutritionActuals.remainingCalories >= 900;
   const shouldRest =
     physiologyRisk ||
     ((poorSystemicReadiness || (conditioningFatigue && stressFlags.poorSleepTrend)) &&
@@ -2040,39 +1865,20 @@ export function buildPhysiqueDecision(
             ? `Train ${nextTrainingTarget.toLowerCase()} today: the week is behind pace and readiness is acceptable.`
             : `Train ${nextTrainingTarget.toLowerCase()} at planned volume; the schedule does not require extra work today.`;
 
-  const calorieRecommendation: DailyPhysiqueDecision["calorieRecommendation"] =
-    nutritionTargets.effectiveCalorieTarget === null
-      ? "set target"
-      : nutritionTargets.campaign.active
-        ? nutritionTargets.campaign.calorieAdjustment > 0
-          ? "+150 cal"
-          : "maintain"
-      : (weightTrend.weeklyDeltaLb ?? 0) <= -0.8 && trainingLoad.hevyWorkoutCount7d >= 3
-        ? "+150 cal"
-        : (weightTrend.weeklyDeltaLb ?? 0) >= 1.2 && trainingLoad.hevyWorkoutCount7d < 4
-          ? "-150 cal"
-          : "maintain";
-
   const mainBottleneck =
-    nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
-      ? "Body weight is missing, so nutrition targets still need a manual baseline."
-      : trainingAvailability === "Rest"
+    trainingAvailability === "Rest"
         ? primaryDecisionReason
       : poorSystemicReadiness
         ? "Overnight physiology and sleep evidence support reducing intensity today."
       : highLoadPressure
         ? `${trainingLoad.hevyWorkoutCount7d} lifts and ${trainingLoad.hevySetCount7d} sets in 7 days support capping hard sets today.`
-      : proteinGap
-        ? "Protein is behind today; close that gap before judging training progress."
-      : calorieGap
-        ? "Calories are still light today; keep the meal plan aligned with the session."
       : lowWeeklyFrequency
           ? `${nextTrainingTarget} is the split target; recent training frequency is behind the physique goal.`
           : strengthDown
-            ? "Progression is soft on at least one key lift; check food, sleep, and exercise selection."
+            ? "Progression is soft on at least one key lift; check recovery and exercise selection."
             : strengthUp
-              ? "Progression signal is positive; keep food and volume consistent."
-              : "Consistency is the main lever: hit volume, protein, and a stable calorie target.";
+              ? "Progression signal is positive; keep training volume consistent."
+              : "Consistency is the main lever: hit planned volume and protect recovery.";
 
   const weeklyScorecard: DailyPhysiqueDecision["weeklyScorecard"] = [
     {
@@ -2112,27 +1918,6 @@ export function buildPhysiqueDecision(
             ? "watch"
             : "good",
     },
-    {
-      label: "Nutrition",
-      value:
-        nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
-          ? "Set target"
-          : nutritionActuals.hasLoggedIntake
-            ? `${nutritionActuals.proteinG}/${nutritionTargets.effectiveProteinTargetG}g`
-            : "No meals",
-      detail:
-        nutritionTargets.effectiveCalorieTarget === null
-          ? "Calories not set"
-          : nutritionActuals.hasLoggedIntake
-            ? `${nutritionActuals.calories}/${nutritionTargets.effectiveCalorieTarget} cal`
-            : `${nutritionTargets.effectiveCalorieTarget} cal / ${nutritionTargets.effectiveProteinTargetG}g target`,
-      status:
-        nutritionTargets.effectiveCalorieTarget === null || nutritionTargets.effectiveProteinTargetG === null
-          ? "missing"
-          : nutritionActuals.hasLoggedIntake
-            ? "good"
-            : "missing",
-    },
   ];
 
   return {
@@ -2143,15 +1928,6 @@ export function buildPhysiqueDecision(
     trainingIntent,
     intensityLabel,
     sessionAnchors,
-    calorieRecommendation,
-    calorieTargetLabel:
-      nutritionTargets.effectiveCalorieTarget === null
-        ? "Set target"
-        : `${nutritionTargets.effectiveCalorieTarget} cal`,
-    proteinTargetLabel:
-      nutritionTargets.effectiveProteinTargetG === null
-        ? "Set target"
-        : `${nutritionTargets.effectiveProteinTargetG}g`,
     mainBottleneck,
     primaryDecisionReason,
     daysLeftInWeek: schedule.daysLeftInWeek,
@@ -2225,8 +2001,6 @@ function buildRecommendations(
   stressFlags: DailyStressFlags,
   lateNightDisruption: DailyLateNightDisruption,
   freshness: DailyFreshness,
-  nutritionTargets: DailyNutritionTargets,
-  nutritionActuals: DailyNutritionActuals,
 ) {
   const stalePenalty = Number(freshness.whoop.isStale) + Number(freshness.hevy.isStale);
   const items: DailyRecommendation[] = [];
@@ -2279,7 +2053,7 @@ function buildRecommendations(
         ],
         [
           { label: "Warm-up check", icon: "technique" },
-          { label: "Add reps/load", icon: "fuel" },
+          { label: "Add reps/load", icon: "intensity" },
           { label: "Clean accessories", icon: "technique" },
         ],
         undefined,
@@ -2312,7 +2086,7 @@ function buildRecommendations(
         ],
         [
           { label: "Warm-up", icon: "technique" },
-          { label: "Train hard", icon: "fuel" },
+          { label: "Train hard", icon: "intensity" },
           { label: "Sharp reps", icon: "technique" },
         ],
         undefined,
@@ -2342,7 +2116,7 @@ function buildRecommendations(
           "Leave the session with clean reps still available",
         ],
         [
-          { label: "Normal load", icon: "fuel" },
+          { label: "Normal load", icon: "intensity" },
           { label: "Planned sets", icon: "technique" },
           { label: "Stop clean", icon: "rest" },
         ],
@@ -2404,170 +2178,54 @@ function buildRecommendations(
             ? "Use simple sick-day support, not a normal training day"
             : "Use gentle stomach and recovery support first",
         lateNightDisruption.likelyLane === "hangover_like"
-          ? "Start with water plus electrolytes, keep food easy to digest if your stomach is off, and use caffeine carefully instead of trying to force intensity through a rough recovery signal."
+          ? "Reduce training demand and prioritize a quiet recovery window instead of forcing intensity through a rough recovery signal."
           : lateNightDisruption.likelyLane === "illness_like"
-            ? "Hydrate, use electrolytes if intake feels low, keep food bland and easy to tolerate like toast or broth if your stomach is off, and rest more aggressively. Let symptoms, not ambition, decide whether any movement is worth it."
-            : "Hydrate first, keep food gentle and bland if your stomach feels off, use ginger chews if nausea shows up, and let symptoms rather than ambition decide how active you should be today.",
+            ? "Rest more aggressively and let symptoms, not ambition, decide whether any movement is worth it."
+            : "Downshift activity and let symptoms rather than ambition decide how active you should be today.",
         lateNightDisruption.likelyLane === "hangover_like"
           ? [
-              "Start with water plus electrolytes",
-              "Keep food easy to digest if your stomach is off",
-              "Use caffeine carefully rather than forcing intensity",
+              "Reduce nonessential activity",
+              "Protect a quiet recovery window",
+              "Avoid forcing intensity",
               "Downshift training if warm-up feels unusually flat",
             ]
           : lateNightDisruption.likelyLane === "illness_like"
             ? [
-                "Hydrate early and use electrolytes if intake feels low",
-                "Keep food bland and easy to tolerate if your stomach is off",
                 "Rest more aggressively than a normal recovery day",
+                "Reduce nonessential activity",
                 "Only use easy movement if symptoms and warm-up clearly allow it",
               ]
             : [
-                "Hydrate first",
-                "Keep food gentle and bland if your stomach feels off",
-                "Use ginger chews if nausea shows up",
+                "Downshift activity",
+                "Protect rest",
                 "Let symptoms decide how active you should be today",
               ],
         lateNightDisruption.likelyLane === "hangover_like"
           ? [
-              { label: "Electrolytes", icon: "electrolytes" },
-              { label: "Easy food", icon: "food" },
+              { label: "Downshift", icon: "rest" },
+              { label: "Easy movement", icon: "walk" },
             ]
           : lateNightDisruption.likelyLane === "illness_like"
             ? [
-                { label: "Hydrate", icon: "electrolytes" },
-                { label: "Easy food", icon: "food" },
+                { label: "Rest", icon: "rest" },
+                { label: "Symptom-led", icon: "symptoms" },
                 { label: "Rest harder", icon: "rest" },
               ]
             : [
-                { label: "Hydrate", icon: "electrolytes" },
-                { label: "Gentle food", icon: "food" },
+                { label: "Downshift", icon: "rest" },
+                { label: "Easy movement", icon: "walk" },
                 { label: "Symptom-led", icon: "symptoms" },
               ],
         lateNightDisruption.likelyLane === "hangover_like"
           ? [
               { label: "Easy walk", icon: "walk", conditionLabel: "if stiff" },
-              { label: "Early meal", icon: "food", conditionLabel: "if flat" },
+              { label: "Extra rest", icon: "rest", conditionLabel: "if flat" },
             ]
           : undefined,
         lateNightDisruption.blurb,
         lateNightDisruption.supportingMetrics,
         lateNightDisruption.confidence === "high" ? 3 - stalePenalty : 2 - stalePenalty,
         "high",
-      ),
-    );
-  }
-
-  if (nutritionTargets.campaign.active) {
-    const campaign = nutritionTargets.campaign;
-    const proteinShortfall = Math.max(0, campaign.proteinTargetG - nutritionActuals.proteinG);
-    const proteinStatus = proteinCoachingStatus(
-      nutritionActuals.proteinG,
-      campaign.proteinMinimumG,
-      campaign.proteinTargetG,
-    );
-    const belowMinimum = proteinStatus === "below_minimum";
-    const title = belowMinimum
-      ? "Highest ROI: finish the protein floor"
-      : proteinStatus === "below_target"
-        ? "Best move now: close the protein gap"
-        : "Hold the Cancun cut lane";
-    const action = belowMinimum
-      ? `Get at least ${campaign.proteinMinimumG - nutritionActuals.proteinG}g more protein today; ${campaign.proteinTargetG}g remains the target.`
-      : proteinStatus === "below_target"
-        ? `Add ${proteinShortfall}g protein without turning it into a large high-fat meal.`
-        : `Keep the day near ${nutritionTargets.effectiveCalorieTarget} calories and stop adding food just because protein is complete.`;
-    items.push(
-      recommendation(
-        "nutrition",
-        title,
-        action,
-        belowMinimum
-          ? [
-              `Reach at least ${campaign.proteinMinimumG}g protein`,
-              `Aim for ${campaign.proteinTargetG}g without a huge late meal`,
-              "Use simple lean protein and keep the calorie lane intact",
-            ]
-          : [
-              `Stay near ${nutritionTargets.effectiveCalorieTarget} calories`,
-              "Keep carbs around training and earlier meals",
-              "Do not compensate with fasting or a crash cut tomorrow",
-            ],
-        belowMinimum
-          ? [
-              { label: "Protein floor", icon: "protein" },
-              { label: "Lean meal", icon: "food" },
-              { label: "No crash cut", icon: "rest" },
-            ]
-          : [
-              { label: "Hold target", icon: "fuel" },
-              { label: "Training carbs", icon: "carbs" },
-              { label: "Stay consistent", icon: "food" },
-            ],
-        undefined,
-        `${campaign.phase.replace("_", " ")} phase with ${campaign.daysRemaining} days remaining. ${campaign.evidence}${campaign.plateauCue ? ` ${campaign.plateauCue}` : ""}`,
-        [
-          `${nutritionActuals.calories}/${nutritionTargets.effectiveCalorieTarget} cal`,
-          `${nutritionActuals.proteinG}/${campaign.proteinTargetG}g protein`,
-          campaign.qualifiedLossRateLbPerWeek === null
-            ? "Loss rate not yet qualified"
-            : `Loss rate ${campaign.qualifiedLossRateLbPerWeek.toFixed(2)} lb/week`,
-        ],
-        belowMinimum ? 3 - stalePenalty : 2 - stalePenalty,
-        belowMinimum ? "high" : "medium",
-      ),
-    );
-
-    const bloatContext = detectBloatContext(nutritionActuals.entries, campaign.finalWeek);
-    if (bloatContext.active) {
-      items.push(
-        recommendation(
-          "nutrition",
-          campaign.finalWeek ? "Final-week move: keep digestion predictable" : "Skip the bloat swing",
-          "Use a normal-sized simple meal next: lean protein, rice or potatoes, and tolerated fruit. Keep water and sodium consistent.",
-          [
-            "Choose chicken, salmon, steak, rice, potatoes, fruit, or tolerated yogurt/kefir",
-            "Skip another huge, late, high-fat, garlic-heavy, or cruciferous meal",
-            "Keep water, sodium, and carbs consistent; do not dehydrate",
-          ],
-          [
-            { label: "Simple meal", icon: "food" },
-            { label: "Steady fluids", icon: "electrolytes" },
-            { label: "Skip bloat stack", icon: "stomach" },
-          ],
-          undefined,
-          campaign.finalWeek
-            ? "Visual sharpness now depends more on predictable digestion, sleep, and stable water balance than squeezing out more scale loss."
-            : "The logged meal pattern can create a temporary stomach or water-weight swing without improving fat loss.",
-          [
-            campaign.finalWeek ? "Final week active" : "Meal trigger detected",
-            `${nutritionActuals.entries.length} meals logged`,
-            "No dehydration or sodium-cutting tricks",
-          ],
-          3 - stalePenalty,
-          "high",
-        ),
-      );
-    }
-  } else {
-    items.push(
-      recommendation(
-        "nutrition",
-        "Keep food simple and protein-consistent",
-        "Hit steady protein across the day and keep meals regular.",
-        ["Hit steady protein across the day", "Keep meals regular and simple"],
-        [
-          { label: "Protein", icon: "protein" },
-          { label: "Regular meals", icon: "food" },
-        ],
-        undefined,
-        "Longevity and body-composition goals respond better to consistency than dramatic swings.",
-        [
-          `Sleep ${readiness.sleepHours ?? "--"}h`,
-          `Workout count ${trainingLoad.hevyWorkoutCount7d}`,
-        ],
-        1,
-        "medium",
       ),
     );
   }
@@ -2601,32 +2259,6 @@ function buildRecommendations(
     );
   }
 
-  if (trainingLoad.hevyWorkoutCount7d >= 3) {
-    items.push(
-      recommendation(
-        "supplement",
-        "Keep the supplement stack conservative",
-        "If you already use creatine monohydrate and tolerate it well, keep it steady rather than adding more supplements.",
-        [
-          "Keep creatine steady if you already tolerate it well",
-          "Do not add new supplements just because today feels off",
-        ],
-        [
-          { label: "Keep steady", icon: "symptoms" },
-          { label: "No new stack", icon: "stomach" },
-        ],
-        undefined,
-        "Given regular lifting, creatine remains the highest-confidence supplement fit.",
-        [
-          `7d workouts ${trainingLoad.hevyWorkoutCount7d}`,
-          `7d volume ${poundsText(trainingLoad.hevyVolume7d, 0)}`,
-        ],
-        2,
-        "low",
-      ),
-    );
-  }
-
   if (stressFlags.illnessRisk) {
     items.push(
       recommendation(
@@ -2656,42 +2288,19 @@ function buildRecommendations(
     );
   }
 
-  if (
-    nutritionTargets.campaign.active
-      ? (nutritionTargets.campaign.qualifiedLossRateLbPerWeek ?? 0) > 1.25
-      : (readiness.bodyWeightDelta7dKg ?? 0) <= -0.9 && trainingLoad.hevyWorkoutCount7d >= 3
-  ) {
-    items.push(
-      recommendation(
-        "caution",
-        "Weight is dropping quickly relative to recent baseline",
-        nutritionTargets.campaign.active
-          ? "The cut is moving faster than planned. Use the automatic 150-calorie increase and protect sleep, digestion, and gym performance."
-          : "If that drop is not intentional, tighten recovery fueling and avoid stacking hard training on top of low energy availability.",
-        [
-          "Tighten recovery fueling if the drop is not intentional",
-          "Avoid stacking hard training on top of low energy availability",
-          "Use the next few days to stabilize instead of digging deeper",
-        ],
-        [
-          { label: "Fuel more", icon: "fuel" },
-          { label: "Back off load", icon: "rest" },
-          { label: "Stabilize", icon: "symptoms" },
-        ],
-        undefined,
-        "Short-term body-weight drops become more meaningful when training demand is already high.",
-        [
-          `Weight 7d delta ${signedPoundsText(readiness.bodyWeightDelta7dKg)}`,
-          `7d workouts ${trainingLoad.hevyWorkoutCount7d}`,
-          `Recovery ${readiness.recoveryScore ?? "--"}`,
-        ],
-        2 - stalePenalty,
-        "medium",
-      ),
-    );
-  }
+  return items.slice(0, 3);
+}
 
-  return items.slice(0, 5);
+function formatSleepStagePrompt(readiness: DailyReadiness) {
+  const stages = readiness.sleepStageSummary;
+  if (!stages) return "unavailable";
+  return [
+    `Deep ${stages.deepHours ?? "--"}h`,
+    `REM ${stages.remHours ?? "--"}h`,
+    `Light ${stages.lightHours ?? "--"}h`,
+    `Awake ${stages.awakeHours ?? "--"}h`,
+    `In bed ${stages.inBedHours ?? "--"}h`,
+  ].join(", ");
 }
 
 function buildWhyChangedToday(
@@ -2768,34 +2377,6 @@ function buildPromptText(summary: DailySummary) {
     `- Split recency observations: upper ${summary.trainingLoad.upperBodyDaysSince ?? "--"}d; lower ${summary.trainingLoad.lowerBodyDaysSince ?? "--"}d; push ${summary.trainingLoad.pushDaysSince ?? "--"}d; pull ${summary.trainingLoad.pullDaysSince ?? "--"}d`,
     `- Weekly goal pressure data: days left ${summary.physiqueDecision.daysLeftInWeek}; lifts remaining for weekly goal ${summary.physiqueDecision.liftsNeededForGoal}; weekly pace ${summary.physiqueDecision.weeklyPaceLabel}; goal still reachable if no lift today ${summary.physiqueDecision.canStillHitWeeklyGoalIfRestToday ? "yes" : "no"}`,
     `- Source signal factors: ${summary.physiqueDecision.decisionFactors.map((factor) => `${factor.label} (${factor.tone})`).join("; ") || "Not available"}`,
-    `- Calories target: ${summary.physiqueDecision.calorieTargetLabel}`,
-    `- Protein: ${summary.physiqueDecision.proteinTargetLabel}`,
-    `- Nutrition phase: ${summary.nutritionTargets.campaign.active ? `${summary.nutritionTargets.campaign.phase}, ${summary.nutritionTargets.campaign.daysRemaining} days to July 17` : "normal targets"}`,
-    `- Campaign targets: ${
-      summary.nutritionTargets.campaign.active
-        ? `${summary.nutritionTargets.campaign.averageCalorieTarget} average, ${summary.nutritionTargets.campaign.trainingDayCalorieTarget} training, ${summary.nutritionTargets.campaign.restDayCalorieTarget} rest, ${summary.nutritionTargets.campaign.proteinMinimumG}g protein minimum`
-        : "inactive"
-    }`,
-    `- Qualified loss rate: ${
-      summary.nutritionTargets.campaign.qualifiedLossRateLbPerWeek === null
-        ? "unavailable"
-        : `${summary.nutritionTargets.campaign.qualifiedLossRateLbPerWeek.toFixed(2)} lb/week`
-    }`,
-    `- Target evidence: ${summary.nutritionTargets.campaign.evidence}`,
-    `- Intake logged today: ${
-      summary.nutritionActuals.hasLoggedIntake
-        ? `${summary.nutritionActuals.calories}/${summary.nutritionActuals.calorieTarget ?? "--"} cal, ${summary.nutritionActuals.proteinG}/${summary.nutritionActuals.proteinTargetG ?? "--"}g protein, ${summary.nutritionActuals.carbsG}g carbs, ${summary.nutritionActuals.fatG}g fat`
-        : "No meals logged yet"
-    }`,
-    `- Intake remaining: ${
-      summary.nutritionActuals.remainingCalories === null
-        ? "No calorie target"
-        : `${summary.nutritionActuals.remainingCalories} cal`
-    }, ${
-      summary.nutritionActuals.remainingProteinG === null
-        ? "no protein target"
-        : `${summary.nutritionActuals.remainingProteinG}g protein`
-    }`,
     "",
     "Metrics",
     `- Recovery: ${summary.readiness.recoveryScore ?? "--"}%`,
@@ -2837,15 +2418,12 @@ function buildPromptText(summary: DailySummary) {
 
 export async function getDailySummary(): Promise<DailySummary> {
   const now = new Date();
-  const dateKey = getDateKey(now);
-  const [freshness, miniTrends, trendSeries, readiness, trainingLoad, manualNutritionTargets, campaignWeights] = await Promise.all([
+  const [freshness, miniTrends, trendSeries, readiness, trainingLoad] = await Promise.all([
     buildFreshness(),
     buildMiniTrends(),
     buildTrendSeries(),
     buildReadiness(),
     buildTrainingLoad(),
-    getNutritionTargets(),
-    getCampaignWeightObservations(now),
   ]);
   const stressFlags = buildStressFlags(readiness, trainingLoad);
   const strengthProgression = buildStrengthProgression(await getRecentHevyWorkouts(90));
@@ -2857,50 +2435,12 @@ export async function getDailySummary(): Promise<DailySummary> {
     buildActivityContext(now),
   ]);
   const historicalContext = await buildHistoricalContext(readiness, now);
-  const actualLiftToday = hasLiftToday(trainingLoad, now);
-  const provisionalCampaign = buildCancunCampaign({
-    now,
-    observations: campaignWeights,
-    isTrainingDay: actualLiftToday,
-  });
-  const provisionalNutritionTargets = buildNutritionTargets(
-    manualNutritionTargets,
-    readiness,
-    trainingLoad,
-    provisionalCampaign,
-  );
-  const provisionalNutritionActuals = await buildNutritionActuals(dateKey, provisionalNutritionTargets);
-  const provisionalDecision = buildPhysiqueDecision(
-    readiness,
-    trainingLoad,
-    stressFlags,
-    lateNightDisruption,
-    activityContext,
-    provisionalNutritionTargets,
-    provisionalNutritionActuals,
-    strengthProgression,
-    now,
-  );
-  const campaign = buildCancunCampaign({
-    now,
-    observations: campaignWeights,
-    isTrainingDay: actualLiftToday || provisionalDecision.trainingAvailability === "Train",
-  });
-  const nutritionTargets = buildNutritionTargets(
-    manualNutritionTargets,
-    readiness,
-    trainingLoad,
-    campaign,
-  );
-  const nutritionActuals = await buildNutritionActuals(dateKey, nutritionTargets);
   const basePhysiqueDecision = buildPhysiqueDecision(
     readiness,
     trainingLoad,
     stressFlags,
     lateNightDisruption,
     activityContext,
-    nutritionTargets,
-    nutritionActuals,
     strengthProgression,
     now,
   );
@@ -2910,7 +2450,6 @@ export async function getDailySummary(): Promise<DailySummary> {
     physiqueDecision,
     readiness,
     trainingLoad,
-    nutritionTargets,
   );
   const recommendations = buildRecommendations(
     readiness,
@@ -2920,8 +2459,6 @@ export async function getDailySummary(): Promise<DailySummary> {
     stressFlags,
     lateNightDisruption,
     freshness,
-    nutritionTargets,
-    nutritionActuals,
   );
   const whyChangedToday = buildWhyChangedToday(
     readiness,
@@ -2933,9 +2470,7 @@ export async function getDailySummary(): Promise<DailySummary> {
 
   const summary: DailySummary = {
     date: now.toISOString(),
-    contextLine: nutritionTargets.campaign.active
-      ? `Goal: arrive lean, recovered, and low-bloat for Cancun on July 17; ${nutritionTargets.campaign.daysRemaining} days remain.`
-      : "Goal: longevity and feeling good first; strength/body composition second.",
+    contextLine: "Training and recovery data dashboard.",
     miniTrends,
     trendSeries,
     readiness,
@@ -2944,8 +2479,6 @@ export async function getDailySummary(): Promise<DailySummary> {
     lateNightDisruption,
     overnightRead,
     strainSummary,
-    nutritionTargets,
-    nutritionActuals,
     physiqueDecision,
     activityContext,
     bodyCard,

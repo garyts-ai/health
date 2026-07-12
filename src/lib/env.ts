@@ -3,7 +3,7 @@ type RequiredEnvKey =
   | "WHOOP_CLIENT_SECRET"
   | "WHOOP_REDIRECT_URI";
 
-type OptionalEnvKey = "HEVY_API_KEY" | "DISCORD_WEBHOOK_URL";
+type OptionalEnvKey = "HEVY_API_KEY";
 
 function readEnv(key: RequiredEnvKey | OptionalEnvKey) {
   const value = process.env[key];
@@ -45,20 +45,6 @@ export function getHevyApiKey() {
 
   if (!value) {
     throw new Error("Missing required environment variable: HEVY_API_KEY");
-  }
-
-  return value;
-}
-
-export function hasDiscordWebhookUrl() {
-  return Boolean(readEnv("DISCORD_WEBHOOK_URL"));
-}
-
-export function getDiscordWebhookUrl() {
-  const value = readEnv("DISCORD_WEBHOOK_URL");
-
-  if (!value) {
-    throw new Error("Missing required environment variable: DISCORD_WEBHOOK_URL");
   }
 
   return value;

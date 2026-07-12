@@ -1,0 +1,6 @@
+.section { opacity: 1; scroll-margin-top: calc(var(--district-header-height) + 12px); }
+.section:target { animation: target-in 180ms var(--os-ease-out) both; }
+.section[data-initial="true"] > * { animation: page-in var(--os-duration-entry) var(--os-ease-out) both; }
+@keyframes target-in { from { opacity: .86; transform: translateY(4px); } }
+@keyframes page-in { from { opacity: .5; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .section:target,.section[data-initial="true"] > * { animation: none; } }

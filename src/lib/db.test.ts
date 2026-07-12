@@ -68,3 +68,21 @@ test("applySchema upgrades existing WHOOP workouts with activity detail columns"
 
   db.close();
 });
+
+test("applySchema removes Discord delivery history but preserves nutrition history tables", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("CREATE TABLE discord_delivery_runs (id INTEGER PRIMARY KEY)");
+
+  applySchema(db);
+
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+    .all()
+    .map((row) => String((row as { name: unknown }).name));
+
+  assert.equal(tables.includes("discord_delivery_runs"), false);
+  assert.equal(tables.includes("nutrition_targets"), true);
+  assert.equal(tables.includes("nutrition_intake_entries"), true);
+
+  db.close();
+});

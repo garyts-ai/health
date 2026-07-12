@@ -1,8 +1,6 @@
 export type RecommendationCategory =
   | "training"
-  | "nutrition"
   | "recovery"
-  | "supplement"
   | "caution";
 
 export type RecommendationPriority = "high" | "medium" | "low";
@@ -13,13 +11,7 @@ export type RecommendationActionIcon =
   | "rest"
   | "walk"
   | "technique"
-  | "electrolytes"
-  | "food"
-  | "ginger"
-  | "stomach"
-  | "protein"
-  | "carbs"
-  | "fuel"
+  | "intensity"
   | "sleep"
   | "stress"
   | "symptoms";
@@ -162,45 +154,6 @@ export type DailyRecentExerciseDetail = {
   setSummary: string;
 };
 
-export type DailyNutritionTargets = {
-  calorieTarget: number | null;
-  proteinTargetG: number | null;
-  effectiveCalorieTarget: number | null;
-  effectiveProteinTargetG: number | null;
-  smartCalorieTarget: number | null;
-  smartProteinTargetG: number | null;
-  targetSource: "campaign" | "manual" | "smart" | "missing";
-  smartReason: string;
-  updatedAt: string | null;
-  campaign: import("@/lib/insights/nutrition-campaign").CancunCampaign;
-};
-
-export type DailyNutritionIntakeEntry = {
-  id: number;
-  mealType: string;
-  label: string;
-  calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
-  note: string | null;
-  loggedAt: string;
-};
-
-export type DailyNutritionActuals = {
-  dateKey: string;
-  calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
-  remainingCalories: number | null;
-  remainingProteinG: number | null;
-  calorieTarget: number | null;
-  proteinTargetG: number | null;
-  hasLoggedIntake: boolean;
-  entries: DailyNutritionIntakeEntry[];
-};
-
 export type DailyWeightTrend = {
   currentLb: number | null;
   average7dLb: number | null;
@@ -228,9 +181,6 @@ export type DailyPhysiqueDecision = {
   trainingIntent: "Push" | "Maintain" | "Back off";
   intensityLabel: string;
   sessionAnchors: string[];
-  calorieRecommendation: "maintain" | "+150 cal" | "-150 cal" | "set target";
-  calorieTargetLabel: string;
-  proteinTargetLabel: string;
   mainBottleneck: string;
   primaryDecisionReason: string;
   daysLeftInWeek: number;
@@ -287,8 +237,6 @@ export type WeeklyPlanDay = {
   workoutType: "Upper" | "Lower" | "Rest" | "Recovery";
   intent: "Push" | "Maintain" | "Back off" | "Recover";
   anchors: string[];
-  calorieTarget: number | null;
-  proteinTargetG: number | null;
   recoveryPriority: string;
   rationale: string;
   guardrail: string | null;
@@ -347,6 +295,7 @@ export type BodyCardSummary = {
 };
 
 export type TrendPoint = {
+  dateKey?: string;
   label: string;
   value: number | null;
 };
@@ -447,8 +396,6 @@ export type DailySummary = {
     blurb: string;
     supportingPoints: string[];
   };
-  nutritionTargets: DailyNutritionTargets;
-  nutritionActuals: DailyNutritionActuals;
   physiqueDecision: DailyPhysiqueDecision;
   activityContext: DailyActivityContext;
   bodyCard: BodyCardSummary;
@@ -458,21 +405,4 @@ export type DailySummary = {
   historicalContext?: DailyHistoricalContext;
   weeklyPlan?: WeeklyPlan;
   llmPromptText: string;
-};
-
-export type DiscordDeliveryTrigger = "manual" | "scheduled";
-
-export type DiscordDeliveryRunStatus = "success" | "failed" | "skipped";
-
-export type DiscordDeliveryStatus = {
-  today: {
-    dateKey: string;
-    lastStatus: DiscordDeliveryRunStatus | null;
-    lastTrigger: DiscordDeliveryTrigger | null;
-    lastSentAt: string | null;
-    lastErrorMessage: string | null;
-    hasSuccessfulSend: boolean;
-    scheduledSentAt: string | null;
-  };
-  latestSuccessfulSendAt: string | null;
 };
