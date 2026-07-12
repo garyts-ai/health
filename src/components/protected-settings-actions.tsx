@@ -19,6 +19,7 @@ type ProviderCard = {
   reconnectHref: string | null;
   reconnectLabel: string;
   syncAction: string;
+  syncNotice: string | null;
 };
 
 function formatTimestamp(value: string | null) {
@@ -34,7 +35,22 @@ function subscribeToBrowserHost() { return () => {}; }
 function getBrowserOAuthSnapshot() { return typeof window !== "undefined" && isSafeOAuthLocation(window.location); }
 function getServerOAuthSnapshot() { return false; }
 
-export function ProtectedSettingsActions({ hevy, summary, whoop }: { hevy: HevyConnectionStatus; summary: DailySummary; whoop: WhoopConnectionStatus }) {
+function providerNotice(provider: "WHOOP" | "Hevy", status?: string) {
+  if (!status) return null;
+  const label = provider === "WHOOP" ? "WHOOP" : "Hevy";
+  if (status === "sync-success") return `${label} sync completed.`;
+  if (status === "sync-unchanged") return `${label} sync completed; no newer records were found.`;
+  if (status === "sync-skipped") return `${label} sync was skipped because the provider is not connected.`;
+  if (status === "sync-failed") return `${label} sync failed. The last known records are still shown.`;
+  if (status === "connected") return `${label} connected and the initial sync completed.`;
+  if (status === "oauth-denied") return `${label} authorization was denied; existing records remain available.`;
+  if (status === "invalid-state") return `${label} authorization could not be verified. Try connecting again.`;
+  if (status === "missing-code") return `${label} authorization returned without a code.`;
+  if (status === "not-configured") return `${label} is not configured yet.`;
+  return null;
+}
+
+export function ProtectedSettingsActions({ hevy, summary, syncStatus, whoop }: { hevy: HevyConnectionStatus; summary: DailySummary; syncStatus?: { whoop?: string; hevy?: string }; whoop: WhoopConnectionStatus }) {
   const canUseWhoopOAuth = useSyncExternalStore(subscribeToBrowserHost, getBrowserOAuthSnapshot, getServerOAuthSnapshot);
   const providers: ProviderCard[] = [
     {
@@ -42,11 +58,13 @@ export function ProtectedSettingsActions({ hevy, summary, whoop }: { hevy: HevyC
       lastSyncCompletedAt: whoop.lastSyncCompletedAt, lastSyncError: whoop.lastSyncError, lastSyncStatus: whoop.lastSyncStatus,
       reconnectHref: whoop.isConfigured && canUseWhoopOAuth ? "/api/auth/whoop" : null,
       reconnectLabel: whoop.isConfigured ? "Reconnect requires HTTPS" : "Configure WHOOP", syncAction: "/api/whoop/sync",
+      syncNotice: providerNotice("WHOOP", syncStatus?.whoop),
     },
     {
       name: "Hevy", connected: hevy.connected, configured: hevy.isConfigured, stale: hevy.isStale,
       lastSyncCompletedAt: hevy.lastSyncCompletedAt, lastSyncError: null, lastSyncStatus: hevy.lastSyncStatus,
       reconnectHref: null, reconnectLabel: "Configure Hevy", syncAction: "/api/hevy/sync",
+      syncNotice: providerNotice("Hevy", syncStatus?.hevy),
     },
   ];
 
@@ -65,6 +83,7 @@ export function ProtectedSettingsActions({ hevy, summary, whoop }: { hevy: HevyC
               <div><h4>{provider.name}</h4><p>Last sync {formatTimestamp(provider.lastSyncCompletedAt)}</p></div>
               <span className={styles.state}>{state}</span>
               {provider.lastSyncStatus === "failed" && provider.lastSyncError ? <p className={styles.error}>Last error: {provider.lastSyncError}</p> : null}
+              {provider.syncNotice ? <p className={styles.notice} role="status">{provider.syncNotice}</p> : null}
               <div className={styles.actions}>
                 {provider.reconnectHref ? <a href={provider.reconnectHref}>Reconnect</a> : <button type="button" disabled>{provider.reconnectLabel}</button>}
                 <form action={provider.syncAction} method="post"><button type="submit" disabled={!provider.configured}>Sync {provider.name}</button></form>

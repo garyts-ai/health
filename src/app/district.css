@@ -14,7 +14,6 @@
   --district-green: #5ff0ad;
   --district-violet: #9a72ff;
   --district-danger: #ff7b79;
-  --district-header-height: 68px;
   --district-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -82,10 +81,15 @@ body {
   margin-inline: auto;
 }
 
+.district-error-state { display: grid; gap: 10px; max-width: 42rem; margin: 18px auto; border: 1px solid var(--district-line-strong); background: var(--district-surface); padding: 20px; color: var(--district-text); }
+.district-error-state p { margin: 0; color: var(--district-muted); font-size: .85rem; line-height: 1.5; }
+.district-error-state button,.district-error-state a { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid var(--district-line-strong); background: transparent; padding: 0 14px; color: var(--district-text); text-decoration: none; cursor: pointer; }
+.district-error-state button:hover,.district-error-state a:hover { border-color: var(--district-cyan); }
+.district-error-state--route { min-height: 100vh; align-content: center; justify-items: start; margin: 0; border: 0; }
+
 .district-section {
   position: relative;
   z-index: 1;
-  scroll-margin-top: calc(var(--district-header-height) + 12px);
   border-top: 1px solid var(--district-line);
   padding: 88px 0 96px;
 }

@@ -1,4 +1,4 @@
-.section { opacity: 1; scroll-margin-top: calc(var(--district-header-height) + 12px); }
+.section { opacity: 1; }
 .section:target { animation: target-in 180ms var(--os-ease-out) both; }
 .section[data-initial="true"] > * { animation: page-in var(--os-duration-entry) var(--os-ease-out) both; }
 @keyframes target-in { from { opacity: .86; transform: translateY(4px); } }

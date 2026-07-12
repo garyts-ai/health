@@ -3,78 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type SyncState = "idle" | "pulling" | "syncing" | "success" | "failed";
+type RefreshState = "idle" | "pulling" | "refreshing" | "success";
 
 const PULL_THRESHOLD = 92;
 const MAX_PULL = 132;
-const AUTO_SYNC_COOLDOWN_MS = 60_000;
-const AUTO_SYNC_STORAGE_KEY = "health-os:auto-sync:last-run";
-
-async function syncSource(path: string) {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { accept: "application/json" },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Sync failed for ${path}`);
-  }
-}
-
-async function syncAllSources() {
-  const results = await Promise.allSettled([
-    syncSource("/api/whoop/sync"),
-    syncSource("/api/hevy/sync"),
-  ]);
-
-  return results.some((result) => result.status === "fulfilled");
-}
-
 export function MobilePullSync() {
   const router = useRouter();
   const startYRef = useRef<number | null>(null);
   const pullRef = useRef(0);
-  const autoSyncStartedRef = useRef(false);
   const [pull, setPull] = useState(0);
-  const [state, setState] = useState<SyncState>("idle");
-
-  useEffect(() => {
-    if (autoSyncStartedRef.current) {
-      return;
-    }
-
-    autoSyncStartedRef.current = true;
-    const lastRun = Number(window.sessionStorage.getItem(AUTO_SYNC_STORAGE_KEY) ?? 0);
-    const now = Date.now();
-
-    if (Number.isFinite(lastRun) && now - lastRun < AUTO_SYNC_COOLDOWN_MS) {
-      return;
-    }
-
-    window.sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(now));
-
-    const runAutoSync = async () => {
-      setState("syncing");
-
-      try {
-        const hadSuccess = await syncAllSources();
-        setState(hadSuccess ? "success" : "failed");
-        if (hadSuccess) {
-          router.refresh();
-        }
-        window.setTimeout(() => setState("idle"), hadSuccess ? 1800 : 2400);
-      } catch {
-        setState("failed");
-        window.setTimeout(() => setState("idle"), 2400);
-      }
-    };
-
-    const timer = window.setTimeout(() => {
-      void runAutoSync();
-    }, 850);
-
-    return () => window.clearTimeout(timer);
-  }, [router]);
+  const [state, setState] = useState<RefreshState>("idle");
 
   useEffect(() => {
     if (!window.matchMedia("(pointer: coarse)").matches) {
@@ -88,25 +26,8 @@ export function MobilePullSync() {
       setState((current) => (current === "pulling" ? "idle" : current));
     };
 
-    const runSync = async () => {
-      setState("syncing");
-
-      try {
-        const hadSuccess = await syncAllSources();
-        setState(hadSuccess ? "success" : "failed");
-        if (hadSuccess) {
-          window.sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
-          router.refresh();
-        }
-        window.setTimeout(() => setState("idle"), hadSuccess ? 1800 : 2400);
-      } catch {
-        setState("failed");
-        window.setTimeout(() => setState("idle"), 2400);
-      }
-    };
-
     const onTouchStart = (event: TouchEvent) => {
-      if (state === "syncing" || window.scrollY > 0 || event.touches.length !== 1) {
+      if (state === "refreshing" || window.scrollY > 0 || event.touches.length !== 1) {
         return;
       }
 
@@ -114,7 +35,7 @@ export function MobilePullSync() {
     };
 
     const onTouchMove = (event: TouchEvent) => {
-      if (startYRef.current === null || state === "syncing") {
+      if (startYRef.current === null || state === "refreshing") {
         return;
       }
 
@@ -131,11 +52,14 @@ export function MobilePullSync() {
     };
 
     const onTouchEnd = () => {
-      const shouldSync = pullRef.current >= PULL_THRESHOLD;
+      const shouldRefresh = pullRef.current >= PULL_THRESHOLD;
       reset();
 
-      if (shouldSync && state !== "syncing") {
-        void runSync();
+      if (shouldRefresh && state !== "refreshing") {
+        setState("refreshing");
+        router.refresh();
+        window.setTimeout(() => setState("success"), 250);
+        window.setTimeout(() => setState("idle"), 1_800);
       }
     };
 
@@ -156,23 +80,22 @@ export function MobilePullSync() {
     return null;
   }
 
-  const progress = state === "syncing" || state === "success" ? 1 : Math.min(1, pull / PULL_THRESHOLD);
+  const progress = state === "refreshing" || state === "success" ? 1 : Math.min(1, pull / PULL_THRESHOLD);
   const label =
-    state === "syncing"
-      ? "Syncing WHOOP + Hevy"
+    state === "refreshing"
+      ? "Refreshing dashboard"
       : state === "success"
-        ? "Sources updated"
-        : state === "failed"
-          ? "Sync failed"
-          : progress >= 1
-            ? "Release to sync sources"
-            : "Pull to sync sources";
+        ? "Dashboard refreshed"
+        : progress >= 1
+          ? "Release to refresh dashboard"
+          : "Pull to refresh dashboard";
 
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed left-0 right-0 top-3 z-50 flex justify-center px-4 md:hidden"
+      className="pointer-events-none fixed left-0 right-0 z-50 flex justify-center px-4 md:hidden"
       style={{
+        top: "calc(var(--district-header-height) + 0.75rem)",
         opacity: state === "pulling" ? 0.64 + progress * 0.36 : 1,
         transform: `translateY(${state === "pulling" ? Math.min(42, pull * 0.28) : 0}px)`,
       }}

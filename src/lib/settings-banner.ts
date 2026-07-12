@@ -6,11 +6,15 @@ const whoopMessages: Record<string, string> = {
   "not-configured": "WHOOP credentials are missing. Add them to .env.local before connecting.",
   "sync-failed": "WHOOP connected, but the sync step failed. Try syncing again.",
   "sync-success": "WHOOP sync completed successfully.",
+  "sync-unchanged": "WHOOP sync completed; no newer records were found.",
+  "sync-skipped": "WHOOP sync was skipped because the provider is not connected.",
 };
 
 const hevyMessages: Record<string, string> = {
   "not-configured": "Hevy sync is disabled until HEVY_API_KEY is added to .env.local.",
   "sync-success": "Hevy sync completed successfully.",
+  "sync-unchanged": "Hevy sync completed; no newer workouts were found.",
+  "sync-skipped": "Hevy sync was skipped because the provider is not connected.",
   "sync-failed": "Hevy sync failed. Double-check the API key and try again.",
 };
 
