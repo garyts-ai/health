@@ -1,5 +1,9 @@
 import { dbAll, dbGet } from "@/lib/db";
-import type { DailyHistoricalContext, DailyReadiness } from "@/lib/insights/types";
+import type {
+  DailyHistoricalContext,
+  DailyPhysiqueDecision,
+  DailyReadiness,
+} from "@/lib/insights/types";
 
 type HistoricalRow = {
   date: string;
@@ -21,15 +25,32 @@ function percentile(values: number[], value: number | null) {
   return Math.round((values.filter((item) => item <= value).length / values.length) * 100);
 }
 
-export function applyHistoricalModifier<T extends { trainingIntent: "Push" | "Maintain" | "Back off" }>(
+export function applyHistoricalModifier<
+  T extends Pick<
+    DailyPhysiqueDecision,
+    "trainingIntent" | "intensityLabel" | "primaryDecisionReason" | "mainBottleneck" | "decisionFactors"
+  >,
+>(
   decision: T,
   context: DailyHistoricalContext,
 ) {
   if (!context.available || context.confidence === "low") return decision;
-  if (context.qualifier?.includes("bottom quartile") && decision.trainingIntent === "Push") {
-    return { ...decision, trainingIntent: "Maintain" as const };
+  if (context.strongestDeviationUnfavorable !== true || decision.trainingIntent !== "Push") {
+    return decision;
   }
-  return decision;
+
+  const detail = context.behaviorCue ?? context.qualifier ?? "Historical context supports maintaining normal volume.";
+  return {
+    ...decision,
+    trainingIntent: "Maintain" as const,
+    intensityLabel: "Keep normal volume, no forced PRs",
+    primaryDecisionReason: `${decision.primaryDecisionReason} Historical context supports maintaining normal volume.`,
+    mainBottleneck: `${detail} Maintain normal volume today.`,
+    decisionFactors: [
+      ...decision.decisionFactors.filter((factor) => factor.label !== "Historical context").slice(0, 5),
+      { label: "Historical context", tone: "caution" as const, detail },
+    ],
+  };
 }
 
 export async function buildHistoricalContext(
@@ -40,7 +61,7 @@ export async function buildHistoricalContext(
     "SELECT imported_at, date_end FROM whoop_export_imports ORDER BY imported_at DESC LIMIT 1",
   );
   if (!importRow) {
-    return { available: false, importAgeTier: "missing", coverageEnd: null, confidence: "low", qualifier: null, strongestDeviation: null, behaviorCue: null };
+    return { available: false, importAgeTier: "missing", coverageEnd: null, confidence: "low", qualifier: null, strongestDeviation: null, strongestDeviationUnfavorable: false, behaviorCue: null };
   }
 
   const start = new Date(now.getTime() - 90 * 86_400_000).toISOString();
@@ -80,6 +101,11 @@ export async function buildHistoricalContext(
   const qualifier = strongest?.percentile === null || strongest?.percentile === undefined
     ? null
     : `${strongest.label} is in your ${strongest.percentile <= 25 ? "bottom quartile" : strongest.percentile >= 75 ? "top quartile" : `${strongest.percentile}th percentile`}.`;
+  const strongestDeviationUnfavorable = strongest?.percentile === null || strongest?.percentile === undefined
+    ? false
+    : strongest.lowerBad
+      ? strongest.percentile <= 25
+      : strongest.percentile >= 75;
 
   return {
     available: rows.length >= 14,
@@ -91,6 +117,7 @@ export async function buildHistoricalContext(
       !strongest || strongest.baseline === null || strongest.value === null
         ? null
         : `${strongest.label}: ${strongest.value.toFixed(1)} vs ${strongest.baseline.toFixed(1)} personal median`,
-    behaviorCue: null,
+    strongestDeviationUnfavorable,
+    behaviorCue: strongestDeviationUnfavorable ? qualifier : null,
   };
 }

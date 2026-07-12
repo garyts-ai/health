@@ -49,6 +49,10 @@ export type DailyFreshness = {
 };
 
 export type DailyReadiness = {
+  observationStatus?: "available" | "unavailable";
+  observationReasons?: string[];
+  observationObservedAt?: string | null;
+  observationCycleId?: number | null;
   recoveryScore: number | null;
   recoveryTrend3d: number | null;
   bodyWeightKg: number | null;
@@ -227,6 +231,7 @@ export type DailyHistoricalContext = {
   confidence: "high" | "medium" | "low";
   qualifier: string | null;
   strongestDeviation: string | null;
+  strongestDeviationUnfavorable?: boolean;
   behaviorCue: string | null;
 };
 

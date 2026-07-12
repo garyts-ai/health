@@ -22,11 +22,30 @@ const trainingLoad = {
 test("historical context can soften push but cannot flip availability or split", () => {
   const modified = applyHistoricalModifier(decision, {
     available: true, importAgeTier: "current", coverageEnd: null, confidence: "high",
-    qualifier: "Sleep is in your bottom quartile.", strongestDeviation: null, behaviorCue: null,
+    qualifier: "Sleep is in your bottom quartile.", strongestDeviation: null,
+    strongestDeviationUnfavorable: true, behaviorCue: "Sleep is in your bottom quartile.",
   });
   assert.equal(modified.trainingIntent, "Maintain");
   assert.equal(modified.trainingAvailability, "Train");
   assert.equal(modified.trainingTarget, "Upper");
+  assert.equal(modified.intensityLabel, "Keep normal volume, no forced PRs");
+  assert.match(modified.primaryDecisionReason, /Historical context supports maintaining normal volume/);
+  assert.equal(
+    (modified.decisionFactors as DailyPhysiqueDecision["decisionFactors"]).at(-1)?.label,
+    "Historical context",
+  );
+});
+
+test("favorable low resting heart rate does not soften a push decision", () => {
+  const modified = applyHistoricalModifier(decision, {
+    available: true, importAgeTier: "current", coverageEnd: null, confidence: "high",
+    qualifier: "Resting HR is in your bottom quartile.", strongestDeviation: null,
+    strongestDeviationUnfavorable: false, behaviorCue: null,
+  });
+
+  assert.equal(modified.trainingIntent, "Push");
+  assert.equal(modified.intensityLabel, "");
+  assert.equal(modified.primaryDecisionReason, "Train upper today.");
 });
 
 test("weekly plan creates seven Monday-Sunday days and four total lift slots", () => {

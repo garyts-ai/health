@@ -46,6 +46,10 @@ export function makeReadiness(overrides: Partial<DailyReadiness> = {}): DailyRea
 
 export function makeMissingReadiness(): DailyReadiness {
   return makeReadiness({
+    observationStatus: "unavailable",
+    observationReasons: ["missing"],
+    observationObservedAt: null,
+    observationCycleId: null,
     recoveryScore: null,
     recoveryTrend3d: null,
     whoopDayStrain: null,

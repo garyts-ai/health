@@ -10,8 +10,14 @@ import {
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
 import { applyHistoricalModifier, buildHistoricalContext } from "@/lib/insights/historical-context";
 import { buildWeeklyPlan } from "@/lib/insights/weekly-plan";
+import { buildReadinessSnapshot } from "@/lib/insights/readiness-snapshot";
 import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
+import type {
+  WhoopCycleSummary,
+  WhoopRecoverySummary,
+  WhoopSleepSummary,
+} from "@/lib/whoop/types";
 import type {
   BodyCardSummary,
   DailyActivityContext,
@@ -37,8 +43,14 @@ import type {
 } from "@/lib/insights/types";
 
 type WhoopSleepRow = {
+  id: string;
+  cycle_id: number | null;
   start: string;
   end: string;
+  timezone_offset: string | null;
+  nap: boolean | number;
+  score_state: string | null;
+  respiratory_rate: number | null;
   sleep_performance_percentage: number | null;
   sleep_consistency_percentage: number | null;
   sleep_efficiency_percentage: number | null;
@@ -51,6 +63,7 @@ type WhoopSleepRow = {
   sleep_needed_debt_milli: number | null;
   sleep_needed_strain_milli: number | null;
   sleep_needed_nap_milli: number | null;
+  raw_json: string;
 };
 
 type WhoopBodyMeasurementRow = {
@@ -70,10 +83,14 @@ type WhoopCycleRow = {
   average_heart_rate: number | null;
   max_heart_rate: number | null;
   raw_json: string;
+  score_state: string | null;
 };
 
 type WhoopRecoveryRow = {
+  cycle_id: number;
   created_at: string;
+  updated_at: string;
+  score_state: string | null;
   recovery_score: number | null;
   resting_heart_rate: number | null;
   hrv_rmssd_milli: number | null;
@@ -165,15 +182,50 @@ function hoursFromMillis(milliseconds: number | null) {
   return milliseconds === null ? null : milliseconds / 3_600_000;
 }
 
-function getActualSleepHours(row: WhoopSleepRow | null) {
+type SleepMetricsRow = {
+  [key: string]: unknown;
+  total_in_bed_time_milli?: number | null;
+  total_awake_time_milli?: number | null;
+  total_light_sleep_time_milli?: number | null;
+  total_slow_wave_sleep_time_milli?: number | null;
+  total_rem_sleep_time_milli?: number | null;
+  totalInBedTimeMilli?: number | null;
+  totalAwakeTimeMilli?: number | null;
+  totalLightSleepTimeMilli?: number | null;
+  totalSlowWaveSleepTimeMilli?: number | null;
+  totalRemSleepTimeMilli?: number | null;
+};
+
+function getSleepMetrics(row: SleepMetricsRow) {
+  if ("totalLightSleepTimeMilli" in row) {
+    return {
+      inBed: row.totalInBedTimeMilli ?? null,
+      awake: row.totalAwakeTimeMilli ?? null,
+      light: row.totalLightSleepTimeMilli ?? null,
+      slowWave: row.totalSlowWaveSleepTimeMilli ?? null,
+      rem: row.totalRemSleepTimeMilli ?? null,
+    };
+  }
+
+  return {
+    inBed: row.total_in_bed_time_milli,
+    awake: row.total_awake_time_milli,
+    light: row.total_light_sleep_time_milli,
+    slowWave: row.total_slow_wave_sleep_time_milli,
+    rem: row.total_rem_sleep_time_milli,
+  };
+}
+
+function getActualSleepHours(row: SleepMetricsRow | null) {
   if (!row) {
     return null;
   }
 
+  const metrics = getSleepMetrics(row);
   const stageSleepMillis = sum([
-    row.total_light_sleep_time_milli,
-    row.total_slow_wave_sleep_time_milli,
-    row.total_rem_sleep_time_milli,
+    metrics.light,
+    metrics.slowWave,
+    metrics.rem,
   ]);
 
   if (stageSleepMillis > 0) {
@@ -181,27 +233,22 @@ function getActualSleepHours(row: WhoopSleepRow | null) {
   }
 
   if (
-    typeof row.total_in_bed_time_milli === "number" &&
-    typeof row.total_awake_time_milli === "number"
+    typeof metrics.inBed === "number" &&
+    typeof metrics.awake === "number"
   ) {
-    return Math.max(0, (row.total_in_bed_time_milli - row.total_awake_time_milli) / 3_600_000);
+    return Math.max(0, (metrics.inBed - metrics.awake) / 3_600_000);
   }
 
-  return hoursFromMillis(row.total_in_bed_time_milli);
+  return hoursFromMillis(metrics.inBed ?? null);
 }
 
-function buildSleepStageSummary(row: WhoopSleepRow | null): DailyReadiness["sleepStageSummary"] {
+function buildSleepStageSummary(row: SleepMetricsRow | null): DailyReadiness["sleepStageSummary"] {
   if (!row) {
     return null;
   }
 
-  const values = [
-    row.total_in_bed_time_milli,
-    row.total_awake_time_milli,
-    row.total_light_sleep_time_milli,
-    row.total_slow_wave_sleep_time_milli,
-    row.total_rem_sleep_time_milli,
-  ];
+  const metrics = getSleepMetrics(row);
+  const values = [metrics.inBed, metrics.awake, metrics.light, metrics.slowWave, metrics.rem];
   const hasAnyStageValue = values.some((value) => typeof value === "number" && value > 0);
 
   if (!hasAnyStageValue) {
@@ -209,11 +256,11 @@ function buildSleepStageSummary(row: WhoopSleepRow | null): DailyReadiness["slee
   }
 
   return {
-    inBedHours: round(hoursFromMillis(row.total_in_bed_time_milli)),
-    awakeHours: round(hoursFromMillis(row.total_awake_time_milli)),
-    lightHours: round(hoursFromMillis(row.total_light_sleep_time_milli)),
-    deepHours: round(hoursFromMillis(row.total_slow_wave_sleep_time_milli)),
-    remHours: round(hoursFromMillis(row.total_rem_sleep_time_milli)),
+    inBedHours: round(hoursFromMillis(metrics.inBed ?? null)),
+    awakeHours: round(hoursFromMillis(metrics.awake ?? null)),
+    lightHours: round(hoursFromMillis(metrics.light ?? null)),
+    deepHours: round(hoursFromMillis(metrics.slowWave ?? null)),
+    remHours: round(hoursFromMillis(metrics.rem ?? null)),
   };
 }
 
@@ -226,8 +273,8 @@ function daysSince(isoDate: string | null) {
   return Math.max(0, Math.floor(diff / DAY_MS));
 }
 
-function getStartDate(days: number) {
-  return new Date(Date.now() - DAY_MS * days).toISOString();
+function getStartDate(days: number, now = new Date()) {
+  return new Date(now.getTime() - DAY_MS * days).toISOString();
 }
 
 function getStartOfWeekIso() {
@@ -543,15 +590,61 @@ function toThreePointSeries(values: Array<number | null>) {
   return [first, middle, last];
 }
 
-function parseRespiratoryRate(rawJson: string) {
-  try {
-    const parsed = JSON.parse(rawJson) as { score?: { respiratory_rate?: number } };
-    return typeof parsed.score?.respiratory_rate === "number"
-      ? parsed.score.respiratory_rate
-      : null;
-  } catch {
-    return null;
-  }
+function toWhoopSleepSummary(row: WhoopSleepRow): WhoopSleepSummary {
+  return {
+    id: row.id,
+    cycleId: row.cycle_id,
+    start: row.start,
+    end: row.end,
+    timezoneOffset: row.timezone_offset,
+    nap: row.nap === true || row.nap === 1,
+    scoreState: row.score_state,
+    sleepPerformancePercentage: row.sleep_performance_percentage,
+    sleepConsistencyPercentage: row.sleep_consistency_percentage,
+    sleepEfficiencyPercentage: row.sleep_efficiency_percentage,
+    respiratoryRate: row.respiratory_rate,
+    totalInBedTimeMilli: row.total_in_bed_time_milli,
+    totalAwakeTimeMilli: row.total_awake_time_milli,
+    totalLightSleepTimeMilli: row.total_light_sleep_time_milli,
+    totalSlowWaveSleepTimeMilli: row.total_slow_wave_sleep_time_milli,
+    totalRemSleepTimeMilli: row.total_rem_sleep_time_milli,
+    sleepNeededBaselineMilli: row.sleep_needed_baseline_milli,
+    sleepNeededDebtMilli: row.sleep_needed_debt_milli,
+    sleepNeededStrainMilli: row.sleep_needed_strain_milli,
+    sleepNeededNapMilli: row.sleep_needed_nap_milli,
+    rawJson: row.raw_json,
+  };
+}
+
+function toWhoopRecoverySummary(row: WhoopRecoveryRow): WhoopRecoverySummary {
+  return {
+    cycleId: row.cycle_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    scoreState: row.score_state,
+    userCalibrating: false,
+    recoveryScore: row.recovery_score,
+    restingHeartRate: row.resting_heart_rate,
+    hrvRmssdMilli: row.hrv_rmssd_milli,
+    spo2Percentage: row.spo2_percentage,
+    skinTempCelsius: row.skin_temp_celsius,
+    rawJson: row.raw_json,
+  };
+}
+
+function toWhoopCycleSummary(row: WhoopCycleRow): WhoopCycleSummary {
+  return {
+    id: row.id,
+    start: row.start,
+    end: row.end,
+    timezoneOffset: null,
+    scoreState: row.score_state,
+    strain: row.strain,
+    kilojoule: row.kilojoule,
+    averageHeartRate: row.average_heart_rate,
+    maxHeartRate: row.max_heart_rate,
+    rawJson: row.raw_json,
+  };
 }
 
 function getExerciseTitles(rawJson: string) {
@@ -906,39 +999,40 @@ async function buildFreshness(): Promise<DailyFreshness> {
   };
 }
 
-async function buildReadiness(): Promise<DailyReadiness> {
+async function buildReadiness(now = new Date()): Promise<DailyReadiness> {
   const [sleepRows, recoveryRows, cycleRows, bodyRows, workoutRows] = await Promise.all([
     dbAll<WhoopSleepRow>(
       `
-      SELECT start, "end", sleep_performance_percentage, sleep_consistency_percentage,
+      SELECT id, cycle_id, start, "end", timezone_offset, nap, score_state, respiratory_rate,
+             sleep_performance_percentage, sleep_consistency_percentage,
              sleep_efficiency_percentage, total_in_bed_time_milli, total_awake_time_milli,
              total_light_sleep_time_milli, total_slow_wave_sleep_time_milli, total_rem_sleep_time_milli,
              sleep_needed_baseline_milli,
-             sleep_needed_debt_milli, sleep_needed_strain_milli, sleep_needed_nap_milli
+             sleep_needed_debt_milli, sleep_needed_strain_milli, sleep_needed_nap_milli, raw_json
       FROM whoop_sleep_summaries
       WHERE start >= ?
       ORDER BY start DESC
     `,
-      getStartDate(28),
+      getStartDate(28, now),
     ),
     dbAll<WhoopRecoveryRow>(
       `
-      SELECT created_at, recovery_score, resting_heart_rate, hrv_rmssd_milli,
+      SELECT cycle_id, created_at, updated_at, score_state, recovery_score, resting_heart_rate, hrv_rmssd_milli,
              spo2_percentage, skin_temp_celsius, raw_json
       FROM whoop_recovery_summaries
       WHERE created_at >= ?
       ORDER BY created_at DESC
     `,
-      getStartDate(28),
+      getStartDate(28, now),
     ),
     dbAll<WhoopCycleRow>(
       `
-      SELECT id, start, "end", strain, kilojoule, average_heart_rate, max_heart_rate, raw_json
+      SELECT id, start, "end", score_state, strain, kilojoule, average_heart_rate, max_heart_rate, raw_json
       FROM whoop_cycles
       WHERE start >= ?
       ORDER BY start DESC
     `,
-      getStartDate(28),
+      getStartDate(28, now),
     ),
     dbAll<WhoopBodyMeasurementRow>(
       `
@@ -947,7 +1041,7 @@ async function buildReadiness(): Promise<DailyReadiness> {
       WHERE observed_on >= ?
       ORDER BY observed_on DESC
     `,
-      getStartDate(28).slice(0, 10),
+      getStartDate(28, now).slice(0, 10),
     ),
     dbAll<WhoopWorkoutRow>(
       `
@@ -956,37 +1050,49 @@ async function buildReadiness(): Promise<DailyReadiness> {
       WHERE start >= ?
       ORDER BY start DESC
     `,
-      getStartDate(28),
+      getStartDate(28, now),
     ),
   ]);
 
-  const latestSleep = sleepRows[0] ?? null;
-  const latestRecovery = recoveryRows[0] ?? null;
-  const latestCycle = cycleRows[0] ?? null;
+  const snapshot = buildReadinessSnapshot({
+    decisionAt: now,
+    sleepRows: sleepRows.map(toWhoopSleepSummary),
+    recoveryRows: recoveryRows.map(toWhoopRecoverySummary),
+    cycleRows: cycleRows.map(toWhoopCycleSummary),
+  });
+  const latestSleep = snapshot.sleep.value;
+  const latestRecovery = snapshot.recovery.value;
+  const latestCycle = snapshot.cycle.value;
   const latestBody = bodyRows[0] ?? null;
-  const sleepNeedHours = latestSleep
-    ? hoursFromMillis(
-        sum([
-          latestSleep.sleep_needed_baseline_milli,
-          latestSleep.sleep_needed_debt_milli,
-          latestSleep.sleep_needed_strain_milli,
-          latestSleep.sleep_needed_nap_milli,
-        ]),
-      )
+  const sleepNeedValues = latestSleep
+    ? [
+        latestSleep.sleepNeededBaselineMilli,
+        latestSleep.sleepNeededDebtMilli,
+        latestSleep.sleepNeededStrainMilli,
+        latestSleep.sleepNeededNapMilli,
+      ]
+    : [];
+  const sleepNeedHours = sleepNeedValues.some((value) => typeof value === "number")
+    ? hoursFromMillis(sum(sleepNeedValues))
     : null;
   const sleepHours = getActualSleepHours(latestSleep);
-  const restingHr7d = average(recoveryRows.slice(0, 7).map((row) => row.resting_heart_rate));
-  const hrv7d = average(recoveryRows.slice(0, 7).map((row) => row.hrv_rmssd_milli));
-  const strain7d = average(cycleRows.slice(0, 7).map((row) => row.strain));
-  const bodyWeight7d = average(bodyRows.slice(0, 7).map((row) => row.weight_kilogram));
-  const bodyWeight28d = average(bodyRows.slice(0, 28).map((row) => row.weight_kilogram));
-  const respiratoryRate7d = average(
-    recoveryRows.slice(0, 7).map((row) => parseRespiratoryRate(row.raw_json)),
-  );
-  const skinTemp7d = average(recoveryRows.slice(0, 7).map((row) => row.skin_temp_celsius));
+  const restingHr7d = snapshot.baselines.restingHeartRate.value;
+  const hrv7d = snapshot.baselines.hrvRmssd.value;
+  const strain7d = snapshot.baselines.strain.value;
+  const priorBodyRows = latestBody
+    ? bodyRows.filter((row) => row.observed_on !== latestBody.observed_on)
+    : bodyRows;
+  const bodyWeight7d = average(priorBodyRows.slice(0, 7).map((row) => row.weight_kilogram));
+  const bodyWeight28d = average(priorBodyRows.slice(0, 28).map((row) => row.weight_kilogram));
+  const respiratoryRate7d = snapshot.baselines.respiratoryRate.value;
+  const skinTemp7d = snapshot.baselines.skinTempCelsius.value;
 
   return {
-    recoveryScore: latestRecovery?.recovery_score ?? null,
+    observationStatus: snapshot.status,
+    observationReasons: snapshot.reasons,
+    observationObservedAt: snapshot.sleep.observedAt,
+    observationCycleId: snapshot.cycleId,
+    recoveryScore: latestRecovery?.recoveryScore ?? null,
     recoveryTrend3d: round(average(recoveryRows.slice(0, 3).map((row) => row.recovery_score))),
     bodyWeightKg: latestBody?.weight_kilogram ?? null,
     bodyWeightDelta7dKg:
@@ -999,37 +1105,39 @@ async function buildReadiness(): Promise<DailyReadiness> {
         : null,
     whoopDayStrain: latestCycle?.strain ?? null,
     whoopDayStrainVs7d:
-      latestCycle?.strain !== null && strain7d !== null ? round(latestCycle.strain - strain7d) : null,
-    sleepPerformance: latestSleep?.sleep_performance_percentage ?? null,
+      latestCycle?.strain !== null && latestCycle?.strain !== undefined && strain7d !== null
+        ? round(latestCycle.strain - strain7d)
+        : null,
+    sleepPerformance: latestSleep?.sleepPerformancePercentage ?? null,
     sleepHours: round(sleepHours),
     sleepVsNeedHours:
       sleepHours !== null && sleepNeedHours !== null ? round(sleepHours - sleepNeedHours) : null,
-    sleepConsistency: latestSleep?.sleep_consistency_percentage ?? null,
-    sleepEfficiency: latestSleep?.sleep_efficiency_percentage ?? null,
-    awakeHours: round(hoursFromMillis(latestSleep?.total_awake_time_milli ?? null)),
+    sleepConsistency: latestSleep?.sleepConsistencyPercentage ?? null,
+    sleepEfficiency: latestSleep?.sleepEfficiencyPercentage ?? null,
+    awakeHours: round(hoursFromMillis(latestSleep?.totalAwakeTimeMilli ?? null)),
     latestSleepStart: latestSleep?.start ?? null,
     latestSleepEnd: latestSleep?.end ?? null,
     sleepStageSummary: buildSleepStageSummary(latestSleep),
-    restingHeartRate: latestRecovery?.resting_heart_rate ?? null,
+    restingHeartRate: latestRecovery?.restingHeartRate ?? null,
     restingHeartRateVs7d:
-      latestRecovery?.resting_heart_rate !== null && restingHr7d !== null
-        ? round(latestRecovery.resting_heart_rate - restingHr7d)
+      latestRecovery?.restingHeartRate !== null && latestRecovery?.restingHeartRate !== undefined && restingHr7d !== null
+        ? round(latestRecovery.restingHeartRate - restingHr7d)
         : null,
-    hrvRmssd: round(latestRecovery?.hrv_rmssd_milli ?? null),
+    hrvRmssd: round(latestRecovery?.hrvRmssdMilli ?? null),
     hrvVs7d:
-      latestRecovery?.hrv_rmssd_milli !== null && hrv7d !== null
-        ? round(latestRecovery.hrv_rmssd_milli - hrv7d)
+      latestRecovery?.hrvRmssdMilli !== null && latestRecovery?.hrvRmssdMilli !== undefined && hrv7d !== null
+        ? round(latestRecovery.hrvRmssdMilli - hrv7d)
         : null,
-    spo2Percentage: round(latestRecovery?.spo2_percentage ?? null, 1),
-    respiratoryRate: round(latestRecovery ? parseRespiratoryRate(latestRecovery.raw_json) : null),
+    spo2Percentage: round(latestRecovery?.spo2Percentage ?? null, 1),
+    respiratoryRate: round(latestSleep?.respiratoryRate ?? null),
     respiratoryRateVs7d:
-      latestRecovery !== null && respiratoryRate7d !== null
-        ? round(parseRespiratoryRate(latestRecovery.raw_json)! - respiratoryRate7d)
+      latestSleep?.respiratoryRate !== null && latestSleep?.respiratoryRate !== undefined && respiratoryRate7d !== null
+        ? round(latestSleep.respiratoryRate - respiratoryRate7d)
         : null,
-    skinTempCelsius: round(latestRecovery?.skin_temp_celsius ?? null),
+    skinTempCelsius: round(latestRecovery?.skinTempCelsius ?? null),
     skinTempVs7d:
-      latestRecovery?.skin_temp_celsius !== null && skinTemp7d !== null
-        ? round(latestRecovery.skin_temp_celsius - skinTemp7d)
+      latestRecovery?.skinTempCelsius !== null && latestRecovery?.skinTempCelsius !== undefined && skinTemp7d !== null
+        ? round(latestRecovery.skinTempCelsius - skinTemp7d)
         : null,
     whoopStrain7dAvg: round(average(workoutRows.slice(0, 7).map((row) => row.strain))),
   };
@@ -1759,6 +1867,64 @@ function buildDecisionFactors(
   return factors.slice(0, 6);
 }
 
+function buildUnavailableReadinessDecision(
+  readiness: DailyReadiness,
+  trainingLoad: DailyTrainingLoad,
+  strengthProgression: DailyStrengthProgression[],
+  now: Date,
+): DailyPhysiqueDecision {
+  const schedule = buildScheduleEvidence(trainingLoad, now);
+  const nextTrainingTarget = chooseTrainingTarget(trainingLoad);
+  const reason = `Readiness unavailable: no current coherent scored sleep/recovery cycle (${readiness.observationReasons?.join(", ") ?? "missing"}).`;
+
+  return {
+    trainingAvailability: "Rest",
+    trainingTarget: "Either",
+    nextTrainingTarget,
+    trainingTargetReason: "Wait for a current scored sleep/recovery cycle before choosing an upper or lower session.",
+    trainingIntent: "Maintain",
+    intensityLabel: "Wait for current recovery data before training hard",
+    sessionAnchors: [],
+    mainBottleneck: reason,
+    primaryDecisionReason: reason,
+    daysLeftInWeek: schedule.daysLeftInWeek,
+    liftsNeededForGoal: schedule.liftsNeededForGoal,
+    canStillHitWeeklyGoalIfRestToday: schedule.canStillHitWeeklyGoalIfRestToday,
+    weeklyPaceLabel: schedule.weeklyPaceLabel,
+    decisionFactors: [
+      { label: "Readiness unavailable", tone: "caution", detail: reason },
+      {
+        label: "Weekly lift goal",
+        tone: schedule.isBehindPace ? "caution" : "neutral",
+        detail: `${trainingLoad.hevyWorkoutCountThisWeek}/${WEEKLY_LIFT_GOAL} lifts Mon-Sun`,
+      },
+      { label: "Split recency", tone: "neutral", detail: formatSplitRecency(trainingLoad) },
+    ],
+    weightTrend: buildWeightTrend(readiness),
+    strengthProgression,
+    weeklyScorecard: [
+      {
+        label: "Lifts",
+        value: `${trainingLoad.hevyWorkoutCountThisWeek}/4`,
+        detail: `${schedule.liftsNeededForGoal} needed / ${schedule.daysLeftInWeek} days left`,
+        status: trainingLoad.hevyWorkoutCountThisWeek >= WEEKLY_LIFT_GOAL ? "good" : "watch",
+      },
+      {
+        label: "Weight trend",
+        value: formatSignedPounds(buildWeightTrend(readiness).weeklyDeltaLb),
+        detail: "Readiness-independent trend",
+        status: "missing",
+      },
+      {
+        label: "Strength",
+        value: strengthProgression[0]?.deltaLabel ?? "--",
+        detail: strengthProgression[0]?.exercise ?? "Need repeat lift history",
+        status: strengthProgression.length ? "good" : "missing",
+      },
+    ],
+  };
+}
+
 export function buildPhysiqueDecision(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
@@ -1768,6 +1934,10 @@ export function buildPhysiqueDecision(
   strengthProgression: DailyStrengthProgression[],
   now = new Date(),
 ): DailyPhysiqueDecision {
+  if (readiness.observationStatus === "unavailable") {
+    return buildUnavailableReadinessDecision(readiness, trainingLoad, strengthProgression, now);
+  }
+
   const weightTrend = buildWeightTrend(readiness);
   const schedule = buildScheduleEvidence(trainingLoad, now);
   const nextTrainingTarget = chooseTrainingTarget(trainingLoad);
@@ -1801,8 +1971,8 @@ export function buildPhysiqueDecision(
   const strengthUp = strengthProgression.some((item) => item.trend === "up");
   const shouldRest =
     physiologyRisk ||
-    ((poorSystemicReadiness || (conditioningFatigue && stressFlags.poorSleepTrend)) &&
-      schedule.canStillHitWeeklyGoalIfRestToday);
+    poorSystemicReadiness ||
+    (conditioningFatigue && stressFlags.poorSleepTrend);
   const trainingAvailability: DailyPhysiqueDecision["trainingAvailability"] = shouldRest ? "Rest" : "Train";
   const trainingTarget: DailyPhysiqueDecision["trainingTarget"] =
     trainingAvailability === "Rest" ? "Either" : nextTrainingTarget;
@@ -2310,6 +2480,11 @@ function buildWhyChangedToday(
   stressFlags: DailyStressFlags,
   lateNightDisruption: DailyLateNightDisruption,
 ): DailyWhyChanged {
+  if (readiness.observationStatus === "unavailable") {
+    const detail = `Readiness unavailable: ${readiness.observationReasons?.join(", ") ?? "missing"}.`;
+    return { headline: "Readiness data is unavailable", deltas: [detail] };
+  }
+
   const deltas: string[] = [];
 
   if (lateNightDisruption.active) {
@@ -2379,6 +2554,7 @@ function buildPromptText(summary: DailySummary) {
     `- Source signal factors: ${summary.physiqueDecision.decisionFactors.map((factor) => `${factor.label} (${factor.tone})`).join("; ") || "Not available"}`,
     "",
     "Metrics",
+    `- Readiness observation status: ${summary.readiness.observationStatus ?? "legacy/unspecified"}; reasons: ${summary.readiness.observationReasons?.join(", ") || "none"}`,
     `- Recovery: ${summary.readiness.recoveryScore ?? "--"}%`,
     `- Sleep: ${summary.readiness.sleepHours ?? "--"}h (${summary.readiness.sleepVsNeedHours ?? "--"}h vs need)`,
     `- Sleep composition: ${formatSleepStagePrompt(summary.readiness)}`,
@@ -2422,7 +2598,7 @@ export async function getDailySummary(): Promise<DailySummary> {
     buildFreshness(),
     buildMiniTrends(),
     buildTrendSeries(),
-    buildReadiness(),
+    buildReadiness(now),
     buildTrainingLoad(),
   ]);
   const stressFlags = buildStressFlags(readiness, trainingLoad);
