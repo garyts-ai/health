@@ -36,7 +36,3 @@
   --os-duration-entry: 320ms;
   --os-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-@media (max-width: 560px) {
-  :root { --district-header-height: 112px; }
-}

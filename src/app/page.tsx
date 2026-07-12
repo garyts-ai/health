@@ -20,6 +20,7 @@ type HomePageProps = {
 
 export default async function Home({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
+  const hasProviderStatus = Boolean(resolvedSearchParams.whoop || resolvedSearchParams.hevy);
   const [summary, whoopStatus, hevyStatus] = await Promise.all([
     getDailySummary(),
     getWhoopConnectionStatus(),
@@ -31,7 +32,8 @@ export default async function Home({ searchParams }: HomePageProps) {
       hevy={hevyStatus}
       summary={summary}
       anatomyDebug={resolvedSearchParams.anatomy === "qa"}
-      utilityBannerMessage={getSettingsBannerMessage(resolvedSearchParams)}
+      utilityBannerMessage={hasProviderStatus ? null : getSettingsBannerMessage(resolvedSearchParams)}
+      syncStatus={{ whoop: resolvedSearchParams.whoop, hevy: resolvedSearchParams.hevy }}
       whoop={whoopStatus}
       whoopImportReason={resolvedSearchParams.reason}
       whoopImportState={resolvedSearchParams.import}

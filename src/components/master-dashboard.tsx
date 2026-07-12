@@ -7,18 +7,19 @@ import styles from "@/components/training-os/today-composition.module.css";
 import { ANATOMY_QA_LATEST_HIGHLIGHTS, ANATOMY_QA_WEEKLY_HIGHLIGHTS, ANATOMY_QA_WEEKLY_VOLUME } from "@/lib/anatomy-qa";
 import { regionsForWeeklyMuscleGroup } from "@/lib/insights/body-map";
 import { regionsForTrainingTarget } from "@/components/training-os/anatomy-viewer-model";
+import { SectionErrorBoundary } from "@/components/section-error-boundary";
 import { buildTodayViewModel } from "@/lib/today-view-model";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
 import type { DailySummary } from "@/lib/insights/types";
 import type { WhoopConnectionStatus } from "@/lib/whoop/types";
 
-type MasterDashboardProps = { anatomyDebug?: boolean; hevy: HevyConnectionStatus; summary: DailySummary; utilityBannerMessage?: string | null; whoop: WhoopConnectionStatus; whoopImportReason?: string; whoopImportState?: string; };
+type MasterDashboardProps = { anatomyDebug?: boolean; hevy: HevyConnectionStatus; summary: DailySummary; utilityBannerMessage?: string | null; syncStatus?: { whoop?: string; hevy?: string }; whoop: WhoopConnectionStatus; whoopImportReason?: string; whoopImportState?: string; };
 
 function SectionHeading({ id, title, description }: { id: string; title: string; description: string }) {
   return <header className="district-section-heading"><h2 id={id}>{title}</h2><p>{description}</p></header>;
 }
 
-export async function MasterDashboard({ anatomyDebug = false, hevy, summary, utilityBannerMessage, whoop, whoopImportReason, whoopImportState }: MasterDashboardProps) {
+export async function MasterDashboard({ anatomyDebug = false, hevy, summary, utilityBannerMessage, syncStatus, whoop, whoopImportReason, whoopImportState }: MasterDashboardProps) {
   const vm = buildTodayViewModel(summary);
   const topRecommendation = vm.actionCards[0];
   const weeklyHighlights = anatomyDebug ? ANATOMY_QA_WEEKLY_HIGHLIGHTS : summary.bodyCard.weeklyHighlightedRegions;
@@ -52,11 +53,11 @@ export async function MasterDashboard({ anatomyDebug = false, hevy, summary, uti
     </PageTransition>
 
     <PageTransition id="whoop" className="district-section district-whoop-section" labelledBy="whoop-title">
-      <div className="district-container"><SectionHeading id="whoop-title" title="WHOOP analysis" description="Long-range baselines and the strongest supported patterns from your private export." /><div className="district-whoop-stack"><Suspense fallback={<div className="district-whoop-loading" role="status"><span>WHOOP / ANALYSIS</span><strong>Loading the latest physiological record…</strong></div>}><WhoopDistrictContent importReason={whoopImportReason} importState={whoopImportState} /></Suspense></div></div>
+      <div className="district-container"><SectionHeading id="whoop-title" title="WHOOP analysis" description="Long-range baselines and the strongest supported patterns from your private export." /><div className="district-whoop-stack"><SectionErrorBoundary label="WHOOP analysis"><Suspense fallback={<div className="district-whoop-loading" role="status"><span>WHOOP / ANALYSIS</span><strong>Loading the latest physiological record…</strong></div>}><WhoopDistrictContent importReason={whoopImportReason} importState={whoopImportState} /></Suspense></SectionErrorBoundary></div></div>
     </PageTransition>
 
     <PageTransition id="utilities" className="district-section district-utilities" labelledBy="utilities-title">
-      <div className="district-container"><SectionHeading id="utilities-title" title="Utilities" description="Refresh source data and copy a compact dashboard context packet for deeper external analysis." /><div className="district-utilities__body"><ProtectedSettingsActions hevy={hevy} summary={summary} whoop={whoop} /></div></div>
+      <div className="district-container"><SectionHeading id="utilities-title" title="Utilities" description="Refresh source data and copy a compact dashboard context packet for deeper external analysis." /><div className="district-utilities__body"><SectionErrorBoundary label="Utilities"><ProtectedSettingsActions hevy={hevy} summary={summary} syncStatus={syncStatus} whoop={whoop} /></SectionErrorBoundary></div></div>
     </PageTransition>
   </AppShell>;
 }

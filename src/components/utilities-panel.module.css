@@ -11,6 +11,7 @@
 .provider[data-state="needs-attention"] .state,.provider[data-state="sync-failed"] .state,.error { color: var(--os-signal-danger); }
 .provider[data-state="connected-stale"] .state,.provider[data-state="not-configured"] .state { color: var(--os-signal-caution); }
 .error { grid-column: 1/-1; }
+.notice { grid-column: 1/-1; color: var(--os-signal-caution) !important; }
 .actions { grid-column: 1/-1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 3px; }
 .actions a,.actions button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid var(--os-line-strong); border-radius: var(--os-radius-md); background: transparent; padding-inline: 13px; color: var(--os-text-primary); font: 700 .7rem var(--font-manrope),sans-serif; text-decoration: none; cursor: pointer; }
 .actions button:disabled { color: var(--os-text-muted); cursor: not-allowed; }
