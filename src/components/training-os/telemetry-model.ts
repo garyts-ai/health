@@ -1,4 +1,5 @@
-import type { InstrumentVisual, TrendPoint } from "./types";
+import type { TrendPoint } from "@/lib/insights/types";
+import type { InstrumentVisual } from "./types";
 
 const clampIndex = (index: number, count: number) => Math.max(0, Math.min(count - 1, index));
 
