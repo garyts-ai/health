@@ -39,7 +39,7 @@ export async function MasterDashboard({ anatomyDebug = false, hevy, summary, uti
       <div className={styles.container}>
         <PageHero
           status={utilityBannerMessage || vm.header.freshnessNotice ? <div role="status">{utilityBannerMessage ?? vm.header.freshnessNotice}</div> : undefined}
-          prescription={<TodayPrescription date={vm.header.dateLabel} call={vm.hero.todayCall} intensityLabel={vm.hero.decision.intensityIntentLabel} intensity={vm.hero.decision.intensity} reason={vm.hero.decision.targetReason} recommendation={topRecommendation} remaining={vm.actionCards.slice(1)} changes={vm.contextBand.whyChanged} />}
+          prescription={<TodayPrescription date={vm.header.dateLabel} call={vm.hero.todayCall} intensityLabel={vm.hero.decision.intensityIntentLabel} intensity={vm.hero.decision.intensity} reason={vm.hero.decision.targetReason} recommendation={topRecommendation} remaining={vm.actionCards.slice(1)} changes={vm.contextBand.whyChanged} decisionEvidence={summary.decisionEvidence} />}
           instrument={<AnatomyViewer weeklyHighlights={weeklyHighlights} latestHighlights={latestHighlights} targetRegionIds={[...targetRegions]} volume={weeklyVolume} latestWorkout={latestWorkout} latestSessionAge={latestAge} workoutCount={workoutCount} emptyMessage={anatomyDebug ? "QA fixture is forcing all major armor regions." : vm.hero.weeklyFocusEmptyMessage} note={anatomyDebug ? "QA fixture" : vm.hero.weeklyMapNote} />}
           rail={<DataRail metrics={vm.hero.telemetry} />}
         />

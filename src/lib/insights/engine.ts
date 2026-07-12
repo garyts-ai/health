@@ -10,7 +10,8 @@ import {
 import { buildOvernightRead, deriveLateNightDisruption } from "@/lib/insights/overnight-read";
 import { applyHistoricalModifier, buildHistoricalContext } from "@/lib/insights/historical-context";
 import { buildWeeklyPlan } from "@/lib/insights/weekly-plan";
-import { buildReadinessSnapshot } from "@/lib/insights/readiness-snapshot";
+import { buildReadinessSnapshot, type ReadinessSnapshot } from "@/lib/insights/readiness-snapshot";
+import { buildDecisionEvidence } from "@/lib/insights/decision-evidence";
 import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
 import type {
@@ -999,7 +1000,7 @@ async function buildFreshness(): Promise<DailyFreshness> {
   };
 }
 
-async function buildReadiness(now = new Date()): Promise<DailyReadiness> {
+async function buildReadiness(now = new Date()): Promise<{ readiness: DailyReadiness; snapshot: ReadinessSnapshot }> {
   const [sleepRows, recoveryRows, cycleRows, bodyRows, workoutRows] = await Promise.all([
     dbAll<WhoopSleepRow>(
       `
@@ -1087,7 +1088,7 @@ async function buildReadiness(now = new Date()): Promise<DailyReadiness> {
   const respiratoryRate7d = snapshot.baselines.respiratoryRate.value;
   const skinTemp7d = snapshot.baselines.skinTempCelsius.value;
 
-  return {
+  const readiness: DailyReadiness = {
     observationStatus: snapshot.status,
     observationReasons: snapshot.reasons,
     observationObservedAt: snapshot.sleep.observedAt,
@@ -1141,6 +1142,8 @@ async function buildReadiness(now = new Date()): Promise<DailyReadiness> {
         : null,
     whoopStrain7dAvg: round(average(workoutRows.slice(0, 7).map((row) => row.strain))),
   };
+
+  return { readiness, snapshot };
 }
 
 
@@ -1923,6 +1926,7 @@ function buildUnavailableReadinessDecision(
       },
     ],
   };
+
 }
 
 export function buildPhysiqueDecision(
@@ -2594,13 +2598,14 @@ function buildPromptText(summary: DailySummary) {
 
 export async function getDailySummary(): Promise<DailySummary> {
   const now = new Date();
-  const [freshness, miniTrends, trendSeries, readiness, trainingLoad] = await Promise.all([
+  const [freshness, miniTrends, trendSeries, readinessResult, trainingLoad] = await Promise.all([
     buildFreshness(),
     buildMiniTrends(),
     buildTrendSeries(),
     buildReadiness(now),
     buildTrainingLoad(),
   ]);
+  const { readiness, snapshot: readinessSnapshot } = readinessResult;
   const stressFlags = buildStressFlags(readiness, trainingLoad);
   const strengthProgression = buildStrengthProgression(await getRecentHevyWorkouts(90));
   const lateNightDisruption = deriveLateNightDisruption(readiness, stressFlags);
@@ -2621,6 +2626,12 @@ export async function getDailySummary(): Promise<DailySummary> {
     now,
   );
   const physiqueDecision = applyHistoricalModifier(basePhysiqueDecision, historicalContext);
+  const decisionEvidence = buildDecisionEvidence(
+    readinessSnapshot,
+    physiqueDecision,
+    historicalContext,
+    basePhysiqueDecision.trainingIntent === "Push" && physiqueDecision.trainingIntent === "Maintain",
+  );
   const weeklyPlan = await buildWeeklyPlan(
     now,
     physiqueDecision,
@@ -2650,6 +2661,7 @@ export async function getDailySummary(): Promise<DailySummary> {
     miniTrends,
     trendSeries,
     readiness,
+    decisionEvidence,
     trainingLoad,
     stressFlags,
     lateNightDisruption,

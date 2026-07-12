@@ -16,4 +16,17 @@
 .evidence article > span { color: var(--os-signal-current); font: .62rem var(--font-geist-mono),monospace; }
 .evidence h3,.changes h3 { margin: 0 0 4px; font-size: .8rem; }.evidence p,.changes p { margin: 0; color: var(--os-text-secondary); font-size: .72rem; line-height: 1.45; }
 .changes { padding-top: 12px; border-top: 1px solid var(--os-line-subtle); }.changes p + p { margin-top: 6px; }
+.evidenceSummary { padding: 4px 0 10px; border-bottom: 1px solid var(--os-line-subtle); }
+.evidenceSummary p { margin: 0; }
+.evidenceMeta { color: var(--os-text-tertiary); font-size: .68rem; }
+.sectionLabel { margin: 14px 0 4px; color: var(--os-signal-current); font: .65rem var(--font-geist-mono),monospace; letter-spacing: .08em; text-transform: uppercase; }
+.observation { display: block !important; padding: 9px 0 !important; }
+.observationHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.observationHeader strong { color: var(--os-text-primary); font: .76rem var(--font-geist-mono),monospace; text-align: right; }
+.observationStatus[data-status="stale"],.observationStatus[data-status="missing"] { color: var(--os-signal-caution); }
+.observationStatus[data-status="invalid"] { color: var(--os-signal-danger); }
+.ruleTrace article { display: block; padding: 9px 0; }
+.ruleTrace article > div { display: flex; justify-content: space-between; gap: 8px; }
+.ruleTrace article span { color: var(--os-signal-caution); font: .62rem var(--font-geist-mono),monospace; text-transform: uppercase; }
+.ruleTrace article span[data-outcome="applied"] { color: var(--os-signal-current); }
 @media (min-width:961px) and (max-height:800px) { .prescription { padding-block: 4px; }.title span { font-size: 3.2rem; }.title strong { font-size: 3.8rem; }.reason { margin-bottom: 7px; }.mission { padding: 10px 13px; }.tags { margin-top: 6px; } }
