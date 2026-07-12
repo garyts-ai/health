@@ -235,6 +235,38 @@ export type DailyHistoricalContext = {
   behaviorCue: string | null;
 };
 
+export type EvidenceObservation = {
+  key: string;
+  label: string;
+  value: number | string | null;
+  unit: string | null;
+  source: "WHOOP live API" | "WHOOP export" | "Hevy" | "Derived";
+  observedAt: string | null;
+  ageHours: number | null;
+  status: "valid" | "stale" | "missing" | "invalid";
+  reason: string | null;
+  baseline: {
+    value: number | null;
+    sampleCount: number;
+    windowSize: number;
+    status: "available" | "insufficient" | "missing";
+  } | null;
+};
+
+export type DecisionRuleTrace = {
+  label: string;
+  outcome: "applied" | "not_applied" | "unavailable";
+  detail: string;
+};
+
+export type DecisionEvidence = {
+  decisionAt: string;
+  readinessStatus: "available" | "unavailable";
+  confidence: RecommendationConfidence;
+  observations: EvidenceObservation[];
+  ruleTrace: DecisionRuleTrace[];
+};
+
 export type WeeklyPlanDay = {
   date: string;
   label: string;
@@ -392,6 +424,7 @@ export type DailySummary = {
     sleepWindows7d: DailySleepWindow[];
   };
   readiness: DailyReadiness;
+  decisionEvidence: DecisionEvidence;
   trainingLoad: DailyTrainingLoad;
   stressFlags: DailyStressFlags;
   lateNightDisruption: DailyLateNightDisruption;
