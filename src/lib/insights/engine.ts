@@ -2626,7 +2626,12 @@ export async function getDailySummary(): Promise<DailySummary> {
     now,
   );
   const physiqueDecision = applyHistoricalModifier(basePhysiqueDecision, historicalContext);
-  const decisionEvidence = buildDecisionEvidence(readinessSnapshot, physiqueDecision, historicalContext);
+  const decisionEvidence = buildDecisionEvidence(
+    readinessSnapshot,
+    physiqueDecision,
+    historicalContext,
+    basePhysiqueDecision.trainingIntent === "Push" && physiqueDecision.trainingIntent === "Maintain",
+  );
   const weeklyPlan = await buildWeeklyPlan(
     now,
     physiqueDecision,

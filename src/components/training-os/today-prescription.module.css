@@ -23,6 +23,8 @@
 .observation { display: block !important; padding: 9px 0 !important; }
 .observationHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .observationHeader strong { color: var(--os-text-primary); font: .76rem var(--font-geist-mono),monospace; text-align: right; }
+.observationStatus[data-status="stale"],.observationStatus[data-status="missing"] { color: var(--os-signal-caution); }
+.observationStatus[data-status="invalid"] { color: var(--os-signal-danger); }
 .ruleTrace article { display: block; padding: 9px 0; }
 .ruleTrace article > div { display: flex; justify-content: space-between; gap: 8px; }
 .ruleTrace article span { color: var(--os-signal-caution); font: .62rem var(--font-geist-mono),monospace; text-transform: uppercase; }

@@ -20,7 +20,7 @@ export function EvidenceDrawer({ children }: { children: ReactNode }) {
 
   return <div className={styles.wrap}>
     <button ref={triggerRef} type="button" className={styles.action} aria-expanded={open} aria-controls={regionId} onClick={open ? close : reveal}>
-      <span aria-hidden="true">◉</span> {open ? "Close today&apos;s evidence" : "Review today&apos;s evidence"} <span aria-hidden="true">{open ? "↑" : "→"}</span>
+      <span aria-hidden="true">◉</span> {open ? "Close today's evidence" : "Review today's evidence"} <span aria-hidden="true">{open ? "↑" : "→"}</span>
     </button>
     {open ? <section id={regionId} className={styles.drawer} role="region" aria-labelledby={headingId}>
       <div className={styles.content}>

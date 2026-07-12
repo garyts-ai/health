@@ -24,7 +24,7 @@ function EvidenceObservationRow({ item }: { item: EvidenceObservation }) {
   const baseline = item.baseline;
   return <article className={styles.observation}>
     <div className={styles.observationHeader}><h3>{item.label}</h3><strong>{displayObservation(item)}</strong></div>
-    <p>{item.source} · {displayObservedAt(item.observedAt)} · {displayAge(item.ageHours)} · {item.status}</p>
+    <p className={styles.observationStatus} data-status={item.status}>{item.source} · {displayObservedAt(item.observedAt)} · {displayAge(item.ageHours)} · {item.status}</p>
     {item.reason ? <p className={styles.evidenceMeta}>Reason: {item.reason}</p> : null}
     {baseline ? <p className={styles.evidenceMeta}>Baseline: {baseline.value === null ? "insufficient" : `${baseline.value.toFixed(1)}${item.unit ? ` ${item.unit}` : ""}`} · {baseline.sampleCount}/{baseline.windowSize} prior cycles</p> : null}
   </article>;

@@ -78,6 +78,7 @@ function ruleTrace(
   snapshot: ReadinessSnapshot,
   decision: DailyPhysiqueDecision,
   historicalContext?: DailyHistoricalContext,
+  historicalApplied = false,
 ): DecisionRuleTrace[] {
   const traces: DecisionRuleTrace[] = [
     snapshot.status === "available"
@@ -123,11 +124,11 @@ function ruleTrace(
   );
 
   traces.push(
-    historicalContext?.strongestDeviationUnfavorable
+    historicalApplied
       ? {
           label: "Historical direction",
           outcome: "applied",
-          detail: historicalContext.strongestDeviation ?? "An unfavorable historical deviation moderated the decision.",
+          detail: historicalContext?.strongestDeviation ?? "An unfavorable historical deviation moderated the decision.",
         }
       : historicalContext?.available
         ? {
@@ -149,6 +150,7 @@ export function buildDecisionEvidence(
   snapshot: ReadinessSnapshot,
   decision: DailyPhysiqueDecision,
   historicalContext?: DailyHistoricalContext,
+  historicalApplied = false,
 ): DecisionEvidence {
   const sleep = snapshot.sleep.value;
   const recovery = snapshot.recovery.value;
@@ -173,6 +175,6 @@ export function buildDecisionEvidence(
     readinessStatus: snapshot.status,
     confidence,
     observations,
-    ruleTrace: ruleTrace(snapshot, decision, historicalContext),
+    ruleTrace: ruleTrace(snapshot, decision, historicalContext, historicalApplied),
   };
 }
