@@ -6,6 +6,7 @@ import JSZip from "jszip";
 import {
   validateWhoopExportZip,
   WHOOP_EXPORT_UPLOAD_MAX_BYTES,
+  WHOOP_EXPORT_MAX_ENTRIES,
   WhoopExportUploadError,
 } from "@/lib/whoop-export/upload";
 
@@ -47,5 +48,16 @@ test("validateWhoopExportZip rejects missing required CSVs and oversized files",
   await assert.rejects(
     validateWhoopExportZip(Buffer.alloc(WHOOP_EXPORT_UPLOAD_MAX_BYTES + 1), "export.zip"),
     /larger than the app upload limit/,
+  );
+});
+
+test("validateWhoopExportZip rejects archives with excessive entry counts", async () => {
+  const zip = new JSZip();
+  for (let index = 0; index <= WHOOP_EXPORT_MAX_ENTRIES; index += 1) {
+    zip.file(`extra-${index}.txt`, "x");
+  }
+  await assert.rejects(
+    validateWhoopExportZip(Buffer.from(await zip.generateAsync({ type: "uint8array" })), "export.zip"),
+    /too many archive entries/,
   );
 });

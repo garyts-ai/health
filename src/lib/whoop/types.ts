@@ -87,6 +87,7 @@ export type WhoopConnectionStatus = {
   connected: boolean;
   isConfigured: boolean;
   status: string;
+  scopes: string[];
   hasOfflineAccess: boolean;
   userId: number | null;
   email: string | null;

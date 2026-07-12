@@ -20,6 +20,7 @@ type ProviderCard = {
   reconnectLabel: string;
   syncAction: string;
   syncNotice: string | null;
+  grantedScopes: string[] | null;
 };
 
 function formatTimestamp(value: string | null) {
@@ -59,12 +60,14 @@ export function ProtectedSettingsActions({ hevy, summary, syncStatus, whoop }: {
       reconnectHref: whoop.isConfigured && canUseWhoopOAuth ? "/api/auth/whoop" : null,
       reconnectLabel: whoop.isConfigured ? "Reconnect requires HTTPS" : "Configure WHOOP", syncAction: "/api/whoop/sync",
       syncNotice: providerNotice("WHOOP", syncStatus?.whoop),
+      grantedScopes: whoop.scopes,
     },
     {
       name: "Hevy", connected: hevy.connected, configured: hevy.isConfigured, stale: hevy.isStale,
       lastSyncCompletedAt: hevy.lastSyncCompletedAt, lastSyncError: null, lastSyncStatus: hevy.lastSyncStatus,
       reconnectHref: null, reconnectLabel: "Configure Hevy", syncAction: "/api/hevy/sync",
       syncNotice: providerNotice("Hevy", syncStatus?.hevy),
+      grantedScopes: null,
     },
   ];
 
@@ -80,7 +83,7 @@ export function ProtectedSettingsActions({ hevy, summary, syncStatus, whoop }: {
           {providers.map((provider) => {
             const state = !provider.configured ? "Not configured" : !provider.connected ? "Needs attention" : provider.lastSyncStatus === "failed" ? "Sync failed" : provider.stale ? "Connected, stale" : "Connected";
             return <article className={styles.provider} key={provider.name} data-state={state.toLowerCase().replaceAll(",", "").replaceAll(" ", "-")}>
-              <div><h4>{provider.name}</h4><p>Last sync {formatTimestamp(provider.lastSyncCompletedAt)}</p></div>
+              <div><h4>{provider.name}</h4><p>Last sync {formatTimestamp(provider.lastSyncCompletedAt)}</p>{provider.grantedScopes ? <p>Granted scope: {provider.grantedScopes.length ? provider.grantedScopes.join(", ") : "none returned"}</p> : null}</div>
               <span className={styles.state}>{state}</span>
               {provider.lastSyncStatus === "failed" && provider.lastSyncError ? <p className={styles.error}>Last error: {provider.lastSyncError}</p> : null}
               {provider.syncNotice ? <p className={styles.notice} role="status">{provider.syncNotice}</p> : null}
