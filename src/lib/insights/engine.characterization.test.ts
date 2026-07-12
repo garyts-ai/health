@@ -135,20 +135,19 @@ test("characterizes the known Phase 1 missing-readiness defect", () => {
     new Date("2026-04-29T14:00:00.000Z"),
   );
 
-  // Characterization only: Phase 1 must deliberately replace this unsafe output.
   assert.deepEqual(projectDecision(decision), {
-    trainingAvailability: "Train",
-    trainingTarget: "Lower",
+    trainingAvailability: "Rest",
+    trainingTarget: "Either",
     nextTrainingTarget: "Lower",
     trainingIntent: "Maintain",
-    intensityLabel: "Keep normal volume, no forced PRs",
-    primaryDecisionReason: "Train lower at planned volume; the schedule does not require extra work today.",
+    intensityLabel: "Wait for current recovery data before training hard",
+    primaryDecisionReason: "Readiness unavailable: no current coherent scored sleep/recovery cycle (missing).",
     daysLeftInWeek: 5,
     liftsNeededForGoal: 2,
     canStillHitWeeklyGoalIfRestToday: true,
     weeklyPaceLabel: "2 lifts needed with 4 days after today",
     decisionFactorLabels: [
-      "Schedule flexible",
+      "Readiness unavailable",
       "Weekly lift goal",
       "Split recency",
     ],
@@ -175,14 +174,13 @@ test("characterizes the known Phase 1 late-week readiness defect", () => {
     new Date("2026-05-02T14:00:00.000Z"),
   );
 
-  // Characterization only: Phase 1 must prevent schedule pressure from enabling training.
   assert.deepEqual(projectDecision(decision), {
-    trainingAvailability: "Train",
-    trainingTarget: "Upper",
+    trainingAvailability: "Rest",
+    trainingTarget: "Either",
     nextTrainingTarget: "Upper",
     trainingIntent: "Back off",
-    intensityLabel: "Cap hard sets; preserve the week",
-    primaryDecisionReason: "Train upper only if warm-up is normal: recovery is 30% with -1.4h versus sleep need.",
+    intensityLabel: "Rest if symptoms are obvious; otherwise keep it very easy",
+    primaryDecisionReason: "Rest today: 30% recovery is paired with a multi-signal overnight disruption; behind pace: 3 lifts needed and schedule pressure is high.",
     daysLeftInWeek: 2,
     liftsNeededForGoal: 3,
     canStillHitWeeklyGoalIfRestToday: false,

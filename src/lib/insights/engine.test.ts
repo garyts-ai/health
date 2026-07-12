@@ -313,7 +313,7 @@ test("physique decision rests on poor recovery when the weekly goal is still rea
   assert.match(decision.primaryDecisionReason, /Rest today/);
 });
 
-test("physique decision trains with a back-off intent when poor recovery meets schedule pressure", () => {
+test("physique decision rests even when poor recovery meets schedule pressure", () => {
   const decision = buildPhysiqueDecision(
     makeReadiness({ recoveryScore: 30, sleepVsNeedHours: -1.4 }),
     makeTraining({
@@ -328,8 +328,8 @@ test("physique decision trains with a back-off intent when poor recovery meets s
     new Date("2026-05-02T14:00:00.000Z"),
   );
 
-  assert.equal(decision.trainingAvailability, "Train");
-  assert.equal(decision.trainingTarget, "Upper");
+  assert.equal(decision.trainingAvailability, "Rest");
+  assert.equal(decision.trainingTarget, "Either");
   assert.equal(decision.trainingIntent, "Back off");
   assert.equal(decision.canStillHitWeeklyGoalIfRestToday, false);
 });
