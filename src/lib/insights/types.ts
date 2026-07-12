@@ -408,6 +408,7 @@ export type DailyActivityContext = {
 
 export type DailySummary = {
   date: string;
+  physiologicalDate: string;
   contextLine: string;
   miniTrends: {
     recovery3d: Array<number | null>;

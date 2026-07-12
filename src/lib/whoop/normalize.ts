@@ -101,10 +101,15 @@ export function normalizeCycleRecord(record: Record<string, unknown>): WhoopCycl
       ? (record.score as Record<string, unknown>)
       : {};
 
+  const start = asString(record.start) ?? new Date(0).toISOString();
+  // An open current WHOOP cycle returns end=null. Preserve it as a current-day
+  // observation by anchoring the normalized end to its physiological start.
+  const end = asString(record.end) ?? start;
+
   return {
     id: asNumber(record.id) ?? -1,
-    start: asString(record.start) ?? new Date(0).toISOString(),
-    end: asString(record.end) ?? new Date(0).toISOString(),
+    start,
+    end,
     timezoneOffset: asString(record.timezone_offset),
     scoreState: asString(record.score_state),
     strain: asNumber(score.strain),

@@ -89,3 +89,70 @@ test("buildReadinessSnapshot excludes the current cycle and requires four prior 
   assert.equal(snapshot.baselines.respiratoryRate.value, 16.5);
   assert.equal(snapshot.baselines.respiratoryRate.status, "available");
 });
+
+test("buildReadinessSnapshot keeps the partial current physiological day regardless of record order", () => {
+  const prior = makeScoredWhoopReadiness({
+    cycle: makeWhoopCycle({ id: 2001, start: "2026-07-11T07:00:00.000Z", end: "2026-07-11T23:00:00.000Z", strain: 16.5 }),
+    sleep: makeWhoopSleep({ id: "sleep-2001", cycleId: 2001, end: "2026-07-11T12:00:00.000Z", sleepPerformancePercentage: 92 }),
+    recovery: makeWhoopRecovery({ cycleId: 2001, recoveryScore: 65, updatedAt: "2026-07-11T12:30:00.000Z", createdAt: "2026-07-11T12:30:00.000Z" }),
+  });
+  const current = makeScoredWhoopReadiness({
+    cycle: makeWhoopCycle({ id: 2002, start: "2026-07-12T07:44:12.640Z", end: "1970-01-01T00:00:00.000Z", strain: 0.3 }),
+    sleep: makeWhoopSleep({ cycleId: 2002, end: "2026-07-12T12:26:58.070Z", sleepPerformancePercentage: 49, totalLightSleepTimeMilli: 4_806_000, totalSlowWaveSleepTimeMilli: 7_086_240, totalRemSleepTimeMilli: 3_693_170 }),
+    recovery: makeWhoopRecovery({
+      cycleId: 2002,
+      recoveryScore: 10,
+      hrvRmssdMilli: null,
+      createdAt: "2026-07-12T12:30:34.988Z",
+      updatedAt: "2026-07-12T12:30:34.988Z",
+    }),
+    decisionAt: "2026-07-12T21:00:00.000Z",
+  });
+  const snapshot = buildReadinessSnapshot({
+    decisionAt: new Date(current.decisionAt),
+    sleepRows: [prior.sleep!, current.sleep!],
+    recoveryRows: [prior.recovery!, current.recovery!],
+    cycleRows: [prior.cycle!, current.cycle!],
+  });
+
+  assert.equal(snapshot.status, "available");
+  assert.equal(snapshot.selectedDate, "2026-07-12");
+  assert.equal(snapshot.physiologicalDate, "2026-07-12");
+  assert.equal(snapshot.recovery.value?.recoveryScore, 10);
+  assert.equal(snapshot.sleep.value?.sleepPerformancePercentage, 49);
+  assert.equal(snapshot.cycle.value?.strain, 0.3);
+  assert.equal(snapshot.cycle.observedAt, "2026-07-12T07:44:12.640Z");
+});
+
+test("buildReadinessSnapshot does not relabel yesterday as today and handles a UTC midnight boundary", () => {
+  const yesterday = makeScoredWhoopReadiness({
+    decisionAt: "2026-05-02T03:45:00.000Z",
+    sleep: makeWhoopSleep({ end: "2026-05-02T03:30:00.000Z" }),
+    cycle: makeWhoopCycle({ end: "2026-05-02T03:30:00.000Z" }),
+    recovery: makeWhoopRecovery({ updatedAt: "2026-05-02T03:31:00.000Z", createdAt: "2026-05-02T03:31:00.000Z" }),
+  });
+  const midnight = buildReadinessSnapshot({
+    decisionAt: new Date(yesterday.decisionAt),
+    sleepRows: [yesterday.sleep!],
+    recoveryRows: [yesterday.recovery!],
+    cycleRows: [yesterday.cycle!],
+  });
+  assert.equal(midnight.status, "available");
+  assert.equal(midnight.selectedDate, "2026-05-01");
+
+  const missingCurrent = makeScoredWhoopReadiness({
+    decisionAt: "2026-05-02T14:00:00.000Z",
+    sleep: makeWhoopSleep({ end: "2026-05-01T11:00:00.000Z" }),
+    recovery: makeWhoopRecovery({ updatedAt: "2026-05-01T11:02:00.000Z", createdAt: "2026-05-01T11:02:00.000Z" }),
+    cycle: makeWhoopCycle({ end: "2026-05-01T11:00:00.000Z" }),
+  });
+  const unavailable = buildReadinessSnapshot({
+    decisionAt: new Date(missingCurrent.decisionAt),
+    sleepRows: [missingCurrent.sleep!],
+    recoveryRows: [missingCurrent.recovery!],
+    cycleRows: [missingCurrent.cycle!],
+  });
+  assert.equal(unavailable.status, "unavailable");
+  assert.ok(unavailable.reasons.includes("different_date"));
+  assert.equal(unavailable.sleep.value, null);
+});

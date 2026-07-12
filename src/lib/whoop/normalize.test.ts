@@ -98,6 +98,18 @@ test("normalizeCycleRecord maps daily strain metrics", () => {
   assert.equal(result.kilojoule, 1900.3);
 });
 
+test("normalizeCycleRecord keeps an open current cycle on its start date", () => {
+  const result = normalizeCycleRecord({
+    id: 56,
+    start: "2026-07-12T07:44:12.640Z",
+    end: null,
+    score_state: "SCORED",
+    score: { strain: 0.3 },
+  });
+
+  assert.equal(result.end, result.start);
+});
+
 test("normalizeWorkoutRecord maps workout score metrics", () => {
   const result = normalizeWorkoutRecord({
     id: "workout-1",

@@ -4,6 +4,7 @@ import type {
 } from "@/lib/insights/types";
 import { regionsForWeeklyMuscleGroup } from "@/lib/insights/body-map";
 import { mapTodayTelemetry } from "@/components/training-os/today-telemetry";
+import { calendarDateFromKey } from "@/lib/calendar";
 
 const ACTIVE_SIGNAL_LABELS: Array<{
   key: keyof DailyStressFlags;
@@ -59,13 +60,13 @@ function sanitizeTrend(values: Array<number | null>) {
   return values.slice(-3).map((value) => (typeof value === "number" ? value : null));
 }
 
-function formatDate(value: string) {
+function formatCalendarDate(key: string) {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIME_ZONE,
     weekday: "long",
     month: "long",
     day: "numeric",
-  }).format(new Date(value));
+  }).format(calendarDateFromKey(key));
 }
 
 function formatShortDate(value: string) {
@@ -253,7 +254,7 @@ export function buildTodayViewModel(
   return {
     header: {
       productName: "Health OS",
-      dateLabel: formatDate(summary.date),
+      dateLabel: formatCalendarDate(summary.physiologicalDate),
       freshnessNotice: buildFreshnessNotice(summary),
     },
     hero: {
