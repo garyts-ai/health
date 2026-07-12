@@ -101,6 +101,7 @@ export function WhoopAnalysisView({ report }: { report: WhoopAnalysisReport }) {
                 <div className="mt-1 text-lg font-semibold">{report.overview.confidence}</div>
               </div>
             </div>
+            <p className="mt-3 text-xs text-white/48">Report analysis window: {report.analysisWindow.start ?? "Not available"} → {report.analysisWindow.end ?? "Not available"} (end exclusive) · {report.analysisWindow.sampleCount} measured cycles.</p>
             <details className="mt-3 border-t border-white/10 pt-3 text-sm text-white/58">
               <summary className="cursor-pointer font-medium text-white/76">Dataset detail</summary>
               <p className="mt-2 leading-5">

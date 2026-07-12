@@ -12,6 +12,7 @@ import { applyHistoricalModifier, buildHistoricalContext } from "@/lib/insights/
 import { buildWeeklyPlan } from "@/lib/insights/weekly-plan";
 import { buildReadinessSnapshot, type ReadinessSnapshot } from "@/lib/insights/readiness-snapshot";
 import { buildDecisionEvidence } from "@/lib/insights/decision-evidence";
+import { calendarDateKey, calendarWeekInterval } from "@/lib/calendar";
 import { kilogramsToPounds } from "@/lib/units";
 import { getWhoopConnectionStatus } from "@/lib/whoop/provider";
 import type {
@@ -137,12 +138,6 @@ type HevyExerciseEntry = {
 type MuscleBucket = "upper" | "lower" | "push" | "pull";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
-const NEW_YORK_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/New_York",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
 const NEW_YORK_WEEKDAY = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   weekday: "short",
@@ -278,22 +273,16 @@ function getStartDate(days: number, now = new Date()) {
   return new Date(now.getTime() - DAY_MS * days).toISOString();
 }
 
-function getStartOfWeekIso() {
-  const now = new Date();
-  const day = now.getDay();
-  const distanceFromMonday = (day + 6) % 7;
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(now.getDate() - distanceFromMonday);
-  return start.toISOString();
+function getStartOfWeekIso(now = new Date()) {
+  return calendarWeekInterval(now).start.toISOString();
 }
 
 function isMonday(date: Date) {
-  return date.getDay() === 1;
+  return calendarDateKey(date) === calendarWeekInterval(date).startKey;
 }
 
 function getDateKey(date: string | Date) {
-  return NEW_YORK_DAY.format(typeof date === "string" ? new Date(date) : date);
+  return calendarDateKey(typeof date === "string" ? new Date(date) : date);
 }
 
 function getDateWindow(days: number) {
@@ -309,12 +298,7 @@ function getDateWindow(days: number) {
 }
 
 function getStartOfWeek(date: Date) {
-  const day = date.getDay();
-  const distanceFromMonday = (day + 6) % 7;
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(date.getDate() - distanceFromMonday);
-  return start;
+  return calendarWeekInterval(date).start;
 }
 
 function addDays(date: Date, days: number) {

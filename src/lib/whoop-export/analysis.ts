@@ -1,4 +1,5 @@
 import { dbAll, dbGet } from "@/lib/db";
+import { calendarDaysIntervalEnding, isInCalendarInterval } from "@/lib/calendar";
 
 type CycleRow = {
   cycle_start: string;
@@ -82,6 +83,12 @@ export type WhoopLeveragePoint = {
 
 export type WhoopAnalysisReport = {
   empty: boolean;
+  analysisWindow: {
+    start: string | null;
+    end: string | null;
+    sampleCount: number;
+    calendarDays: number;
+  };
   inventory: {
     sourceName: string | null;
     importedAt: string | null;
@@ -278,10 +285,15 @@ function formatMinutes(minutes: number | null) {
   );
 }
 
-function trendDelta(rows: CycleRow[], key: keyof CycleRow) {
-  const recent = average(values(rows.slice(-28), key));
-  const prior = average(values(rows.slice(-56, -28), key));
+function trendDelta(recentRows: CycleRow[], priorRows: CycleRow[], key: keyof CycleRow) {
+  const recent = average(values(recentRows, key));
+  const prior = average(values(priorRows, key));
   return recent === null || prior === null ? null : recent - prior;
+}
+
+export function windowConfidence(recentCount: number, priorCount = recentCount): WhoopFinding["confidence"] {
+  const paired = Math.min(recentCount, priorCount);
+  return paired >= 14 ? "High" : paired >= 4 ? "Moderate" : "Suggestive";
 }
 
 export function gapCount(rows: Array<Pick<CycleRow, "cycle_start">>) {
@@ -345,6 +357,7 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
   if (!latestImport) {
     return {
       empty: true,
+      analysisWindow: { start: null, end: null, sampleCount: 0, calendarDays: 0 },
       inventory: {
         sourceName: null, importedAt: null, latestImport: null, imports: [], start: null, end: null, days: 0,
         counts: {}, gaps: 0, reliability: "No WHOOP export has been seeded.", missing: [],
@@ -367,9 +380,18 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
     dbAll<JournalRow>("SELECT cycle_start, question_text, answered_yes FROM whoop_export_journal_answers"),
     dbGet<{ count: number | string }>("SELECT COUNT(*) AS count FROM whoop_export_sleeps"),
   ]);
-  const recent = cycles.slice(-28);
   const coverageStart = cycles[0]?.cycle_start ?? latestImport.date_start;
   const coverageEnd = cycles.at(-1)?.cycle_start ?? latestImport.date_end;
+  const analysisEndDate = coverageEnd ? new Date(coverageEnd) : new Date();
+  const recentInterval = calendarDaysIntervalEnding(analysisEndDate, 28);
+  const priorInterval = calendarDaysIntervalEnding(new Date(recentInterval.start.getTime() - 1), 28);
+  const recent = cycles.filter((row) => isInCalendarInterval(row.cycle_start, recentInterval));
+  const prior = cycles.filter((row) => isInCalendarInterval(row.cycle_start, priorInterval));
+  const recentWorkouts = workouts.filter((row) => isInCalendarInterval(row.workout_start, recentInterval));
+  const medical14Interval = calendarDaysIntervalEnding(analysisEndDate, 14);
+  const medical7Interval = calendarDaysIntervalEnding(analysisEndDate, 7);
+  const medical14 = cycles.filter((row) => isInCalendarInterval(row.cycle_start, medical14Interval));
+  const medical7 = cycles.filter((row) => isInCalendarInterval(row.cycle_start, medical7Interval));
   const days =
     coverageStart && coverageEnd
       ? Math.floor((new Date(coverageEnd).getTime() - new Date(coverageStart).getTime()) / 86_400_000) + 1
@@ -392,15 +414,18 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
   const findings: WhoopFinding[] = [];
 
   const sleepGap = asleep !== null && need !== null ? asleep - need : null;
-  const bedtimeVariance = standardDeviation(bedtimeValues);
+  const recentBedtimeValues = recent
+    .map((row) => minutesFromLocalMidnight(row.sleep_onset, row.timezone_offset))
+    .filter((value): value is number => value !== null);
+  const bedtimeVariance = standardDeviation(recentBedtimeValues);
   if (sleepGap !== null) {
     findings.push({
       title: sleepGap < 0 ? "Sleep is running below calculated need" : "Sleep duration is meeting calculated need",
-      evidence: `${display(asleep !== null ? asleep / 60 : null, "h")} asleep versus ${display(need !== null ? need / 60 : null, "h")} average need.`,
+      evidence: `Full-export average: ${display(asleep !== null ? asleep / 60 : null, "h")} asleep versus ${display(need !== null ? need / 60 : null, "h")} average need; recent 28-day coverage N=${recent.length}.`,
       interpretation: sleepGap < 0
         ? "The recurring duration gap is a direct constraint on recovery, independent of sleep-stage mix."
         : "Duration is not the dominant recovery constraint across the full export.",
-      confidence: cycles.length >= 90 ? "High" : "Moderate",
+      confidence: windowConfidence(recent.length),
       severity: Math.abs(sleepGap),
       visualization: {
         kind: "gap",
@@ -413,25 +438,25 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
   if (bedtimeVariance !== null) {
     findings.push({
       title: bedtimeVariance > 45 ? "Sleep timing varies materially" : "Sleep timing is comparatively stable",
-      evidence: `Bedtime standard deviation is ${bedtimeVariance.toFixed(0)} minutes; average onset is ${formatMinutes(average(bedtimeValues))}.`,
+      evidence: `Bedtime standard deviation is ${bedtimeVariance.toFixed(0)} minutes; average onset is ${formatMinutes(average(recentBedtimeValues))}.`,
       interpretation: bedtimeVariance > 45
         ? "Timing variability can weaken sleep consistency even when total duration is adequate."
         : "Timing consistency is unlikely to be a major standalone limiter.",
-      confidence: "High",
+      confidence: windowConfidence(recent.length),
       severity: bedtimeVariance,
       visualization: { kind: "variability", value: bedtimeVariance, threshold: 45, unit: "min" },
     });
   }
-  const hrvDelta = trendDelta(cycles, "hrv_rmssd_milli");
-  const rhrDelta = trendDelta(cycles, "resting_heart_rate");
+  const hrvDelta = trendDelta(recent, prior, "hrv_rmssd_milli");
+  const rhrDelta = trendDelta(recent, prior, "resting_heart_rate");
   findings.push({
     title: "Recent autonomic direction",
-    evidence: `Recent 28-day HRV is ${display(average(values(recent, "hrv_rmssd_milli")), " ms", 0)} (${display(hrvDelta, " ms", 1)} versus prior 28 days); RHR is ${display(average(values(recent, "resting_heart_rate")), " bpm", 1)} (${display(rhrDelta, " bpm", 1)}).`,
+    evidence: `Recent 28-day HRV is ${display(average(values(recent, "hrv_rmssd_milli")), " ms", 0)} (${display(hrvDelta, " ms", 1)} versus prior 28 days; N=${values(recent, "hrv_rmssd_milli").length}/${values(prior, "hrv_rmssd_milli").length}); RHR is ${display(average(values(recent, "resting_heart_rate")), " bpm", 1)} (${display(rhrDelta, " bpm", 1)}; N=${values(recent, "resting_heart_rate").length}/${values(prior, "resting_heart_rate").length}).`,
     interpretation:
       (hrvDelta ?? 0) < -3 || (rhrDelta ?? 0) > 2
         ? "The recent window shows more physiological strain than the preceding month."
         : "The recent window does not show a strong adverse autonomic shift.",
-    confidence: "High",
+    confidence: windowConfidence(Math.min(values(recent, "hrv_rmssd_milli").length, values(recent, "resting_heart_rate").length), Math.min(values(prior, "hrv_rmssd_milli").length, values(prior, "resting_heart_rate").length)),
     severity: Math.abs(hrvDelta ?? 0) + Math.abs(rhrDelta ?? 0) * 3,
     visualization: { kind: "autonomic", hrvDelta, rhrDelta },
   });
@@ -488,12 +513,14 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
   }
 
   const medicalFlags: string[] = [];
-  const lowSpo2 = values(cycles.slice(-14), "spo2_percentage").filter((value) => value < 94);
-  if (lowSpo2.length >= 3) medicalFlags.push(`${lowSpo2.length} of the last 14 measured nights had average SpO₂ below 94%.`);
-  const highTemp = values(cycles.slice(-7), "skin_temp_celsius");
+  const lowSpo2 = values(medical14, "spo2_percentage").filter((value) => value < 94);
+  const measuredSpo2 = values(medical14, "spo2_percentage");
+  if (lowSpo2.length >= 3) medicalFlags.push(`${lowSpo2.length}/${measuredSpo2.length} measured nights in the last 14 calendar days had average SpO2 below 94%. This is not a diagnosis.`);
+  const highTemp = values(medical7, "skin_temp_celsius");
+  const measuredTemp = values(medical7, "skin_temp_celsius");
   const fullTemp = average(values(cycles, "skin_temp_celsius"));
   if (fullTemp !== null && highTemp.filter((value) => value - fullTemp > 0.5).length >= 3) {
-    medicalFlags.push("Skin temperature was more than 0.5°C above personal baseline on at least three recent nights.");
+    medicalFlags.push(`${highTemp.filter((value) => value - fullTemp > 0.5).length}/${measuredTemp.length} measured nights in the last 7 calendar days were more than 0.5C above personal baseline. This is not a diagnosis.`);
   }
 
   const workoutDuration = average(
@@ -525,9 +552,9 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
       metric("Sleep debt", average(values(cycles, "sleep_debt_minutes")), average(values(recent, "sleep_debt_minutes")), " min", 0, undefined, "down"),
     ],
     activity: [
-      metric("Workout frequency", weeklyWorkoutFrequency, workouts.filter((row) => new Date(row.workout_start) >= new Date(cycles.at(-28)?.cycle_start ?? 0)).length / 4, "/week", 1, undefined, "neutral"),
-      metric("Workout duration", workoutDuration, average(workouts.slice(-28).map((row) => row.duration_minutes).filter((value): value is number => value !== null)), " min", 0, undefined, "neutral"),
-      metric("Workout strain", average(workouts.map((row) => row.activity_strain).filter((value): value is number => value !== null)), average(workouts.slice(-28).map((row) => row.activity_strain).filter((value): value is number => value !== null)), "", 1, undefined, "neutral"),
+      metric("Workout frequency", weeklyWorkoutFrequency, recentWorkouts.length / 4, "/week", 1, undefined, "neutral"),
+      metric("Workout duration", workoutDuration, average(recentWorkouts.map((row) => row.duration_minutes).filter((value): value is number => value !== null)), " min", 0, undefined, "neutral"),
+      metric("Workout strain", average(workouts.map((row) => row.activity_strain).filter((value): value is number => value !== null)), average(recentWorkouts.map((row) => row.activity_strain).filter((value): value is number => value !== null)), "", 1, undefined, "neutral"),
       textMetric("Most common activity", [...new Map(workouts.map((row) => [row.activity_name ?? "Unknown", workouts.filter((item) => item.activity_name === row.activity_name).length])).entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Not available", "Full export"),
     ],
   };
@@ -551,6 +578,12 @@ export async function getWhoopAnalysisReport(): Promise<WhoopAnalysisReport> {
 
   return {
     empty: false,
+    analysisWindow: {
+      start: recentInterval.startKey,
+      end: recentInterval.endKey,
+      sampleCount: recent.length,
+      calendarDays: 28,
+    },
     inventory: {
       sourceName: latestImport.source_name,
       importedAt: latestImport.imported_at,

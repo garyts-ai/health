@@ -1,20 +1,6 @@
 import { dbAll } from "@/lib/db";
+import { calendarDateFromKey, calendarDateKey, calendarWeekInterval } from "@/lib/calendar";
 import type { DailyPhysiqueDecision, DailyReadiness, DailyTrainingLoad, WeeklyPlan, WeeklyPlanDay } from "@/lib/insights/types";
-
-const TIME_ZONE = "America/New_York";
-const DAY_MS = 86_400_000;
-
-function dateKey(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(date);
-}
-
-function monday(date: Date) {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, weekday: "short" }).format(date);
-  const localDay = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday);
-  const copy = new Date(date);
-  copy.setUTCDate(copy.getUTCDate() - ((localDay + 6) % 7));
-  return new Date(`${dateKey(copy)}T12:00:00.000Z`);
-}
 
 export function buildWeeklyPlanFromInputs({
   now,
@@ -29,9 +15,9 @@ export function buildWeeklyPlanFromInputs({
   trainingLoad: DailyTrainingLoad;
   completed: Array<{ date: string; title: string | null }>;
 }): WeeklyPlan {
-  const start = monday(now);
-  const today = dateKey(now);
-  const completedByDay = new Map(completed.map((item) => [item.date.slice(0, 10), item]));
+  const interval = calendarWeekInterval(now);
+  const today = calendarDateKey(now);
+  const completedByDay = new Map(completed.map((item) => [calendarDateKey(item.date), item]));
   const completedLifts = completedByDay.size;
   let remaining = Math.max(0, 4 - completedLifts);
   let next: "Upper" | "Lower" = decision.nextTrainingTarget === "Lower" ? "Lower" : "Upper";
@@ -39,15 +25,16 @@ export function buildWeeklyPlanFromInputs({
   const days: WeeklyPlanDay[] = [];
 
   for (let index = 0; index < 7; index += 1) {
-    const date = new Date(start.getTime() + index * DAY_MS);
-    const key = dateKey(date);
+    const date = calendarDateFromKey(interval.startKey);
+    date.setUTCDate(date.getUTCDate() + index);
+    const key = calendarDateKey(date);
     const actual = completedByDay.get(key);
     const isToday = key === today;
     const futureSlots = 7 - index;
-    let workoutType: WeeklyPlanDay["workoutType"] = "Recovery";
-    let state: WeeklyPlanDay["state"] = key < today ? "recovery" : "planned";
+    let workoutType: WeeklyPlanDay["workoutType"] = "Rest";
+    let state: WeeklyPlanDay["state"] = key < today ? "unobserved" : "planned";
     let intent: WeeklyPlanDay["intent"] = "Recover";
-    let rationale = "Use this as a recovery and preparation day.";
+    let rationale = "No workout was recorded for this past date; no recovery state is inferred.";
     let guardrail: string | null = null;
 
     if (actual) {
@@ -86,13 +73,13 @@ export function buildWeeklyPlanFromInputs({
       : workoutType === "Lower" ? trainingLoad.lowerSessionAnchors.slice(0, 3) : [];
     days.push({
       date: key,
-      label: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TIME_ZONE }).format(date),
+      label: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" }).format(date),
       state, workoutType, intent, anchors,
-      recoveryPriority: workoutType === "Rest" || workoutType === "Recovery" ? "Sleep, walking, and low strain" : readiness.sleepVsNeedHours !== null && readiness.sleepVsNeedHours < -1 ? "Protect sleep after training" : "Normal recovery routine",
+      recoveryPriority: state === "unobserved" ? "No recorded workout; physiology not inferred" : workoutType === "Rest" ? "Sleep, walking, and low strain" : readiness.sleepVsNeedHours !== null && readiness.sleepVsNeedHours < -1 ? "Protect sleep after training" : "Normal recovery routine",
       rationale, guardrail, actualWorkout: actual?.title ?? null,
     });
   }
-  return { weekStart: days[0].date, weekEnd: days[6].date, targetLifts: 4, completedLifts, days };
+  return { generatedAt: now.toISOString(), weekStart: days[0].date, weekEnd: days[6].date, targetLifts: 4, completedLifts, days };
 }
 
 export async function buildWeeklyPlan(
@@ -101,10 +88,11 @@ export async function buildWeeklyPlan(
   readiness: DailyReadiness,
   trainingLoad: DailyTrainingLoad,
 ) {
-  const start = monday(now);
+  const interval = calendarWeekInterval(now);
   const completed = await dbAll<{ date: string; title: string | null }>(
-    "SELECT start_time AS date, title FROM hevy_workouts WHERE start_time >= ? ORDER BY start_time",
-    start.toISOString(),
+    "SELECT start_time AS date, title FROM hevy_workouts WHERE start_time >= ? AND start_time < ? ORDER BY start_time",
+    interval.start.toISOString(),
+    interval.end.toISOString(),
   );
   return buildWeeklyPlanFromInputs({ now, decision, readiness, trainingLoad, completed });
 }

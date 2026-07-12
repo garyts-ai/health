@@ -56,6 +56,7 @@ test("weekly plan creates seven Monday-Sunday days and four total lift slots", (
   assert.equal(plan.days.length, 7);
   assert.equal(plan.weekStart, "2026-06-22");
   assert.equal(plan.weekEnd, "2026-06-28");
+  assert.equal(plan.generatedAt, "2026-06-22T16:00:00.000Z");
   assert.equal(plan.days.filter((day) => day.workoutType === "Upper" || day.workoutType === "Lower").length, 4);
 });
 
@@ -69,4 +70,14 @@ test("weekly plan preserves completed workouts and alternates future splits", ()
   assert.equal(plan.days[0].state, "completed");
   assert.equal(plan.days[0].workoutType, "Upper");
   assert.ok(plan.days.some((day) => day.state === "planned" && day.guardrail));
+});
+
+test("weekly forecast keeps past dates without workouts explicitly unobserved", () => {
+  const plan = buildWeeklyPlanFromInputs({
+    now: new Date("2026-06-24T16:00:00.000Z"),
+    decision, readiness, trainingLoad, completed: [],
+  });
+  assert.equal(plan.days[0].state, "unobserved");
+  assert.equal(plan.days[0].workoutType, "Rest");
+  assert.match(plan.days[0].rationale, /No workout was recorded/);
 });

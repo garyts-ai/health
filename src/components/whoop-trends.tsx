@@ -69,7 +69,7 @@ function formatChartDelta(value: number | null, baseline: number | null, unit: s
 function directionLabel(direction: WhoopMetric["direction"]) {
   if (direction === "missing") return "No comparison";
   if (direction === "flat") return "Near baseline";
-  return direction === "up" ? "Trending up" : "Trending down";
+  return direction === "up" ? "Above full-period baseline" : "Below full-period baseline";
 }
 
 function directionArrow(direction: WhoopMetric["direction"]) {
@@ -655,7 +655,7 @@ export function WhoopVisualAnalysis({ report }: { report: WhoopAnalysisReport })
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">Visual analysis</h2>
             <div className="mt-1 text-sm text-white/54">
-              {rangeLabel} ending {Number.isFinite(newestDate) ? formatDate(new Date(newestDate).toISOString()) : "at latest record"} · {visibleDates.length} recorded cycles
+              Chart window only: {rangeLabel} ending {Number.isFinite(newestDate) ? formatDate(new Date(newestDate).toISOString()) : "at latest record"} · {visibleDates.length} recorded cycles. Report findings use the independent 28-day analysis window.
             </div>
           </div>
           <div className="flex flex-wrap gap-1" role="group" aria-label="WHOOP chart range">
