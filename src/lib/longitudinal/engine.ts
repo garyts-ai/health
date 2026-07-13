@@ -534,7 +534,7 @@ function associations(journals: JournalRow[], days: CanonicalDay[], windowDays: 
 }
 
 const JOURNAL_EVENT_RULES: Array<{ type: JournalEventType; icon: string; pattern: RegExp; label: string }> = [
-  { type: "alcohol", icon: "circle", pattern: /alcohol|drink|drinking/i, label: "Alcohol" },
+  { type: "alcohol", icon: "circle", pattern: /\balcohol\b/i, label: "Alcohol" },
   { type: "caffeine", icon: "diamond", pattern: /caffeine|coffee/i, label: "Caffeine" },
   { type: "late_meal", icon: "square", pattern: /late.?meal|late.?food|eat.*late/i, label: "Late meal" },
   { type: "travel", icon: "plane", pattern: /travel|flight|jet.?lag/i, label: "Travel" },

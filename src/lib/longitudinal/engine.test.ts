@@ -229,13 +229,14 @@ test("event timeline contains explicit positive journal rows only", () => {
   const rows: LongitudinalEngineInput["journalRows"] = [
     { id: "alcohol-yes", cycle_start: `${date(-3)}T05:00:00.000Z`, question_text: "Did you consume alcohol?", answered_yes: 1 },
     { id: "alcohol-no", cycle_start: `${date(-2)}T05:00:00.000Z`, question_text: "Did you consume alcohol?", answered_yes: 0 },
+    { id: "water-yes", cycle_start: `${date(-2)}T06:00:00.000Z`, question_text: "Did you drink water?", answered_yes: 1 },
     { id: "travel-yes", cycle_start: `${date(-1)}T05:00:00.000Z`, question_text: "Did you travel?", answered_yes: 1 },
     { id: "missing-date", cycle_start: null, question_text: "Were you ill?", answered_yes: 1 },
     { id: "old-entry", cycle_start: `${date(-200)}T05:00:00.000Z`, question_text: "Did you consume caffeine?", answered_yes: 1 },
   ];
   const view = buildLongitudinalHealthView(input({ journalRows: rows }));
-  assert.deepEqual(view.journalEvents?.map((event) => event.id), ["alcohol-yes", "travel-yes"]);
-  assert.deepEqual(view.journalEvents?.map((event) => event.type), ["alcohol", "travel"]);
+  assert.deepEqual(view.journalEvents?.map((event) => event.id), ["alcohol-yes", "water-yes", "travel-yes"]);
+  assert.deepEqual(view.journalEvents?.map((event) => event.type), ["alcohol", "hydration", "travel"]);
   assert.ok(view.journalEvents?.every((event) => event.source === "WHOOP Journal" && event.metadata.answeredYes === true));
   assert.equal(view.journalEvents?.some((event) => event.id === "alcohol-no"), false);
 });

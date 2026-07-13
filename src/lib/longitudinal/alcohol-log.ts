@@ -8,7 +8,7 @@ export type AlcoholJournalRow = {
   answered_yes: number;
 };
 
-const ALCOHOL_PATTERN = /alcohol|drink|drinking/i;
+const ALCOHOL_PATTERN = /\balcohol\b/i;
 
 function daysBetween(start: string, end: string) {
   return Math.max(0, Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86_400_000));
@@ -42,14 +42,15 @@ export function alcoholHeatmapDays(selectedDate: string, entries: AlcoholLogEntr
 
 export function alcoholLogSummary(entries: AlcoholLogEntry[], selectedDate: string): AlcoholLogSummary {
   const selectedMonth = selectedDate.slice(0, 7);
+  const windowStart = shiftCalendarDateKey(selectedDate, -89);
   const latestEntryDate = entries[0]?.physiologicalDate ?? null;
   return {
     thisMonthCount: entries.filter((entry) => entry.physiologicalDate.startsWith(selectedMonth)).length,
     last30dCount: entries.filter((entry) => entry.physiologicalDate >= shiftCalendarDateKey(selectedDate, -29)).length,
-    last90dCount: entries.filter((entry) => entry.physiologicalDate >= shiftCalendarDateKey(selectedDate, -89)).length,
+    last90dCount: entries.filter((entry) => entry.physiologicalDate >= windowStart).length,
     latestEntryDate,
     currentAlcoholFreeStreakDays: latestEntryDate === null ? null : daysBetween(latestEntryDate, selectedDate),
-    longestAlcoholFreeStreakDays: longestAlcoholFreeStreak(entries.filter((entry) => entry.physiologicalDate >= shiftCalendarDateKey(selectedDate, -89)), selectedDate),
+    longestAlcoholFreeStreakDays: longestAlcoholFreeStreak(entries.filter((entry) => entry.physiologicalDate >= windowStart), selectedDate, windowStart),
   };
 }
 
@@ -68,10 +69,10 @@ export function normalizeAlcoholEntries(rows: AlcoholJournalRow[], selectedDate:
   }).filter((entry) => entry.physiologicalDate <= selectedDate).sort((left, right) => right.physiologicalDate.localeCompare(left.physiologicalDate) || right.occurredAt.localeCompare(left.occurredAt));
 }
 
-function longestAlcoholFreeStreak(entries: AlcoholLogEntry[], selectedDate: string) {
+function longestAlcoholFreeStreak(entries: AlcoholLogEntry[], selectedDate: string, windowStart: string) {
   if (!entries.length) return null;
   const dates = [...new Set(entries.map((entry) => entry.physiologicalDate))].sort();
-  let longest = 0;
+  let longest = daysBetween(windowStart, dates[0]);
   let previous = dates[0];
   let run = 0;
   for (let index = 1; index < dates.length; index += 1) {
@@ -90,8 +91,10 @@ export function buildAlcoholLogView(rows: AlcoholJournalRow[], selectedDate: str
   const grouped = dayEntries(entries);
   const selectedMonth = selectedDate.slice(0, 7);
   const calendarDays = alcoholCalendarDays(selectedMonth, entries, selectedDate);
-  const heatmapStart = shiftCalendarDateKey(selectedDate, -364);
-  const heatmapDays = Array.from({ length: 365 }, (_, index) => calendarDay(shiftCalendarDateKey(heatmapStart, index), selectedMonth, selectedDate, grouped));
+  const earliestDate = entries.at(-1)?.physiologicalDate ?? selectedDate;
+  const heatmapLength = Math.max(365, daysBetween(earliestDate, selectedDate) + 1);
+  const heatmapStart = shiftCalendarDateKey(selectedDate, -(heatmapLength - 1));
+  const heatmapDays = Array.from({ length: heatmapLength }, (_, index) => calendarDay(shiftCalendarDateKey(heatmapStart, index), selectedMonth, selectedDate, grouped));
   const summary = alcoholLogSummary(entries, selectedDate);
   return { summary, selectedMonth, calendarDays, heatmapDays, entries };
 }

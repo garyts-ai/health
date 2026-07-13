@@ -301,7 +301,7 @@ function AlcoholLogGraph({ view, range }: { view: LongitudinalHealthView; range:
   const daysToShow = range === "week" ? 7 : range === "30d" ? 30 : range === "3m" ? 90 : range === "1y" ? 365 : Math.max(365, allDays.length);
   const days = allDays.slice(-daysToShow);
   const logged = days.filter((day) => day.hasAlcoholEntry).reduce((sum, day) => sum + day.entryCount, 0);
-  const latest = entries[0]?.physiologicalDate ?? null;
+  const latest = [...days].reverse().find((day) => day.hasAlcoholEntry)?.date ?? null;
   return <article className={styles.metricGraph} data-alcohol-graph="true">
     <header><div><h3>Alcohol log</h3><span>Explicit journal dates</span></div><div className={styles.metricGraphValue} style={{ "--metric-tone": "#ff9b62" } as CSSProperties}><strong>{logged} {logged === 1 ? "entry" : "entries"}</strong><span>{latest ? `Latest ${graphDate(latest)}` : "No entries"}</span></div></header>
     <div className={styles.alcoholMiniChart} role="img" aria-label={`Alcohol log for ${range === "all" ? "all available history" : rangeLabelFor(range)}. ${logged} entries${latest ? `, latest ${graphDate(latest)}` : "."}`}>
