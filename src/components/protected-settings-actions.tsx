@@ -1,10 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { LlmContextPacket } from "@/components/llm-context-packet";
 import { GlassPanel } from "@/components/training-os";
 import type { HevyConnectionStatus } from "@/lib/hevy/types";
-import type { DailySummary } from "@/lib/insights/types";
 import type { WhoopConnectionStatus } from "@/lib/whoop/types";
 import styles from "./utilities-panel.module.css";
 
@@ -51,7 +49,7 @@ function providerNotice(provider: "WHOOP" | "Hevy", status?: string) {
   return null;
 }
 
-export function ProtectedSettingsActions({ hevy, summary, syncStatus, whoop }: { hevy: HevyConnectionStatus; summary: DailySummary; syncStatus?: { whoop?: string; hevy?: string }; whoop: WhoopConnectionStatus }) {
+export function ProtectedSettingsActions({ hevy, syncStatus, whoop }: { hevy: HevyConnectionStatus; syncStatus?: { whoop?: string; hevy?: string }; whoop: WhoopConnectionStatus }) {
   const canUseWhoopOAuth = useSyncExternalStore(subscribeToBrowserHost, getBrowserOAuthSnapshot, getServerOAuthSnapshot);
   const providers: ProviderCard[] = [
     {
@@ -95,11 +93,6 @@ export function ProtectedSettingsActions({ hevy, summary, syncStatus, whoop }: {
           })}
         </div>
       </GlassPanel>
-    </fieldset>
-
-    <fieldset className={styles.fieldset}>
-      <legend>LLM Context Packet</legend>
-      <LlmContextPacket summary={summary} />
     </fieldset>
   </div>;
 }

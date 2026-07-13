@@ -1,9 +1,8 @@
-import type { WhoopAnalysisReport } from "@/lib/whoop-export/analysis";
+import { getWhoopExportInventory } from "@/lib/whoop-export/inventory";
 
 type WhoopExportUploadPanelProps = {
   importState?: string;
   reason?: string;
-  report: WhoopAnalysisReport;
 };
 
 function formatDate(value: string | null | undefined) {
@@ -49,14 +48,13 @@ function importMessage(importState: string | undefined, reason: string | undefin
   return null;
 }
 
-export function WhoopExportUploadPanel({
+export async function WhoopExportUploadPanel({
   importState,
   reason,
-  report,
 }: WhoopExportUploadPanelProps) {
+  const inventory = await getWhoopExportInventory();
   const message = importMessage(importState, reason);
-  const latest = report.inventory.latestImport;
-  const imports = report.inventory.imports;
+  const latest = inventory.latestImport;
 
   return (
     <section
@@ -68,10 +66,10 @@ export function WhoopExportUploadPanel({
       <div className="hud-content grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] lg:items-start">
         <div>
           <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">
-            WHOOP export upload
+            WHOOP export history
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/62">
-            Upload the full WHOOP export ZIP to refresh the historical analysis. The ZIP is parsed
+            Upload the full WHOOP export ZIP to refresh the Observatory history. The ZIP is parsed
             in memory; overlapping rows are updated and the raw file is not stored.
           </p>
 
@@ -93,32 +91,32 @@ export function WhoopExportUploadPanel({
             <div className="bg-[#07101c] p-3">
               <div className="text-white/44">Coverage</div>
               <div className="mt-1 font-semibold text-white">
-                {formatDate(report.inventory.start)} – {formatDate(report.inventory.end)}
+                {formatDate(inventory.start)} – {formatDate(inventory.end)}
               </div>
             </div>
             <div className="bg-[#07101c] p-3">
               <div className="text-white/44">Cycles</div>
               <div className="mt-1 font-semibold text-white">
-                {report.inventory.counts.cycles ?? 0}
+                {inventory.counts.cycles}
               </div>
             </div>
             <div className="bg-[#07101c] p-3">
               <div className="text-white/44">Sleeps</div>
               <div className="mt-1 font-semibold text-white">
-                {report.inventory.counts.sleeps ?? 0}
+                {inventory.counts.sleeps}
               </div>
             </div>
             <div className="bg-[#07101c] p-3">
               <div className="text-white/44">Workouts</div>
               <div className="mt-1 font-semibold text-white">
-                {report.inventory.counts.workouts ?? 0}
+                {inventory.counts.workouts}
               </div>
             </div>
           </div>
 
           <p className="mt-3 text-xs leading-5 text-white/48">
             Latest import: {latest ? `${latest.sourceName} at ${formatDateTime(latest.importedAt)}` : "none yet"}.
-            {imports.length > 1 ? ` ${imports.length} uploads are recorded for provenance.` : ""}
+            {inventory.importCount > 1 ? ` ${inventory.importCount} uploads are recorded for provenance.` : ""}
           </p>
         </div>
 

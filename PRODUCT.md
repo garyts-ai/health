@@ -10,8 +10,8 @@ The product is one continuous page with four canonical anchors:
 
 - `#today` — the immediate training decision and anatomy profile.
 - `#weekly` — the complete Monday-to-Sunday plan and muscle-volume ledger.
-- `#whoop` — import state, range analysis, ranked findings, trends, and protocol.
-- `#utilities` — provider connections and a compact context packet for deeper analysis in an external LLM.
+- `#whoop` — the Longitudinal Health Observatory: a compact long-term signal summary, six domain snapshots, acute deviations, explicit recorded events, recorded relationships, and detailed Visual analysis graphs.
+- `#utilities` — provider connections, WHOOP export management, and a longitudinal evidence packet for deeper analysis in an external LLM.
 
 Legacy `/weekly`, `/whoop`, and `/settings` entry points redirect to the matching root anchor while preserving query parameters.
 
@@ -23,6 +23,10 @@ Legacy `/weekly`, `/whoop`, and `/settings` entry points redirect to the matchin
 - Every mobile surface retains the full decision context available on desktop.
 - Anatomy geometry and intensity semantics remain data, not decoration.
 - Deterministic app recommendations stay limited to training, recovery, and safety cautions; detailed general or nutrition advice belongs in the external-LLM handoff.
+- The Observatory observes and organizes connected data. It never recommends actions, diagnoses, claims causality, infers unrecorded behavior, or presents a medical or longevity score.
+- Recorded journal answers are an event layer, not a health domain. They appear only when explicitly recorded and can filter the relationship layer.
+- Every Observatory statement is traceable to a typed observation, calculation, trend, baseline comparison, recorded association, limitation, or unknown.
+- Observatory compact and detail charts share visible axes, domain-specific identity accents, baseline context, and exact-value pointer/keyboard inspection. Body weight is presented in pounds (lb), with kilograms retained only at the storage boundary.
 - Provider sync and import actions keep their existing API contracts.
 
 ## Brand personality

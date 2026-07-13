@@ -21,7 +21,7 @@ function failureMessage(error: unknown) {
 }
 
 export async function POST(request: Request) {
-  const redirectUrl = buildRequestRedirectUrl(request, "/#whoop");
+  const redirectUrl = buildRequestRedirectUrl(request, "/#utilities");
   const wantsJson = request.headers.get("accept")?.includes("application/json") ?? false;
 
   try {

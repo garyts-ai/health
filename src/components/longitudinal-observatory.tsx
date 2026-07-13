@@ -1,0 +1,873 @@
+"use client";
+
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+
+import type { LongitudinalHealthView } from "@/lib/longitudinal/types";
+
+import styles from "./longitudinal-observatory.module.css";
+
+type UnknownRecord = Record<string, unknown>;
+type Direction = "improving" | "stable" | "weakening" | "mixed" | "insufficient_data";
+
+type DomainModel = {
+  key: string;
+  label: string;
+  direction: Direction;
+  confidence: string;
+  coverage: number | null;
+  magnitude: number | null;
+  persistenceDays: number | null;
+  changeLabel: string;
+  summary: string;
+  limitations: string[];
+  metricIds: string[];
+  metrics: UnknownRecord[];
+  metric: UnknownRecord | null;
+};
+
+type ObservationModel = {
+  id: string;
+  title: string;
+  observation: string;
+  confidence: string;
+  statementType: string;
+  startDate: string | null;
+  endDate: string | null;
+  metricIds: string[];
+  sourceRecordIds: string[];
+  limitations: string[];
+  persistenceDays: number;
+};
+
+const DOMAIN_LABELS: Record<string, string> = {
+  physiology: "Physiology",
+  sleep: "Sleep",
+  cardiovascularActivity: "Cardiovascular activity",
+  dailyMovement: "Daily movement",
+  strength: "Strength training",
+  bodyWeight: "Body weight",
+  recordedBehaviors: "Recorded behaviors",
+};
+
+const DIRECTION_LABELS: Record<Direction, string> = {
+  improving: "Improving",
+  stable: "Stable",
+  weakening: "Weakening",
+  mixed: "Mixed direction",
+  insufficient_data: "Insufficient data",
+};
+
+function record(value: unknown): UnknownRecord {
+  return value && typeof value === "object" ? value as UnknownRecord : {};
+}
+
+function text(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function number(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function records(value: unknown): UnknownRecord[] {
+  return Array.isArray(value) ? value.map(record) : [];
+}
+
+function direction(value: unknown): Direction {
+  const normalized = text(value).toLowerCase();
+  if (["improving", "up", "upward", "favorable"].includes(normalized)) return "improving";
+  if (["weakening", "down", "downward", "unfavorable"].includes(normalized)) return "weakening";
+  if (normalized === "mixed") return "mixed";
+  if (["insufficient", "insufficient_data", "missing", "unknown"].includes(normalized)) return "insufficient_data";
+  return "stable";
+}
+
+function nestedNumber(source: UnknownRecord, keys: string[]): number | null {
+  for (const key of keys) {
+    const direct = number(source[key]);
+    if (direct !== null) return direct;
+    const nested = record(source[key]);
+    const nestedValue = number(nested.value) ?? number(nested.percent) ?? number(nested.days);
+    if (nestedValue !== null) return nestedValue;
+  }
+  return null;
+}
+
+function normalizedCoverage(value: number | null): number | null {
+  if (value === null) return null;
+  return Math.max(0, Math.min(100, value <= 1 ? value * 100 : value));
+}
+
+function domainModels(view: LongitudinalHealthView): DomainModel[] {
+  const root = record(view);
+  const domains = record(root.domains);
+  const coverage = record(record(root.dataCoverage).byDomain);
+
+  return Object.entries(domains).map(([key, value]) => {
+    const domain = record(value);
+    const metrics = records(domain.metrics);
+    const largestId = text(domain.largestShiftMetricId);
+    const metric = metrics.find((item) => text(item.id) === largestId) ?? metrics[0] ?? null;
+    const currentValue = metric ? number(metric.currentValue) : null;
+    const baselineValue = metric ? number(metric.baselineValue) : null;
+    const calculatedMagnitude = currentValue !== null && baselineValue !== null && baselineValue !== 0
+      ? Math.abs((currentValue - baselineValue) / baselineValue) * 100
+      : null;
+    const relativeChange = metric ? number(metric.relativeChange) : null;
+    const magnitude = metric ? nestedNumber(metric, ["normalizedMagnitude", "magnitudePercent", "changePercent", "magnitude"]) ?? calculatedMagnitude ?? (relativeChange === null ? null : Math.abs(relativeChange) * 100) : null;
+    const persistenceDays = metric ? nestedNumber(metric, ["persistenceDays", "persistence", "durationDays"]) : null;
+    const absoluteChange = metric ? number(metric.absoluteChange) : null;
+    const unit = metric ? text(metric.unit) : "";
+    const changeLabel = absoluteChange === null
+      ? DIRECTION_LABELS[direction(domain.direction)]
+      : `${absoluteChange > 0 ? "↑ +" : absoluteChange < 0 ? "↓ " : "→ "}${Number(absoluteChange.toFixed(2))}${unit}`;
+    const domainCoverageDetail = record(coverage[key]);
+    const domainCoverage = normalizedCoverage(
+      nestedNumber(domain, ["coverage", "coveragePercent"]) ?? number(domainCoverageDetail.ratio),
+    );
+
+    return {
+      key,
+      label: text(domain.label, DOMAIN_LABELS[key] ?? key),
+      direction: direction(domain.direction),
+      confidence: text(domain.confidence, "Not established"),
+      coverage: domainCoverage,
+      magnitude: magnitude === null ? null : Math.max(0, Math.min(100, Math.abs(magnitude))),
+      persistenceDays,
+      changeLabel,
+      summary: text(domain.summary, "No supported domain observation is available."),
+      limitations: strings(domain.limitations),
+      metricIds: metrics.map((item) => text(item.id)).filter(Boolean),
+      metrics,
+      metric,
+    };
+  });
+}
+
+function observationModels(view: LongitudinalHealthView): ObservationModel[] {
+  return records(record(view).notableTrends).map((item, index) => ({
+    id: text(item.id, `observation-${index}`),
+    title: text(item.title, "Observed change"),
+    observation: text(item.observation, text(item.summary, "No observation text is available.")),
+    confidence: text(item.confidence, "Not established"),
+    statementType: text(item.statementType, "trend_description"),
+    startDate: text(item.startDate) || null,
+    endDate: text(item.endDate) || null,
+    metricIds: strings(item.metricIds),
+    sourceRecordIds: strings(record(item.provenance).sourceRecordIds),
+    limitations: strings(item.limitations),
+    persistenceDays: number(item.persistenceDays) ?? 0,
+  }));
+}
+
+function formatPercent(value: number | null) {
+  return value === null ? "Not established" : `${Math.round(value)}%`;
+}
+
+function sentenceCase(value: string) {
+  return value.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase());
+}
+
+type ChartRange = "week" | "30d" | "3m" | "1y" | "all";
+
+const CHART_RANGES: Array<{ key: ChartRange; label: string; days: number | null }> = [
+  { key: "week", label: "Week", days: 7 },
+  { key: "30d", label: "30 days", days: 30 },
+  { key: "3m", label: "3 months", days: 90 },
+  { key: "1y", label: "1 year", days: 365 },
+  { key: "all", label: "All time", days: null },
+];
+
+const CHART_RANGE_STORAGE_KEY = "healthmax:whoop-chart-range:v2";
+
+function shiftDate(date: string, days: number) {
+  const value = new Date(`${date}T12:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+type GraphPoint = { date: string; value: number; x: number; y: number; originalIndex: number };
+type GraphSeries = { key: string; label: string; unit: string; tone: "green" | "violet" | "cyan" | "coral" | "amber" | "rose"; baseline: number | null; values: Array<{ date: string; value: number | null }> };
+
+const GRAPH_TONES = {
+  green: { line: "#78e08f", fill: "#78e08f" }, violet: { line: "#8e80e8", fill: "#8e80e8" }, cyan: { line: "#35cfc0", fill: "#35cfc0" },
+  coral: { line: "#ef8069", fill: "#ef8069" }, amber: { line: "#d9a93f", fill: "#d9a93f" }, rose: { line: "#d77f98", fill: "#d77f98" },
+};
+
+function graphDate(value: string | null) {
+  return value ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`)) : "—";
+}
+
+function graphValue(value: number | null, unit: string) {
+  return value === null || !Number.isFinite(value) ? "—" : `${Number(value.toFixed(1))}${unit}`;
+}
+
+function graphDirection(baseline: number | null, average: number | null) {
+  if (baseline === null || average === null) return "No comparison";
+  if (Math.abs(average - baseline) < 0.05) return "Near baseline";
+  return average > baseline ? "Above full-period baseline" : "Below full-period baseline";
+}
+
+function graphGeometry(values: Array<{ date: string; value: number | null }>, baseline: number | null) {
+  const present = values.map((point, index) => ({ ...point, originalIndex: index })).filter((point): point is { date: string; value: number; originalIndex: number } => point.value !== null && Number.isFinite(point.value));
+  const domain = baseline === null ? present.map((point) => point.value) : [...present.map((point) => point.value), baseline];
+  const min = domain.length ? Math.min(...domain) : 0;
+  const max = domain.length ? Math.max(...domain) : 1;
+  const span = max - min || 1;
+  const coordinates: GraphPoint[] = present.map((point) => ({ date: point.date, value: point.value, originalIndex: point.originalIndex, x: values.length <= 1 ? 50 : (point.originalIndex / (values.length - 1)) * 100, y: 88 - ((point.value - min) / span) * 72 }));
+  const coordinateByIndex = new Map(coordinates.map((point) => [point.originalIndex, point]));
+  const segments: GraphPoint[][] = [];
+  let current: GraphPoint[] = [];
+  values.forEach((point, index) => {
+    const coordinate = point.value === null ? undefined : coordinateByIndex.get(index);
+    if (!coordinate) { if (current.length) segments.push(current); current = []; return; }
+    current.push(coordinate);
+  });
+  if (current.length) segments.push(current);
+  return { present, coordinates, segments, latest: coordinates.at(-1), baselineY: baseline === null ? null : 88 - ((baseline - min) / span) * 72, min, max };
+}
+
+function rangeValues(series: GraphSeries, range: ChartRange, selectedDate: string) {
+  const days = CHART_RANGES.find((item) => item.key === range)?.days;
+  if (days === null || days === undefined) return series.values;
+  const start = shiftDate(selectedDate, -(days - 1));
+  return series.values.filter((point) => point.date >= start && point.date <= selectedDate);
+}
+
+function MetricGraph({ series, range, rangeLabel, selectedDate }: { series: GraphSeries; range: ChartRange; rangeLabel: string; selectedDate: string }) {
+  const values = rangeValues(series, range, selectedDate);
+  const summaryValues = values.map((point) => point.value).filter((value): value is number => value !== null && Number.isFinite(value));
+  const average = summaryValues.length ? summaryValues.reduce((sum, value) => sum + value, 0) / summaryValues.length : null;
+  const geometry = graphGeometry(values, series.baseline);
+  const tone = GRAPH_TONES[series.tone];
+  const gradientId = `metric-graph-${series.key}`;
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [activePoint, setActivePoint] = useState<GraphPoint | null>(null);
+  const nearestPoint = (x: number) => geometry.coordinates.reduce<GraphPoint | null>((best, point) => !best || Math.abs(point.x - x) < Math.abs(best.x - x) ? point : best, null);
+  const setNearest = (clientX: number) => {
+    const bounds = svgRef.current?.getBoundingClientRect();
+    if (!bounds || !geometry.coordinates.length) return;
+    setActivePoint(nearestPoint(Math.max(0, Math.min(100, ((clientX - bounds.left) / bounds.width) * 100))));
+  };
+  const latest = geometry.latest ?? null;
+
+  return (
+    <article className={styles.metricGraph}>
+      <header>
+        <div><h3>{series.label}</h3><span>{geometry.present.length} observation{geometry.present.length === 1 ? "" : "s"}</span></div>
+        <div className={styles.metricGraphValue} style={{ "--metric-tone": tone.line } as CSSProperties}><strong>{graphValue(latest?.value ?? null, series.unit)}</strong><span>{graphDirection(series.baseline, average)}</span></div>
+      </header>
+      {geometry.present.length < 2 ? <div className={styles.metricGraphEmpty}>No observations in {rangeLabel}</div> : (
+        <div className={styles.chartInteractive} tabIndex={0} role="group" aria-label={`${series.label} trend for ${rangeLabel}. Use left and right arrow keys to inspect points.`} onBlur={() => setActivePoint(null)} onKeyDown={(event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const currentIndex = activePoint ? geometry.coordinates.findIndex((point) => point.originalIndex === activePoint.originalIndex) : geometry.coordinates.length - 1;
+          const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? geometry.coordinates.length - 1 : Math.max(0, Math.min(geometry.coordinates.length - 1, currentIndex + (event.key === "ArrowLeft" ? -1 : 1)));
+          setActivePoint(geometry.coordinates[nextIndex] ?? null);
+        }}>
+          <div className={styles.metricGraphStats}><span>max {graphValue(geometry.max, series.unit)}</span><span>avg {graphValue(average, series.unit)}</span><span>min {graphValue(geometry.min, series.unit)}</span></div>
+          <svg ref={svgRef} className={styles.metricGraphSvg} viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${series.label} ${rangeLabel} graph. Latest ${graphValue(latest?.value ?? null, series.unit)}.`} onPointerMove={(event) => setNearest(event.clientX)} onPointerDown={(event) => setNearest(event.clientX)} onPointerLeave={() => setActivePoint(null)}>
+            <defs><linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={tone.fill} stopOpacity=".28" /><stop offset="100%" stopColor={tone.fill} stopOpacity="0" /></linearGradient></defs>
+            <line x1="0" y1="88" x2="100" y2="88" /><line x1="0" y1="52" x2="100" y2="52" /><line x1="0" y1="16" x2="100" y2="16" />
+            {geometry.baselineY !== null ? <line className={styles.chartBaseline} x1="0" y1={geometry.baselineY} x2="100" y2={geometry.baselineY} /> : null}
+            {geometry.segments.map((segment, index) => { const points = segment.map((point) => `${point.x},${point.y}`).join(" "); const first = segment[0]; const last = segment.at(-1); if (!first || !last) return null; return <g key={`${series.key}-${index}`}><polygon points={`${first.x},92 ${points} ${last.x},92`} fill={`url(#${gradientId})`} /><polyline points={points} fill="none" stroke={tone.line} /></g>; })}
+            {latest && !activePoint ? <circle cx={latest.x} cy={latest.y} r="2.4" fill={tone.line} /> : null}
+            {activePoint ? <><line className={styles.chartCursor} x1={activePoint.x} y1="12" x2={activePoint.x} y2="92" /><circle cx={activePoint.x} cy={activePoint.y} r="3" fill={tone.line} stroke="#10131b" strokeWidth="1.4" /></> : null}
+            {geometry.coordinates.map((point) => <circle key={`${point.date}-${point.originalIndex}`} cx={point.x} cy={point.y} r="5" fill="transparent" onPointerEnter={() => setActivePoint(point)} />)}
+          </svg>
+          {activePoint ? <div className={styles.chartTooltip} style={{ left: `${Math.min(78, Math.max(22, activePoint.x))}%`, top: `${Math.min(78, Math.max(8, activePoint.y - 22))}%` }}><span>{graphDate(activePoint.date)}</span><strong style={{ color: tone.line }}>{graphValue(activePoint.value, series.unit)}</strong><em>{graphValue(activePoint.value - (series.baseline ?? activePoint.value), series.unit)} vs baseline</em></div> : null}
+          <div className={styles.metricGraphDates}><span>{graphDate(geometry.coordinates[0]?.date ?? null)}</span><strong>{activePoint ? `${graphDate(activePoint.date)} ${graphValue(activePoint.value, series.unit)}` : latest ? `Latest ${graphDate(latest.date)} ${graphValue(latest.value, series.unit)}` : "Select a point"}</strong><span>{graphDate(geometry.coordinates.at(-1)?.date ?? null)}</span></div>
+        </div>
+      )}
+      <footer><span>baseline {graphValue(series.baseline, series.unit)}</span><span>range avg {graphValue(average, series.unit)}</span></footer>
+    </article>
+  );
+}
+
+function MetricGraphs({ view }: { view: LongitudinalHealthView }) {
+  const [range, setRange] = useState<ChartRange>(() => {
+    if (typeof window === "undefined") return "week";
+    const stored = window.localStorage.getItem(CHART_RANGE_STORAGE_KEY) as ChartRange | null;
+    return stored && CHART_RANGES.some((item) => item.key === stored) ? stored : "week";
+  });
+  const updateRange = (next: ChartRange) => {
+    setRange(next);
+    window.localStorage.setItem(CHART_RANGE_STORAGE_KEY, next);
+  };
+  const rangeLabel = CHART_RANGES.find((item) => item.key === range)?.label ?? "Week";
+  const metricsById = new Map(Object.values(view.domains).flatMap((domain) => domain.metrics.map((metric) => [metric.id, metric] as const)));
+  const series = [
+    ["recovery", "Recovery", "%", "green"], ["sleep_duration", "Sleep", "h", "violet"], ["hrv", "HRV", "ms", "cyan"],
+    ["resting_heart_rate", "Resting HR", "bpm", "coral"], ["day_strain", "Strain", "", "amber"], ["skin_temperature", "Skin temp", "°C", "rose"],
+  ].map(([key, label, unit, tone]) => { const metric = metricsById.get(key); return metric ? { key, label, unit, tone: tone as GraphSeries["tone"], baseline: metric.baselineValue, values: metric.points } : null; }).filter((item): item is GraphSeries => Boolean(item));
+  const visibleCount = series[0] ? rangeValues(series[0], range, view.selectedDate).filter((point) => point.value !== null).length : 0;
+
+  return (
+    <section className={`hud-frame ${styles.graphs}`} aria-labelledby="longitudinal-graphs-title">
+      <header className={styles.graphsHeader}>
+        <div>
+          <h2 id="longitudinal-graphs-title">Visual analysis</h2>
+          <p>Chart window only: {rangeLabel} ending {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${view.selectedDate}T12:00:00Z`))} · {visibleCount} recorded cycles. Report findings use the independent 28-day analysis window.</p>
+        </div>
+        <div className={styles.rangeControls} role="group" aria-label="Metric graph range">
+          {CHART_RANGES.map((item) => <button key={item.key} type="button" aria-pressed={range === item.key} onClick={() => updateRange(item.key)}>{item.label}</button>)}
+        </div>
+      </header>
+      <div className={styles.graphsGrid}>
+        {series.map((item) => <MetricGraph key={item.key} series={item} range={range} rangeLabel={rangeLabel} selectedDate={view.selectedDate} />)}
+      </div>
+    </section>
+  );
+}
+
+function topObservations(view: LongitudinalHealthView, observations: ObservationModel[]) {
+  const root = record(view);
+  const result: ObservationModel[] = [];
+  const largest = observations[0];
+  if (largest) result.push(largest);
+  const persistent = observations
+    .filter((item) => item.id !== largest?.id)
+    .sort((a, b) => b.persistenceDays - a.persistenceDays)[0];
+  if (persistent) result.push(persistent);
+  const current = record(root.currentDeviation);
+  if (current.active === true && text(current.summary)) {
+    result.push({
+      id: "current-deviation",
+      title: "Current deviation",
+      observation: text(current.summary),
+      confidence: "Personal baseline comparison",
+      statementType: "personal_baseline_comparison",
+      startDate: text(current.date) || null,
+      endDate: text(current.date) || null,
+      metricIds: strings(current.deviatingMetricIds),
+      sourceRecordIds: [],
+      limitations: [],
+      persistenceDays: 0,
+    });
+  }
+
+  const association = records(root.recordedAssociations).find((item) => text(item.claim) === "association_detected");
+  if (current.active !== true && association && result.length < 3) {
+    result.push({
+      id: text(association.id, "recorded-association"),
+      title: "Recorded association",
+      observation: text(association.observation, text(association.summary, "A recorded association met the analysis threshold.")),
+      confidence: text(association.confidence, "Not established"),
+      statementType: "recorded_association",
+      startDate: null,
+      endDate: null,
+      metricIds: [text(association.outcomeKey)].filter(Boolean),
+      sourceRecordIds: [],
+      limitations: strings(association.limitations),
+      persistenceDays: 0,
+    });
+  }
+  return result.slice(0, 3);
+}
+
+function aggregateCounts(view: LongitudinalHealthView, domains: DomainModel[]) {
+  const aggregate = record(record(view).aggregateTrend);
+  const count = (key: "improving" | "stable" | "weakening") => number(aggregate[`${key}Count`]) ?? domains.filter((item) => item.direction === key).length;
+  return {
+    improving: count("improving"),
+    stable: count("stable"),
+    weakening: count("weakening"),
+  };
+}
+
+function endpoint(directionValue: Direction, x: number, y: number) {
+  if (directionValue === "improving") return <circle className={styles.endpoint} cx={x} cy={y} r="7" />;
+  if (directionValue === "weakening") return <path className={styles.endpoint} d={`M ${x} ${y - 8} L ${x + 8} ${y} L ${x} ${y + 8} L ${x - 8} ${y} Z`} />;
+  if (directionValue === "mixed") return <path className={styles.endpoint} d={`M ${x} ${y - 8} L ${x + 8} ${y + 7} L ${x - 8} ${y + 7} Z`} />;
+  return <rect className={styles.endpoint} x={x - 6} y={y - 6} width="12" height="12" />;
+}
+
+function TrajectoryHorizon({ domains, selectedKey, windowDays }: { domains: DomainModel[]; selectedKey: string | null; windowDays: number }) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const height = 92 + domains.length * 70;
+
+  return (
+    <svg className={styles.horizon} viewBox={`0 0 1000 ${height}`} role="img" aria-labelledby={`${titleId} ${descriptionId}`}>
+      <title id={titleId}>Longitudinal trajectory horizon</title>
+      <desc id={descriptionId}>Domain lanes show measured direction, magnitude, persistence, confidence, and missing coverage over the selected long-term window. Circles mean improving, squares stable, diamonds weakening, triangles mixed, and interrupted lines indicate insufficient coverage.</desc>
+      <g className={styles.axis} aria-hidden="true">
+        {[110, 380, 650, 920].map((x) => <line key={x} x1={x} x2={x} y1="48" y2={height - 30} />)}
+        <text x="110" y="28">{windowDays} DAYS</text>
+        <text x="380" y="28">{Math.round(windowDays / 2)} DAYS</text>
+        <text x="650" y="28">{Math.round(windowDays / 6)} DAYS</text>
+        <text x="920" y="28" textAnchor="end">CURRENT</text>
+      </g>
+      {domains.map((domain, index) => {
+        const baselineY = 76 + index * 70;
+        const directionSign = domain.direction === "improving" ? -1 : domain.direction === "weakening" ? 1 : 0;
+        const endY = baselineY + directionSign * ((domain.magnitude ?? 0) / 100) * 24;
+        const persistence = Math.max(0, Math.min(windowDays, domain.persistenceDays ?? 0));
+        const startX = persistence ? 920 - (persistence / windowDays) * 810 : 110;
+        const insufficient = domain.direction === "insufficient_data" || domain.coverage === 0;
+        const path = `M ${startX} ${baselineY} C ${startX + (920 - startX) * 0.42} ${baselineY}, ${startX + (920 - startX) * 0.72} ${endY}, 920 ${endY}`;
+        return (
+          <g key={domain.key} className={styles.lane} data-direction={domain.direction} data-selected={selectedKey === domain.key}>
+            <title>{`${domain.label}: ${DIRECTION_LABELS[domain.direction]}; magnitude ${domain.magnitude === null ? "not established" : `${Math.round(domain.magnitude)} percent`}; persistence ${domain.persistenceDays === null ? "not established" : `${Math.round(domain.persistenceDays)} days`}; confidence ${domain.confidence}; coverage ${formatPercent(domain.coverage)}.`}</title>
+            <text className={styles.laneLabel} x="18" y={baselineY + 4}>{domain.label}</text>
+            <line className={styles.baseline} x1="110" x2="920" y1={baselineY} y2={baselineY} />
+            {insufficient ? (
+              <>
+                <line className={styles.missing} x1="110" x2="360" y1={baselineY} y2={baselineY} />
+                <line className={styles.missing} x1="430" x2="650" y1={baselineY} y2={baselineY} />
+                <line className={styles.missing} x1="740" x2="920" y1={baselineY} y2={baselineY} />
+              </>
+            ) : <path className={styles.trail} data-confidence={domain.confidence.toLowerCase()} d={path} />}
+            {!insufficient ? endpoint(domain.direction, 920, endY) : null}
+            <text className={styles.directionLabel} x="982" y={endY + 4} textAnchor="end">{domain.changeLabel}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function MetricChart({ domain, showRaw, showSmoothed, showBaseline, showEvents, events }: { domain: DomainModel; showRaw: boolean; showSmoothed: boolean; showBaseline: boolean; showEvents: boolean; events: NonNullable<LongitudinalHealthView["journalEvents"]> }) {
+  const source = records(domain.metric ? domain.metric.points : []).map((point) => ({ date: text(point.date), value: number(point.value) }));
+  const endDate = text(domain.metric?.endDate, source.at(-1)?.date);
+  const windowDays = number(domain.metric?.windowDays) ?? 90;
+  const startDate = endDate ? shiftDate(endDate, -(windowDays - 1)) : source[0]?.date ?? "";
+  const points = source.filter((point) => point.date >= startDate && (!endDate || point.date <= endDate));
+  const values = points.map((point) => point.value).filter((value): value is number => value !== null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  if (values.length < 2) return <div className={styles.comparison} aria-label={`${domain.label} comparison`}><span>Long-term baseline</span><div><i /><b style={{ insetInlineStart: `${50 + (domain.direction === "improving" ? 1 : domain.direction === "weakening" ? -1 : 0) * ((domain.magnitude ?? 0) / 2)}%` }} /></div><strong>{domain.magnitude === null ? "Magnitude not established" : `${Math.round(domain.magnitude)}% measured displacement`}</strong></div>;
+  const width = 760;
+  const height = 270;
+  const left = 58;
+  const right = 16;
+  const top = 18;
+  const bottom = 48;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const unit = text(domain.metric?.unit);
+  const baseline = number(domain.metric?.baselineValue);
+  const minValue = Math.min(...values, ...(baseline === null ? [] : [baseline]));
+  const maxValue = Math.max(...values, ...(baseline === null ? [] : [baseline]));
+  const pad = Math.max((maxValue - minValue) * .12, unit === "lb" ? .5 : .2);
+  const min = minValue - pad;
+  const max = maxValue + pad;
+  const span = max - min || 1;
+  const xFor = (index: number) => left + (points.length <= 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
+  const yFor = (value: number) => top + (1 - (value - min) / span) * plotHeight;
+  const present = points.map((point, index) => ({ ...point, index })).filter((point): point is { date: string; value: number; index: number } => point.value !== null);
+  const pathFor = (series: Array<{ date: string; value: number | null }>) => {
+    const segments: string[] = [];
+    let path = "";
+    series.forEach((point, index) => {
+      if (point.value === null) { if (path) segments.push(path); path = ""; return; }
+      path += `${path ? " L" : "M"} ${xFor(index).toFixed(1)} ${yFor(point.value).toFixed(1)}`;
+    });
+    if (path) segments.push(path);
+    return segments;
+  };
+  const smoothed = points.map((point, index) => ({ ...point, value: point.value === null ? null : median(points.slice(Math.max(0, index - 6), index + 1).map((item) => item.value).filter((value): value is number => value !== null)) }));
+  const tickValues = [max, min + span / 2, min];
+  const tickIndices = [0, Math.floor((points.length - 1) / 3), Math.floor((points.length - 1) * 2 / 3), points.length - 1].filter((index, i, all) => all.indexOf(index) === i);
+  const selected = activeIndex === null ? null : present.find((point) => point.index === activeIndex) ?? null;
+  const selectNearest = (clientX: number) => { const bounds = svgRef.current?.getBoundingClientRect(); if (!bounds) return; const local = ((clientX - bounds.left) / bounds.width) * width; const nearest = present.reduce((best, point) => Math.abs(xFor(point.index) - local) < Math.abs(xFor(best.index) - local) ? point : best, present[0]); setActiveIndex(nearest.index); };
+  const eventMarkers = showEvents ? events.filter((event) => event.physiologicalDate >= startDate && event.physiologicalDate <= endDate).map((event) => ({ ...event, x: left + (points.length <= 1 ? plotWidth / 2 : ((Math.max(0, points.findIndex((point) => point.date >= event.physiologicalDate)) / Math.max(1, points.length - 1)) * plotWidth)) })) : [];
+  return <div className={styles.detailChartWrap} style={{ "--domain-tone": chartToneForDomain(domain.key) } as CSSProperties}>
+    <div className={styles.detailChartInteractive} tabIndex={0} role="group" aria-label={`${domain.label} chart with axes and exact-value inspection. Use arrow keys to inspect points.`} onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "Home", "End", "Escape"].includes(event.key)) return; event.preventDefault(); if (event.key === "Escape") { setActiveIndex(null); return; } const current = activeIndex === null ? present.length - 1 : Math.max(0, present.findIndex((point) => point.index === activeIndex)); const next = event.key === "Home" ? 0 : event.key === "End" ? present.length - 1 : Math.max(0, Math.min(present.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1))); setActiveIndex(present[next]?.index ?? null); }}>
+      <svg ref={svgRef} className={styles.detailChart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${domain.label} from ${points[0]?.date ?? "first observation"} to ${points.at(-1)?.date ?? "latest observation"}. Values range from ${displayNumber(Math.min(...values), unit)} to ${displayNumber(Math.max(...values), unit)}.`} onPointerMove={(event) => selectNearest(event.clientX)} onPointerDown={(event) => selectNearest(event.clientX)} onPointerLeave={() => setActiveIndex(null)}>
+        {tickValues.map((value) => <g key={value}><line className={styles.detailGrid} x1={left} x2={width - right} y1={yFor(value)} y2={yFor(value)} /><text className={styles.detailTick} x={left - 8} y={yFor(value) + 4} textAnchor="end">{displayNumber(value, unit)}</text></g>)}
+        {tickIndices.map((index) => <text key={index} className={styles.detailDateTick} x={xFor(index)} y={height - 20} textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}>{chartDateLabel(points[index]?.date)}</text>)}
+        <line className={styles.detailAxis} x1={left} x2={left} y1={top} y2={height - bottom} /><line className={styles.detailAxis} x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} />
+        {showBaseline && baseline !== null ? <line className={styles.detailBaseline} x1={left} x2={width - right} y1={yFor(baseline)} y2={yFor(baseline)} /> : null}
+        {showRaw ? pathFor(points).map((path, index) => <path key={`raw-${index}`} className={styles.detailRawPath} d={path} />) : null}
+        {showSmoothed ? pathFor(smoothed).map((path, index) => <path key={`smooth-${index}`} className={styles.detailSmoothPath} d={path} />) : null}
+        {showRaw ? present.map((point) => <circle key={`${point.date}-${point.index}`} className={styles.detailRawPoint} cx={xFor(point.index)} cy={yFor(point.value)} r={selected?.index === point.index ? 4 : 2.2} />) : null}
+        {eventMarkers.map((event) => <g key={event.id}><line className={styles.detailEventMarker} x1={event.x} x2={event.x} y1={height - bottom + 4} y2={height - bottom + 16} /><title>{`${event.label} · ${event.physiologicalDate} · ${event.source}`}</title></g>)}
+        {selected ? <><line className={styles.detailCrosshair} x1={xFor(selected.index)} x2={xFor(selected.index)} y1={top} y2={height - bottom} /><circle className={styles.detailActivePoint} cx={xFor(selected.index)} cy={yFor(selected.value)} r="5" /></> : null}
+      </svg>
+      {selected ? <div className={styles.detailTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, unit)}</strong><em>{baseline === null ? "Recorded value" : `${displayNumber(selected.value - baseline, unit)} vs baseline`}</em></div> : null}
+    </div>
+  </div>;
+}
+
+function DomainDetail({ domain, observations, panelId, events = [] }: { domain: DomainModel; observations: ObservationModel[]; panelId: string; events?: NonNullable<LongitudinalHealthView["journalEvents"]> }) {
+  const [activeMetricId, setActiveMetricId] = useState(text(domain.metric?.id));
+  const [showRaw, setShowRaw] = useState(true);
+  const [showSmoothed, setShowSmoothed] = useState(true);
+  const [showBaseline, setShowBaseline] = useState(true);
+  const [showEvents, setShowEvents] = useState(false);
+  const activeMetric = domain.metrics.find((metric) => text(metric.id) === activeMetricId) ?? domain.metric;
+  const activeDomain = activeMetric === domain.metric ? domain : { ...domain, metric: activeMetric };
+  const matching = observations.filter((item) => item.metricIds.some((id) => domain.metricIds.includes(id))).slice(0, 3);
+  return (
+    <section className={styles.detail} id={panelId} aria-labelledby={`${panelId}-title`} style={{ "--domain-tone": chartToneForDomain(domain.key) } as CSSProperties}>
+      <header className={styles.detailHeader}>
+        <div>
+          <h3 id={`${panelId}-title`}>{domain.label}</h3>
+          <p>{domain.summary}</p>
+        </div>
+        <dl>
+          <div><dt>Direction</dt><dd>{DIRECTION_LABELS[domain.direction]}</dd></div>
+          <div><dt>Confidence</dt><dd>{domain.confidence}</dd></div>
+          <div><dt>Coverage</dt><dd>{formatPercent(domain.coverage)}</dd></div>
+        </dl>
+      </header>
+      <div className={styles.detailControls} role="group" aria-label="Detail chart controls">
+        {domain.metrics.length > 1 ? <label className={styles.metricSelector}>Metric<select value={domain.metrics.some((metric) => text(metric.id) === activeMetricId) ? activeMetricId : text(domain.metric?.id)} onChange={(event) => setActiveMetricId(event.target.value)}>{domain.metrics.map((metric) => <option key={text(metric.id)} value={text(metric.id)}>{text(metric.label, text(metric.id))}</option>)}</select></label> : null}
+        <button type="button" aria-pressed={showRaw} onClick={() => setShowRaw((value) => !value)}>Raw</button>
+        <button type="button" aria-pressed={showSmoothed} onClick={() => setShowSmoothed((value) => !value)}>Smoothed</button>
+        <button type="button" aria-pressed={showBaseline} onClick={() => setShowBaseline((value) => !value)}>Baseline</button>
+        <button type="button" aria-pressed={showEvents} onClick={() => setShowEvents((value) => !value)} disabled={!events.length}>Events{events.length ? ` · ${events.length}` : ""}</button>
+      </div>
+      <MetricChart domain={activeDomain} showRaw={showRaw} showSmoothed={showSmoothed} showBaseline={showBaseline} showEvents={showEvents} events={events} />
+      {matching.length ? <ol className={styles.domainObservations}>{matching.map((item) => <li key={item.id}><strong>{item.title}</strong><p>{item.observation}</p></li>)}</ol> : null}
+      <div className={styles.knownUnknown}>
+        <section><h4>Known</h4><p>{domain.summary}</p><p className={styles.provenance}>{matching.length ? `${matching[0].startDate ?? "Start unavailable"} – ${matching[0].endDate ?? "end unavailable"} · ${sentenceCase(matching[0].statementType)} · ${matching[0].sourceRecordIds.length} source records` : `${domain.confidence} confidence · ${formatPercent(domain.coverage)} coverage`}</p></section>
+        <section><h4>Unknown</h4>{domain.limitations.length ? <ul>{domain.limitations.map((item) => <li key={item}>{item}</li>)}</ul> : <p>The connected data does not establish why this pattern occurred.</p>}</section>
+      </div>
+    </section>
+  );
+}
+
+function ProductionOverview({ view }: { view: LongitudinalHealthView }) {
+  const domains = domainModels(view);
+  const root = record(view);
+  const coverage = record(root.dataCoverage);
+  const aggregate = record(root.aggregateTrend);
+  const comparisonKeys = ["physiology", "sleep", "cardiovascularActivity", "strength"];
+  const comparisonDomains = comparisonKeys.map((key) => domains.find((item) => item.key === key)).filter((item): item is DomainModel => Boolean(item));
+  const coveragePercent = normalizedCoverage(number(coverage.overall));
+  const confidence = text(aggregate.confidence, "Not established");
+  const availableInputs = strings(coverage.availableInputs);
+  const unavailableInputs = strings(coverage.unavailableInputs);
+
+  return (
+    <section className={`hud-frame ${styles.productionOverview}`} aria-labelledby="whoop-observation-overview-title">
+      <div className={styles.productionOverviewGrid}>
+        <div className={styles.productionOverviewMain}>
+          <div className={styles.productionKicker}>OBSERVATION SYSTEM</div>
+          <h2 id="whoop-observation-overview-title">Connected health history</h2>
+          <p>Long-range baselines and supported patterns from connected records. This surface describes observations; it does not prescribe actions or interpret medical risk.</p>
+          <div className={styles.productionStats}>
+            <div><span>Coverage</span><strong>{coveragePercent === null ? "—" : `${Math.round(coveragePercent)}%`}</strong></div>
+            <div><span>Window</span><strong>{view.windowDays} days</strong></div>
+            <div><span>Confidence</span><strong>{confidence}</strong></div>
+          </div>
+          <p className={styles.productionMeta}>Selected physiological date: {view.selectedDate} · Generated {view.generatedAt}</p>
+          <details className={styles.productionDetails}>
+            <summary>Dataset detail</summary>
+            <p>{availableInputs.length ? `Available: ${availableInputs.join(", ")}.` : "No connected source records are available."}</p>
+            <p>{unavailableInputs.length ? `Unavailable: ${unavailableInputs.join(", ")}.` : "No additional unavailable inputs recorded."}</p>
+          </details>
+        </div>
+        <div className={styles.productionComparisons}>
+          {comparisonDomains.map((item) => {
+            const metric = item.metric;
+            const current = metric ? number(metric.currentValue) : null;
+            const unit = metric ? text(metric.unit) : "";
+            return (
+              <div key={item.key} className={styles.productionComparison}>
+                <div><span>{item.label}</span><strong>{current === null ? "—" : `${Number(current.toFixed(1))}${unit}`}</strong></div>
+                <div><em>{DIRECTION_LABELS[item.direction]}</em><small>{item.coverage === null ? "Coverage not established" : `${Math.round(item.coverage)}% domain coverage`}</small></div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type Timeframe = 30 | 90 | 180 | 365;
+
+const TIMEFRAMES: Array<{ value: Timeframe; label: string }> = [
+  { value: 30, label: "30 days" },
+  { value: 90, label: "90 days" },
+  { value: 180, label: "180 days" },
+  { value: 365, label: "1 year" },
+];
+
+const EVENT_LABELS: Record<string, string> = {
+  alcohol: "Alcohol", caffeine: "Caffeine", late_meal: "Late meal", travel: "Travel", illness: "Illness",
+  stress: "Stress", medication: "Medication", hydration: "Hydration", menstrual_cycle: "Menstrual cycle", other: "Other",
+};
+
+function glyphForStatus(value: Direction) {
+  if (value === "improving") return "↗";
+  if (value === "weakening") return "↘";
+  if (value === "mixed") return "↕";
+  if (value === "insufficient_data") return "—";
+  return "→";
+}
+
+function shortObservation(value: string) {
+  const compact = value
+    .replace(/ across the available \d+-day comparison\.?/gi, ".")
+    .replace(/ across \d+ recorded comparisons\.?/gi, ".")
+    .replace(/ across the available records\.?/gi, ".")
+    .replace(/\s+/g, " ")
+    .trim();
+  const strength = compact.match(/Strength sets trended upward by ([\d.]+) \/week/i);
+  if (strength) return `Weekly strength volume increased by ${Math.round(Number(strength[1]))} sets.`;
+  const sleep = compact.match(/Sleep duration trended upward by ([\d.]+) h/i);
+  if (sleep) return `Sleep duration increased by ${Number(sleep[1]).toFixed(1)}h.`;
+  return compact;
+}
+
+function displayNumber(value: number | null, unit: string) {
+  if (value === null || !Number.isFinite(value)) return "—";
+  const digits = unit === "h" || unit === "kg" || unit === "lb" ? 1 : 0;
+  const formatted = Number(value.toFixed(digits));
+  return unit === "lb" ? `${formatted} lb` : `${formatted}${unit}`;
+}
+
+function median(values: number[]) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function chartDateLabel(value: string | undefined) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+}
+
+function chartToneForDomain(domainId: string) {
+  const tones: Record<string, string> = {
+    physiology: "var(--domain-physiology)",
+    sleep: "var(--domain-sleep)",
+    cardiovascularActivity: "var(--domain-cardio)",
+    dailyMovement: "var(--domain-movement)",
+    strength: "var(--domain-strength)",
+    bodyWeight: "var(--domain-weight)",
+  };
+  return tones[domainId] ?? "var(--os-signal-current)";
+}
+
+type CompactChartPoint = { date: string; value: number };
+
+function CompactSparkline({ metric, timeframe, selectedDate, domainId, activeIndex, onActiveChange }: { metric: UnknownRecord | null; timeframe: Timeframe; selectedDate: string; domainId: string; activeIndex: number | null; onActiveChange: (index: number | null) => void }) {
+  const points = records(metric?.points)
+    .map((point) => ({ date: text(point.date), value: number(point.value) }))
+    .filter((point): point is CompactChartPoint => Boolean(point.date) && point.value !== null)
+    .filter((point) => point.date >= shiftDate(selectedDate, -(timeframe - 1)));
+  if (points.length < 2) return <div className={styles.cardChartEmpty}>No chartable observations</div>;
+  const values = points.map((point) => point.value as number);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const left = 35;
+  const right = 294;
+  const top = 10;
+  const bottom = 77;
+  const xFor = (index: number) => left + (index / Math.max(1, points.length - 1)) * (right - left);
+  const yFor = (value: number) => bottom - ((value - min) / span) * (bottom - top);
+  const path = points.map((point, index) => `${index ? "L" : "M"} ${xFor(index).toFixed(1)} ${yFor(point.value).toFixed(1)}`).join(" ");
+  const selected = activeIndex === null ? null : points[activeIndex] ?? null;
+  const tone = chartToneForDomain(domainId);
+  const baseline = number(metric?.baselineValue);
+  const baselineY = baseline === null ? null : yFor(baseline);
+  const nearest = (clientX: number, target: SVGSVGElement) => {
+    const bounds = target.getBoundingClientRect();
+    const x = Math.max(left, Math.min(right, left + ((clientX - bounds.left) / bounds.width) * 300));
+    return points.reduce((best, point, index) => Math.abs(xFor(index) - x) < Math.abs(xFor(best) - x) ? index : best, 0);
+  };
+  return (
+    <div className={styles.cardChartWrap} style={{ "--chart-tone": tone } as CSSProperties}>
+      <svg className={styles.cardChart} viewBox="0 0 300 108" role="img" aria-label={`${text(metric?.label, "Metric")} trend from ${points[0]?.date} to ${points.at(-1)?.date}. Use arrow keys while focused on the card to inspect exact values.`} onPointerMove={(event) => onActiveChange(nearest(event.clientX, event.currentTarget))} onPointerLeave={() => onActiveChange(null)}>
+        {[top, (top + bottom) / 2, bottom].map((y) => <line key={y} className={styles.cardChartGrid} x1={left} x2={right} y1={y} y2={y} />)}
+        {baselineY !== null && baselineY >= top && baselineY <= bottom ? <line className={styles.cardChartBaseline} x1={left} x2={right} y1={baselineY} y2={baselineY} /> : null}
+        <text className={styles.cardChartAxisLabel} x="2" y={top + 3}>{displayNumber(max, text(metric?.unit))}</text>
+        <text className={styles.cardChartAxisLabel} x="2" y={(top + bottom) / 2 + 3}>{displayNumber((max + min) / 2, text(metric?.unit))}</text>
+        <text className={styles.cardChartAxisLabel} x="2" y={bottom + 3}>{displayNumber(min, text(metric?.unit))}</text>
+        <path d={path} />
+        <circle className={styles.cardChartLatest} cx={xFor(points.length - 1)} cy={yFor(points.at(-1)?.value ?? min)} r="3" />
+        {selected ? <><line className={styles.cardChartCursor} x1={xFor(activeIndex ?? 0)} y1={top} x2={xFor(activeIndex ?? 0)} y2={bottom} /><circle className={styles.cardChartActive} cx={xFor(activeIndex ?? 0)} cy={yFor(selected.value)} r="3.5" /></> : null}
+        {points.map((point, index) => <circle key={`${point.date}-${index}`} className={styles.cardChartHit} cx={xFor(index)} cy={yFor(point.value)} r="8" onPointerEnter={() => onActiveChange(index)} />)}
+        {[...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])].map((index) => <text key={index} className={styles.cardChartDate} x={xFor(index)} y="101" textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}>{chartDateLabel(points[index]?.date)}</text>)}
+      </svg>
+      {selected ? <div className={styles.cardChartTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, text(metric?.unit))}</strong><em>{baseline === null ? "Recorded value" : `${displayNumber(selected.value - baseline, text(metric?.unit))} vs baseline`}</em></div> : null}
+    </div>
+  );
+}
+
+function CompactDomainVisual({ card, timeframe, selectedDate, activeIndex, onActiveChange }: { card: UnknownRecord; timeframe: Timeframe; selectedDate: string; activeIndex: number | null; onActiveChange: (index: number | null) => void }) {
+  const metric = record(card.primaryMetric);
+  if (text(card.chartType) !== "weekly_bars") return <CompactSparkline metric={metric} timeframe={timeframe} selectedDate={selectedDate} domainId={text(card.id)} activeIndex={activeIndex} onActiveChange={onActiveChange} />;
+  const points = records(metric.points).map((point) => ({ date: text(point.date), value: number(point.value) })).filter((point): point is CompactChartPoint => point.value !== null && Boolean(point.date) && point.date >= shiftDate(selectedDate, -(timeframe - 1))).slice(-8);
+  if (points.length < 2) return <div className={styles.cardChartEmpty}>No chartable observations</div>;
+  const max = Math.max(...points.map((point) => point.value), 1);
+  const tone = chartToneForDomain(text(card.id));
+  const selected = activeIndex === null ? null : points[activeIndex] ?? null;
+  return <div className={styles.cardChartWrap} style={{ "--chart-tone": tone } as CSSProperties}>
+    <div className={styles.cardBars} role="img" aria-label={`${text(metric.label, "Weekly metric")} weekly bars. Use arrow keys while focused on the card to inspect exact values.`}>
+      <span className={styles.cardBarsAxis}>{displayNumber(max, text(metric.unit))}</span>
+      {points.map((point, index) => <i key={`${point.date}-${index}`} role="img" aria-label={`${chartDateLabel(point.date)} ${displayNumber(point.value, text(metric.unit))}`} className={styles.cardBar} data-active={activeIndex === index} style={{ height: `${Math.max(8, (point.value / max) * 100)}%` }} onPointerEnter={(event) => { event.stopPropagation(); onActiveChange(index); }} />)}
+      <span className={styles.cardBarsBaseline}>{displayNumber(0, text(metric.unit))}</span>
+    </div>
+    {selected ? <div className={styles.cardChartTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, text(metric.unit))}</strong><em>Recorded week</em></div> : null}
+  </div>;
+}
+
+function DomainSnapshotCard({ card, timeframe, selectedDate, onSelect, selected }: { card: UnknownRecord; timeframe: Timeframe; selectedDate: string; onSelect: () => void; selected: boolean }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const primary = record(card.primaryMetric);
+  const secondary = record(card.secondaryMetric);
+  const cardDirection = direction(card.direction);
+  const title = DOMAIN_LABELS[text(card.id)] ?? text(card.title, "Health domain");
+  const primaryChange = number(primary.absoluteChange);
+  const secondaryChange = number(secondary.absoluteChange);
+  const filteredChartPoints = records(primary.points)
+    .map((point) => ({ date: text(point.date), value: number(point.value) }))
+    .filter((point): point is CompactChartPoint => Boolean(point.date) && point.value !== null && point.date >= shiftDate(selectedDate, -(timeframe - 1)) && point.date <= selectedDate);
+  const chartPoints = text(card.chartType) === "weekly_bars" ? filteredChartPoints.slice(-8) : filteredChartPoints;
+  const activePoint = activeIndex === null ? null : chartPoints[activeIndex] ?? null;
+  const metricLine = (metric: UnknownRecord, change: number | null) => {
+    if (!text(metric.label)) return null;
+    const unit = text(metric.unit);
+    const sign = change === null ? "" : change > 0 ? "↑ " : change < 0 ? "↓ " : "→ ";
+    return <div className={styles.cardMetric}><span>{text(metric.label)}</span><strong>{change === null ? displayNumber(number(metric.currentValue), unit) : `${sign}${displayNumber(Math.abs(change), unit)}`}</strong></div>;
+  };
+  return (
+    <button type="button" className={styles.domainCard} data-domain={text(card.id)} data-direction={cardDirection} data-selected={selected} onClick={onSelect} onKeyDown={(event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const count = chartPoints.length;
+      if (!count) return;
+      const current = activeIndex ?? count - 1;
+      const next = event.key === "Home" ? 0 : event.key === "End" ? count - 1 : Math.max(0, Math.min(count - 1, current + (event.key === "ArrowLeft" ? -1 : 1)));
+      setActiveIndex(next);
+    }} aria-label={`${title}, ${DIRECTION_LABELS[cardDirection]}. Use arrow keys to inspect chart values.${activePoint ? ` Selected ${chartDateLabel(activePoint.date)} ${displayNumber(activePoint.value, text(primary.unit))}.` : ""}`}>
+      <header><div><h3>{title}</h3><span className={styles.cardDirection}><b aria-hidden="true">{glyphForStatus(cardDirection)}</b>{DIRECTION_LABELS[cardDirection]}</span></div><span className={styles.cardConfidence}>{text(card.confidence, "Not established")}</span></header>
+      <CompactDomainVisual card={card} timeframe={timeframe} selectedDate={selectedDate} activeIndex={activeIndex} onActiveChange={setActiveIndex} />
+      <div className={styles.cardMetrics}>{metricLine(primary, primaryChange)}{metricLine(secondary, secondaryChange)}</div>
+      <p className={styles.cardObservation}>{shortObservation(text(card.observation, "No supported observation is available."))}</p>
+      <footer><span>{number(card.coveredDays) ?? 0} / {number(card.expectedDays) ?? 0} days</span><span>Open detail →</span></footer>
+    </button>
+  );
+}
+
+function TrajectoryHero({ view, timeframe, setTimeframe, observations }: { view: LongitudinalHealthView; timeframe: Timeframe; setTimeframe: (value: Timeframe) => void; observations: ObservationModel[] }) {
+  const aggregate = record(view.aggregateTrend);
+  const counts = aggregateCounts(view, domainModels(view).filter((domain) => domain.key !== "recordedBehaviors"));
+  const largest = observations.find((item) => item.id !== "current-deviation") ?? null;
+  const current = record(view.currentDeviation);
+  const coverage = record(view.dataCoverage);
+  const overall = normalizedCoverage(number(coverage.overall));
+  const covered = number(coverage.coveredDays) ?? (overall === null ? null : Math.round((overall / 100) * view.windowDays));
+  const expected = number(coverage.expectedDays) ?? view.windowDays;
+  return (
+    <section className={`hud-frame ${styles.trajectoryHero}`} aria-labelledby="trajectory-hero-title">
+      <div className={styles.heroMain}><div className={styles.heroTitleRow}><div><h2 id="trajectory-hero-title">Long-term signals</h2><p>Describes connected-data trends, not overall health or medical risk.</p></div><div className={styles.timeframeControls} role="group" aria-label="Trajectory timeframe">{TIMEFRAMES.map((item) => <button key={item.value} type="button" aria-pressed={timeframe === item.value} onClick={() => setTimeframe(item.value)}>{item.label}</button>)}</div></div>
+        <h3 className={styles.heroStatus}>{text(aggregate.summary, DIRECTION_LABELS[direction(aggregate.direction)])}</h3>
+        <div className={styles.countChips}><span><b>{counts.improving}</b> improving</span><span><b>{counts.stable}</b> stable</span><span><b>{counts.weakening}</b> weakening</span></div>
+      </div>
+      <div className={styles.heroFacts}>
+        <div><span>Largest measured shift</span><strong>{largest ? shortObservation(largest.observation) : "No supported shift"}</strong></div>
+        <div><span>Current deviation</span><strong>{current.active === true && Array.isArray(current.metrics) && current.metrics.length ? `${current.metrics.length} metrics outside recent ranges today` : "No active deviation today"}</strong></div>
+        <div><span>Coverage</span><strong>{overall === null ? "Not established" : `${Math.round(overall)}% · ${covered ?? 0} of ${expected} days`}</strong><details className={styles.coverageDetail}><summary>View breakdown</summary><ul>{Object.entries(record(coverage.bySource)).map(([source, detail]) => <li key={source}><span>{source}</span><b>{Math.round((number(record(detail).ratio) ?? 0) * 100)}%</b></li>)}{strings(coverage.unavailableInputs).length > 0 ? <li><span>Unavailable</span><b>{strings(coverage.unavailableInputs).join(", ")}</b></li> : null}</ul></details></div>
+      </div>
+    </section>
+  );
+}
+
+function CurrentDeviationBanner({ view }: { view: LongitudinalHealthView }) {
+  const deviation = view.currentDeviation;
+  if (!deviation.active || !deviation.metrics.length) return null;
+  return <section className={styles.deviationBanner} aria-labelledby="current-deviation-title"><div><span>Current deviation</span><h2 id="current-deviation-title">Outside recent personal ranges today</h2></div><div className={styles.deviationMetrics}>{deviation.metrics.map((item) => <span key={item.metricId}>{item.label}</span>)}</div><small>{deviation.date} · Long-term direction unchanged</small></section>;
+}
+
+function RecordedEvents({ view, selectedType, setSelectedType }: { view: LongitudinalHealthView; selectedType: string | null; setSelectedType: (value: string | null) => void }) {
+  const events = view.journalEvents ?? [];
+  const counts = [...new Set(events.map((event) => event.type))].map((type) => ({ type, label: EVENT_LABELS[type] ?? type, count: events.filter((event) => event.type === type).length }));
+  const filtered = selectedType ? events.filter((event) => event.type === selectedType) : events;
+  const startDate = shiftDate(view.selectedDate, -89);
+  const position = (date: string) => Math.max(0, Math.min(100, ((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${startDate}T12:00:00Z`)) / (Date.parse(`${view.selectedDate}T12:00:00Z`) - Date.parse(`${startDate}T12:00:00Z`))) * 100));
+  return <section className={styles.eventsSection} aria-labelledby="recorded-events-title"><header className={styles.sectionHeader}><div><h2 id="recorded-events-title">Recorded events</h2><p>Explicit WHOOP Journal entries positioned by physiological date.</p></div><button type="button" className={styles.clearFilter} onClick={() => setSelectedType(null)} disabled={!selectedType}>{selectedType ? "Clear filter" : "All events"}</button></header>{counts.length ? <div className={styles.eventChips}>{counts.map((item) => <button key={item.type} type="button" aria-pressed={selectedType === item.type} onClick={() => setSelectedType(selectedType === item.type ? null : item.type)}>{item.label} <b>{item.count}</b></button>)}</div> : <p className={styles.emptyState}>No journal entries are available for this period.</p>}{filtered.length ? <div className={styles.eventTimeline} role="list" aria-label="Recorded events timeline"><div className={styles.timelineAxis}><span>90d</span><span>60d</span><span>30d</span><span>Today</span></div>{counts.filter((item) => !selectedType || item.type === selectedType).map((item) => <div className={styles.eventRow} key={item.type}><strong>{item.label}</strong><div>{filtered.filter((event) => event.type === item.type).map((event) => <button key={event.id} type="button" className={styles.eventPoint} style={{ left: `${position(event.physiologicalDate)}%` }} data-event-icon={event.icon} title={`${event.label} · ${event.physiologicalDate} · ${event.source}`} aria-label={`${event.label} on ${event.physiologicalDate}`} />)}</div></div>)}</div> : null}</section>;
+}
+
+function RecordedRelationships({ view, selectedType }: { view: LongitudinalHealthView; selectedType: string | null }) {
+  const selectedLabel = selectedType ? (EVENT_LABELS[selectedType] ?? selectedType).toLowerCase() : null;
+  const relationships = view.recordedAssociations.filter((item) => item.claim === "association_detected" && (!selectedType || item.exposureKey.toLowerCase().includes(selectedType.replaceAll("_", " ")) || item.exposureLabel.toLowerCase().includes(selectedLabel ?? "")) ).slice(0, 3);
+  return <section className={styles.relationshipsSection} aria-labelledby="recorded-relationships-title"><header className={styles.sectionHeader}><div><h2 id="recorded-relationships-title">Recorded relationships</h2><p>Explicit event-to-outcome comparisons. Association does not establish causality.</p></div></header>{relationships.length ? <div className={styles.relationshipGrid}>{relationships.map((item) => <article key={item.id} className={styles.relationshipCard}><header><h3>{item.exposureLabel} → {item.outcomeLabel}</h3><span>{item.confidence}</span></header><div className={styles.relationshipCounts}><strong>{item.exposedCount} recorded nights</strong><strong>{item.comparisonCount} comparison nights</strong></div><div className={styles.relationshipCompare}><div><span>Recorded</span><b style={{ height: `${Math.min(100, Math.max(8, Math.abs(item.exposedMedian ?? 0)))}%` }} /><strong>{displayNumber(item.exposedMedian, "")}</strong></div><div><span>Comparison</span><b style={{ height: `${Math.min(100, Math.max(8, Math.abs(item.comparisonMedian ?? 0)))}%` }} /><strong>{displayNumber(item.comparisonMedian, "")}</strong></div></div><p>{item.observation}</p><footer><span>Lag {item.lagHours}h · {item.analysisWindowDays}d window</span><span>Difference {displayNumber(item.absoluteDifference, "")}</span></footer><small>Recorded association. The available data does not establish why.</small></article>)}</div> : <p className={styles.emptyState}>No clear recorded relationships met the current sample and confidence requirements.</p>}</section>;
+}
+
+void TrajectoryHorizon;
+void ProductionOverview;
+void topObservations;
+
+export function LongitudinalObservatory({ view }: { view: LongitudinalHealthView }) {
+  const domains = useMemo(() => domainModels(view).filter((domain) => domain.key !== "recordedBehaviors"), [view]);
+  const observations = useMemo(() => observationModels(view), [view]);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedEventType, setSelectedEventType] = useState<string | null>(null);
+  const [timeframe, setTimeframe] = useState<Timeframe>(90);
+  const panelId = `${useId()}-domain-detail`;
+  const selectedDomain = domains.find((item) => item.key === selectedKey) ?? null;
+  const cards = (view.domainCards ?? []).map((card) => record(card));
+  const cardById = new Map(cards.map((card) => [text(card.id), card]));
+
+  return (
+    <div className={styles.observatory}>
+      <TrajectoryHero view={view} timeframe={timeframe} setTimeframe={setTimeframe} observations={observations} />
+      <CurrentDeviationBanner view={view} />
+      <section className={styles.domainGridSection} aria-labelledby="domain-snapshot-title">
+        <header className={styles.sectionHeader}><div><h2 id="domain-snapshot-title">Domain snapshots</h2><p>Six connected domains, one primary visual, and real metric units.</p></div></header>
+        <div className={styles.domainGrid}>
+          {domains.map((domain) => {
+            const card = cardById.get(domain.key) ?? { id: domain.key, title: domain.label, direction: domain.direction, confidence: domain.confidence, observation: domain.summary, primaryMetric: domain.metric, secondaryMetric: null, coveredDays: domain.coverage ? Math.round((domain.coverage / 100) * view.windowDays) : 0, expectedDays: view.windowDays };
+            return <DomainSnapshotCard key={domain.key} card={card} timeframe={timeframe} selectedDate={view.selectedDate} selected={selectedKey === domain.key} onSelect={() => setSelectedKey(selectedKey === domain.key ? null : domain.key)} />;
+          })}
+        </div>
+      </section>
+      {selectedDomain ? <DomainDetail domain={selectedDomain} observations={observations} panelId={panelId} events={view.journalEvents ?? []} /> : null}
+      <RecordedEvents view={view} selectedType={selectedEventType} setSelectedType={setSelectedEventType} />
+      <RecordedRelationships view={view} selectedType={selectedEventType} />
+      <MetricGraphs view={view} />
+    </div>
+  );
+  /*
+  return (
+    <div className={styles.observatory}>
+      <section className={`hud-frame ${styles.primary}`} aria-labelledby="longitudinal-health-title">
+        <aside className={styles.summary} aria-label="Longitudinal summary">
+          <div className={styles.aggregate} data-direction={aggregateDirection}>
+            <span>Connected data</span>
+            <h3>{text(aggregate.label, DIRECTION_LABELS[aggregateDirection])}</h3>
+            <p>{counts.improving} improving · {counts.stable} stable · {counts.weakening} weakening</p>
+            {text(aggregate.summary) ? <p className={styles.aggregateSummary}>{text(aggregate.summary)}</p> : null}
+          </div>
+          <ol className={styles.highlights}>
+            {highlights.map((item) => <li key={item.id}><span>{item.title}</span><p>{item.observation}</p></li>)}
+          </ol>
+          <div className={styles.coverage}>
+            <div><span>Data coverage</span><strong>{formatPercent(overallCoverage)}</strong></div>
+            <div className={styles.coverageTrack} aria-hidden="true"><i style={{ width: `${overallCoverage ?? 0}%` }} /></div>
+            <p>{coveredDays !== null && expectedDays !== null ? `${coveredDays} of ${expectedDays} days covered` : text(record(root.dataCoverage).summary, "Coverage is reported only from connected records.")}</p>
+          </div>
+        </aside>
+      </section>
+
+      <div className={styles.domainTabs} role="group" aria-label="Health data domains">
+        {domains.map((domain, index) => {
+          const selected = domain.key === selectedKey;
+          return <button key={domain.key} ref={(element) => { tabsRef.current[index] = element; }} type="button" aria-expanded={selected} aria-controls={selected ? panelId : undefined} tabIndex={selectedKey === null ? (index === 0 ? 0 : -1) : selected ? 0 : -1} data-direction={domain.direction} onKeyDown={(event) => selectFromKeyboard(event, index)} onClick={() => setSelectedKey(selected ? null : domain.key)}><span>{domain.label}</span><span className={styles.tabState}>{DIRECTION_LABELS[domain.direction]}</span></button>;
+        })}
+      </div>
+
+      {selectedDomain ? <DomainDetail domain={selectedDomain} observations={observations} panelId={panelId} /> : null}
+    </div>
+  );
+  */
+}
