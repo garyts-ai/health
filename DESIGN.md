@@ -37,6 +37,7 @@ Nightmarket informs the restrained rain, light activation, and visibility-pausin
 - Today fills at least `100svh` and uses a connected 44/56 prescription-to-anatomy split on desktop.
 - Mobile puts the full decision first and begins the anatomy instrument immediately afterward.
 - Weekly is seven aligned columns on desktop and a complete vertical timeline on narrow screens.
+- WHOOP is a Longitudinal Health Observatory. Its compact Long-term Signals hero leads into six domain snapshot cards, a separate Recorded Events layer, Recorded Relationships, inline domain detail, and the preserved production Visual analysis graph section; Utilities owns export management and the external evidence packet.
 - WHOOP and Utilities use ruled sections and field groupings, not floating card grids.
 - Today ends with one continuous three-column telemetry rail for Recovery, Sleep, and Strain; no nutrition instruments appear in the product UI.
 
@@ -67,6 +68,10 @@ The visible-by-default hero is fully assembled before hydration. Standard hover,
 
 The Today telemetry rail has one shared interaction state. Pointer, touch, and keyboard input scrub the same seven-day index across all three charts, with a visible exact-date readout and explicit null states. Charts never autoplay or interpolate missing observations.
 
+The Observatory uses small multiples for rapid comprehension: each domain card shows a real metric unit, actual variation, confidence, coverage, and an inline drill-down. Recorded journal answers are dated event marks with explicit filters; they are never rendered as a seventh health domain. Recorded relationship cards show samples, lag, robust difference, confidence, and a non-causal limitation. The production Visual analysis section retains its six interactive metric cards and range controls.
+
+Observatory charts share a quiet telemetry treatment: three-tick compact axes, date anchors, baseline guides, pointer/keyboard crosshairs, and exact-value inspection. Domain identity accents stay distinct from trend status (mint physiology, violet sleep, amber cardio, cyan movement, magenta strength, ion-blue body weight). Body weight is displayed in pounds; source storage remains kilograms.
+
 ## Accessibility
 
 Every section has a landmark and heading. Anchor targets account for the sticky rail. Current navigation exposes `aria-current="location"`; manual scrolling uses history replacement while deliberate tab clicks create history entries. Focus is visible, touch targets are at least 44px, charts expose one keyboard interaction with a current-point readout, and all detail remains available at 200% zoom.
@@ -79,6 +84,6 @@ The aquarium background is absent from the rendered experience. Anatomy images h
 
 The reusable foundation lives in `src/components/training-os/`. Global semantic values live in `src/app/training-os-tokens.css`; component layout and states remain in CSS Modules. `AppShell`, `GlobalNavigation`, `PageHero`, `GlassPanel`, `MetricInstrument`, `DataRail`, `AnatomyViewer`, `MuscleVolumeRow`, `EvidenceDrawer`, and `PageTransition` are the shared contracts. Today uses the three semantic surface levels (base, raised, and overlay), with localized blur permitted only on overlay.
 
-Today's anatomy callouts and volume rows share hover, focus, and pinned state; Escape clears inspection. Utilities contains only provider connections and the compact LLM context packet. The packet is visually secondary to the dashboard and never presents external-model advice as app-authored evidence.
+Today's anatomy callouts and volume rows share hover, focus, and pinned state; Escape clears inspection. Utilities contains provider connections, WHOOP export management, and the longitudinal context packet. The packet is visually secondary to the dashboard and never presents external-model advice as app-authored evidence.
 
-The next implementation step is to migrate Weekly's summary and muscle-volume area to `DataRail` and `MuscleVolumeRow`, leaving the day-ledger logic and data unchanged.
+Observatory copy is deterministic and observation-only. The top surface contains one descriptive aggregate, no more than three traceable observations, and one coverage statement. Recovery remains an acute composite and does not drive the long-term aggregate. Reasons, mechanisms, recommendations, diagnoses, and medical-risk conclusions belong outside the app; the external packet carries evidence and unknowns without prewriting an answer.

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { LongitudinalUtilitiesContent } from "@/components/longitudinal-utilities-content";
 import { ProtectedSettingsActions } from "@/components/protected-settings-actions";
 import { WeeklyPlanView } from "@/components/weekly-plan-view";
 import { WhoopDistrictContent } from "@/components/whoop-district-content";
@@ -53,11 +54,11 @@ export async function MasterDashboard({ anatomyDebug = false, hevy, summary, uti
     </PageTransition>
 
     <PageTransition id="whoop" className="district-section district-whoop-section" labelledBy="whoop-title">
-      <div className="district-container"><SectionHeading id="whoop-title" title="WHOOP analysis" description="Long-range baselines and the strongest supported patterns from your private export." /><div className="district-whoop-stack"><SectionErrorBoundary label="WHOOP analysis"><Suspense fallback={<div className="district-whoop-loading" role="status"><span>WHOOP / ANALYSIS</span><strong>Loading the latest physiological record…</strong></div>}><WhoopDistrictContent importReason={whoopImportReason} importState={whoopImportState} /></Suspense></SectionErrorBoundary></div></div>
+      <div className="district-container"><SectionHeading id="whoop-title" title="WHOOP analysis" description="Long-range baselines and the strongest supported patterns from your private export." /><div className="district-whoop-stack"><SectionErrorBoundary label="Longitudinal Health Observatory"><Suspense fallback={<div className="district-whoop-loading" role="status"><span>WHOOP / ANALYSIS</span><strong>Loading the latest physiological record…</strong></div>}><WhoopDistrictContent /></Suspense></SectionErrorBoundary></div></div>
     </PageTransition>
 
     <PageTransition id="utilities" className="district-section district-utilities" labelledBy="utilities-title">
-      <div className="district-container"><SectionHeading id="utilities-title" title="Utilities" description="Refresh source data and copy a compact dashboard context packet for deeper external analysis." /><div className="district-utilities__body"><SectionErrorBoundary label="Utilities"><ProtectedSettingsActions hevy={hevy} summary={summary} syncStatus={syncStatus} whoop={whoop} /></SectionErrorBoundary></div></div>
+      <div className="district-container"><SectionHeading id="utilities-title" title="Utilities" description="Manage connected records, import long-range WHOOP history, and prepare an evidence packet for external analysis." /><div className="district-utilities__body"><SectionErrorBoundary label="Utilities"><ProtectedSettingsActions hevy={hevy} syncStatus={syncStatus} whoop={whoop} /><Suspense fallback={<div className="district-whoop-loading" role="status"><span>LONGITUDINAL CONTEXT</span><strong>Preparing data coverage and evidence…</strong></div>}><LongitudinalUtilitiesContent importReason={whoopImportReason} importState={whoopImportState} /></Suspense></SectionErrorBoundary></div></div>
     </PageTransition>
   </AppShell>;
 }

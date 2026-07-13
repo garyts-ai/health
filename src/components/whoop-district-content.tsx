@@ -1,22 +1,7 @@
-import { WhoopAnalysisView } from "@/components/whoop-analysis-view";
-import { WhoopExportUploadPanel } from "@/components/whoop-export-upload-panel";
-import { getWhoopAnalysisReport } from "@/lib/whoop-export/analysis";
+import { LongitudinalObservatory } from "@/components/longitudinal-observatory";
+import { getLongitudinalHealthView } from "@/lib/longitudinal";
 
-type WhoopDistrictContentProps = {
-  importReason?: string;
-  importState?: string;
-};
-
-export async function WhoopDistrictContent({
-  importReason,
-  importState,
-}: WhoopDistrictContentProps) {
-  const report = await getWhoopAnalysisReport();
-
-  return (
-    <>
-      <WhoopExportUploadPanel importState={importState} reason={importReason} report={report} />
-      <WhoopAnalysisView report={report} />
-    </>
-  );
+export async function WhoopDistrictContent() {
+  const view = await getLongitudinalHealthView();
+  return <LongitudinalObservatory view={view} />;
 }

@@ -453,6 +453,7 @@ html[data-motion-paused="true"] .district-root * {
 
 .district-utilities { background: rgba(10, 11, 16, 0.9); }
 .district-utilities__body { display: grid; gap: 18px; }
+.district-longitudinal-utilities { display: grid; gap: 28px; }
 .district-footer {
   position: relative;
   z-index: 2;
