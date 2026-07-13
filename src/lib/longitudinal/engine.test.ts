@@ -146,7 +146,8 @@ test("explicit alcohol records can produce a cautious next-day association", () 
 test("unrecorded alcohol is never inferred and small samples are insufficient", () => {
   const absent = buildLongitudinalHealthView(input());
   assert.equal(absent.recordedAssociations.length, 0);
-  assert.doesNotMatch(JSON.stringify(absent), /alcohol/i);
+  assert.equal(absent.alcoholLog?.entries.length, 0);
+  assert.equal(absent.alcoholLog?.summary.last90dCount, 0);
 
   const sparse = buildLongitudinalHealthView(input({ journalRows: alcoholRows(2) }));
   assert.ok(sparse.recordedAssociations.length > 0);

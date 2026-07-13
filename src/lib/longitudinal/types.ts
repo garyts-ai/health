@@ -163,6 +163,42 @@ export type JournalEventViewModel = {
   source: "WHOOP Journal";
 };
 
+export type AlcoholLogEntry = {
+  id: string;
+  occurredAt: string;
+  physiologicalDate: string;
+  source: "WHOOP Journal";
+  notes?: string | null;
+  quantity?: number | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type AlcoholLogSummary = {
+  thisMonthCount: number;
+  last30dCount: number;
+  last90dCount: number;
+  latestEntryDate: string | null;
+  currentAlcoholFreeStreakDays: number | null;
+  longestAlcoholFreeStreakDays: number | null;
+};
+
+export type AlcoholCalendarDay = {
+  date: string;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  hasAlcoholEntry: boolean;
+  entryCount: number;
+  entryIds: string[];
+};
+
+export type AlcoholLogViewModel = {
+  summary: AlcoholLogSummary;
+  selectedMonth: string;
+  calendarDays: AlcoholCalendarDay[];
+  heatmapDays: AlcoholCalendarDay[];
+  entries: AlcoholLogEntry[];
+};
+
 export type DomainDisplayMetric = {
   id: string;
   label: string;
@@ -242,6 +278,7 @@ export type LongitudinalHealthView = {
   notableTrends: NotableTrend[];
   recordedAssociations: RecordedAssociation[];
   journalEvents?: JournalEventViewModel[];
+  alcoholLog?: AlcoholLogViewModel;
   domainCards?: DomainCardViewModel[];
   dataCoverage: DataCoverage;
 };

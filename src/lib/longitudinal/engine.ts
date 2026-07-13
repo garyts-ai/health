@@ -1,6 +1,7 @@
 import { dbAll } from "@/lib/db";
 import { calendarDateKey, shiftCalendarDateKey, HEALTH_TIME_ZONE } from "@/lib/calendar";
 import { clamp01, mad, median, percentile, round, theilSen } from "@/lib/longitudinal/statistics";
+import { buildAlcoholLogView } from "@/lib/longitudinal/alcohol-log";
 import type {
   AggregateTrend,
   CurrentDeviation,
@@ -736,6 +737,7 @@ export function buildLongitudinalHealthView(input: LongitudinalEngineInput): Lon
     aggregateTrend: aggregate(metrics), domains, currentDeviation: currentDeviation([...physiological, ...sleep], selectedDate),
     notableTrends, recordedAssociations: associations(input.journalRows, canonical, windowDays),
     journalEvents: journalEvents(input.journalRows, selectedDate, windowDays),
+    alcoholLog: buildAlcoholLogView(input.journalRows, selectedDate),
     domainCards: domainCards(domains, dataCoverage),
     dataCoverage,
   };
