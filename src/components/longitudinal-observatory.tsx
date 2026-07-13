@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import type { LongitudinalHealthView } from "@/lib/longitudinal/types";
+import { alcoholHeatmapDays } from "@/lib/longitudinal/alcohol-log";
 
 import styles from "./longitudinal-observatory.module.css";
 
@@ -294,6 +295,36 @@ function MetricGraph({ series, range, rangeLabel, selectedDate }: { series: Grap
   );
 }
 
+function AlcoholLogGraph({ view, range }: { view: LongitudinalHealthView; range: ChartRange }) {
+  const entries = view.alcoholLog?.entries ?? [];
+  const allDays = view.alcoholLog?.heatmapDays ?? alcoholHeatmapDays(view.selectedDate, entries);
+  const daysToShow = range === "week" ? 7 : range === "30d" ? 30 : range === "3m" ? 90 : range === "1y" ? 365 : Math.max(365, allDays.length);
+  const days = allDays.slice(-daysToShow);
+  const logged = days.filter((day) => day.hasAlcoholEntry).reduce((sum, day) => sum + day.entryCount, 0);
+  const latest = [...days].reverse().find((day) => day.hasAlcoholEntry)?.date ?? null;
+  return <article className={styles.metricGraph} data-alcohol-graph="true">
+    <header><div><h3>Alcohol log</h3><span>Explicit journal dates</span></div><div className={styles.metricGraphValue} style={{ "--metric-tone": "#ff9b62" } as CSSProperties}><strong>{logged} {logged === 1 ? "entry" : "entries"}</strong><span>{latest ? `Latest ${graphDate(latest)}` : "No entries"}</span></div></header>
+    <div className={styles.alcoholMiniChart} role="img" aria-label={`Alcohol log for ${range === "all" ? "all available history" : rangeLabelFor(range)}. ${logged} entries${latest ? `, latest ${graphDate(latest)}` : "."}`}>
+      {days.map((day) => <span key={day.date} className={styles.alcoholMiniDay} data-logged={day.hasAlcoholEntry} title={`${graphDate(day.date)}${day.hasAlcoholEntry ? ` · ${day.entryCount} ${day.entryCount === 1 ? "entry" : "entries"}` : " · No alcohol entry"}`} />)}
+    </div>
+    <div className={styles.metricGraphDates}><span>{graphDate(days[0]?.date ?? null)}</span><strong>{logged ? `${logged} logged` : "No entries recorded"}</strong><span>{graphDate(days.at(-1)?.date ?? null)}</span></div>
+    <footer><span>Warm amber marks logged days</span><span>Tracking only</span></footer>
+  </article>;
+}
+
+function rangeLabelFor(range: ChartRange) {
+  return CHART_RANGES.find((item) => item.key === range)?.label ?? "selected period";
+}
+
+function PlaceholderGraph() {
+  return <article className={styles.metricGraph} data-placeholder-graph="true">
+    <header><div><h3>Open visualization slot</h3><span>Reserved for the next log</span></div><div className={styles.metricGraphValue}><strong>—</strong><span>Not selected</span></div></header>
+    <div className={styles.metricGraphPlaceholder} role="img" aria-label="Placeholder for a future visualization."><span>Placeholder</span><small>Choose the next log or data view</small></div>
+    <div className={styles.metricGraphDates}><span>—</span><strong>Awaiting selection</strong><span>—</span></div>
+    <footer><span>Intentional empty slot</span><span>Observation only</span></footer>
+  </article>;
+}
+
 function MetricGraphs({ view }: { view: LongitudinalHealthView }) {
   const [range, setRange] = useState<ChartRange>(() => {
     if (typeof window === "undefined") return "week";
@@ -310,7 +341,8 @@ function MetricGraphs({ view }: { view: LongitudinalHealthView }) {
     ["recovery", "Recovery", "%", "green"], ["sleep_duration", "Sleep", "h", "violet"], ["hrv", "HRV", "ms", "cyan"],
     ["resting_heart_rate", "Resting HR", "bpm", "coral"], ["day_strain", "Strain", "", "amber"], ["skin_temperature", "Skin temp", "°C", "rose"],
   ].map(([key, label, unit, tone]) => { const metric = metricsById.get(key); return metric ? { key, label, unit, tone: tone as GraphSeries["tone"], baseline: metric.baselineValue, values: metric.points } : null; }).filter((item): item is GraphSeries => Boolean(item));
-  const visibleCount = series[0] ? rangeValues(series[0], range, view.selectedDate).filter((point) => point.value !== null).length : 0;
+  const productionSeries = series.filter((item) => item.key !== "recovery" && item.key !== "sleep_duration");
+  const visibleCount = productionSeries[0] ? rangeValues(productionSeries[0], range, view.selectedDate).filter((point) => point.value !== null).length : 0;
 
   return (
     <section className={`hud-frame ${styles.graphs}`} aria-labelledby="longitudinal-graphs-title">
@@ -324,7 +356,9 @@ function MetricGraphs({ view }: { view: LongitudinalHealthView }) {
         </div>
       </header>
       <div className={styles.graphsGrid}>
-        {series.map((item) => <MetricGraph key={item.key} series={item} range={range} rangeLabel={rangeLabel} selectedDate={view.selectedDate} />)}
+        {productionSeries.map((item) => <MetricGraph key={item.key} series={item} range={range} rangeLabel={rangeLabel} selectedDate={view.selectedDate} />)}
+        <AlcoholLogGraph view={view} range={range} />
+        <PlaceholderGraph />
       </div>
     </section>
   );
@@ -597,11 +631,6 @@ const TIMEFRAMES: Array<{ value: Timeframe; label: string }> = [
   { value: 365, label: "1 year" },
 ];
 
-const EVENT_LABELS: Record<string, string> = {
-  alcohol: "Alcohol", caffeine: "Caffeine", late_meal: "Late meal", travel: "Travel", illness: "Illness",
-  stress: "Stress", medication: "Medication", hydration: "Hydration", menstrual_cycle: "Menstrual cycle", other: "Other",
-};
-
 function glyphForStatus(value: Direction) {
   if (value === "improving") return "↗";
   if (value === "weakening") return "↘";
@@ -788,21 +817,6 @@ function CurrentDeviationBanner({ view }: { view: LongitudinalHealthView }) {
   return <section className={styles.deviationBanner} aria-labelledby="current-deviation-title"><div><span>Current deviation</span><h2 id="current-deviation-title">Outside recent personal ranges today</h2></div><div className={styles.deviationMetrics}>{deviation.metrics.map((item) => <span key={item.metricId}>{item.label}</span>)}</div><small>{deviation.date} · Long-term direction unchanged</small></section>;
 }
 
-function RecordedEvents({ view, selectedType, setSelectedType }: { view: LongitudinalHealthView; selectedType: string | null; setSelectedType: (value: string | null) => void }) {
-  const events = view.journalEvents ?? [];
-  const counts = [...new Set(events.map((event) => event.type))].map((type) => ({ type, label: EVENT_LABELS[type] ?? type, count: events.filter((event) => event.type === type).length }));
-  const filtered = selectedType ? events.filter((event) => event.type === selectedType) : events;
-  const startDate = shiftDate(view.selectedDate, -89);
-  const position = (date: string) => Math.max(0, Math.min(100, ((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${startDate}T12:00:00Z`)) / (Date.parse(`${view.selectedDate}T12:00:00Z`) - Date.parse(`${startDate}T12:00:00Z`))) * 100));
-  return <section className={styles.eventsSection} aria-labelledby="recorded-events-title"><header className={styles.sectionHeader}><div><h2 id="recorded-events-title">Recorded events</h2><p>Explicit WHOOP Journal entries positioned by physiological date.</p></div><button type="button" className={styles.clearFilter} onClick={() => setSelectedType(null)} disabled={!selectedType}>{selectedType ? "Clear filter" : "All events"}</button></header>{counts.length ? <div className={styles.eventChips}>{counts.map((item) => <button key={item.type} type="button" aria-pressed={selectedType === item.type} onClick={() => setSelectedType(selectedType === item.type ? null : item.type)}>{item.label} <b>{item.count}</b></button>)}</div> : <p className={styles.emptyState}>No journal entries are available for this period.</p>}{filtered.length ? <div className={styles.eventTimeline} role="list" aria-label="Recorded events timeline"><div className={styles.timelineAxis}><span>90d</span><span>60d</span><span>30d</span><span>Today</span></div>{counts.filter((item) => !selectedType || item.type === selectedType).map((item) => <div className={styles.eventRow} key={item.type}><strong>{item.label}</strong><div>{filtered.filter((event) => event.type === item.type).map((event) => <button key={event.id} type="button" className={styles.eventPoint} style={{ left: `${position(event.physiologicalDate)}%` }} data-event-icon={event.icon} title={`${event.label} · ${event.physiologicalDate} · ${event.source}`} aria-label={`${event.label} on ${event.physiologicalDate}`} />)}</div></div>)}</div> : null}</section>;
-}
-
-function RecordedRelationships({ view, selectedType }: { view: LongitudinalHealthView; selectedType: string | null }) {
-  const selectedLabel = selectedType ? (EVENT_LABELS[selectedType] ?? selectedType).toLowerCase() : null;
-  const relationships = view.recordedAssociations.filter((item) => item.claim === "association_detected" && (!selectedType || item.exposureKey.toLowerCase().includes(selectedType.replaceAll("_", " ")) || item.exposureLabel.toLowerCase().includes(selectedLabel ?? "")) ).slice(0, 3);
-  return <section className={styles.relationshipsSection} aria-labelledby="recorded-relationships-title"><header className={styles.sectionHeader}><div><h2 id="recorded-relationships-title">Recorded relationships</h2><p>Explicit event-to-outcome comparisons. Association does not establish causality.</p></div></header>{relationships.length ? <div className={styles.relationshipGrid}>{relationships.map((item) => <article key={item.id} className={styles.relationshipCard}><header><h3>{item.exposureLabel} → {item.outcomeLabel}</h3><span>{item.confidence}</span></header><div className={styles.relationshipCounts}><strong>{item.exposedCount} recorded nights</strong><strong>{item.comparisonCount} comparison nights</strong></div><div className={styles.relationshipCompare}><div><span>Recorded</span><b style={{ height: `${Math.min(100, Math.max(8, Math.abs(item.exposedMedian ?? 0)))}%` }} /><strong>{displayNumber(item.exposedMedian, "")}</strong></div><div><span>Comparison</span><b style={{ height: `${Math.min(100, Math.max(8, Math.abs(item.comparisonMedian ?? 0)))}%` }} /><strong>{displayNumber(item.comparisonMedian, "")}</strong></div></div><p>{item.observation}</p><footer><span>Lag {item.lagHours}h · {item.analysisWindowDays}d window</span><span>Difference {displayNumber(item.absoluteDifference, "")}</span></footer><small>Recorded association. The available data does not establish why.</small></article>)}</div> : <p className={styles.emptyState}>No clear recorded relationships met the current sample and confidence requirements.</p>}</section>;
-}
-
 void TrajectoryHorizon;
 void ProductionOverview;
 void topObservations;
@@ -811,7 +825,6 @@ export function LongitudinalObservatory({ view }: { view: LongitudinalHealthView
   const domains = useMemo(() => domainModels(view).filter((domain) => domain.key !== "recordedBehaviors"), [view]);
   const observations = useMemo(() => observationModels(view), [view]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [selectedEventType, setSelectedEventType] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<Timeframe>(90);
   const panelId = `${useId()}-domain-detail`;
   const selectedDomain = domains.find((item) => item.key === selectedKey) ?? null;
@@ -831,9 +844,7 @@ export function LongitudinalObservatory({ view }: { view: LongitudinalHealthView
           })}
         </div>
       </section>
-      {selectedDomain ? <DomainDetail domain={selectedDomain} observations={observations} panelId={panelId} events={view.journalEvents ?? []} /> : null}
-      <RecordedEvents view={view} selectedType={selectedEventType} setSelectedType={setSelectedEventType} />
-      <RecordedRelationships view={view} selectedType={selectedEventType} />
+      {selectedDomain ? <DomainDetail domain={selectedDomain} observations={observations} panelId={panelId} events={(view.journalEvents ?? []).filter((event) => event.type === "alcohol")} /> : null}
       <MetricGraphs view={view} />
     </div>
   );
