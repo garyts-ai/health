@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildLongitudinalHealthView, type LongitudinalEngineInput } from "@/lib/longitudinal/engine";
+import { buildLongitudinalHealthView, metricPointsWithPersonalRanges, type LongitudinalEngineInput } from "@/lib/longitudinal/engine";
 
 const NOW = new Date("2026-07-12T16:00:00.000Z");
 
@@ -56,8 +56,46 @@ test("acute deviation remains separate from stable long-term direction", () => {
   assert.equal(view.currentDeviation.active, true);
   assert.ok(view.currentDeviation.deviatingMetricIds.includes("recovery"));
   assert.equal(view.currentDeviation.changesLongTermAggregate, false);
+  const recoveryPoint = view.domains.physiology.metrics.find((metric) => metric.id === "recovery")?.points.at(-1);
+  assert.equal(recoveryPoint?.personalRange?.status, "below");
+  assert.equal(view.currentDeviation.metrics.find((metric) => metric.metricId === "recovery")?.robustZScore, recoveryPoint?.personalRange?.robustZScore);
   assert.notEqual(view.aggregateTrend.direction, "weakening");
   assert.doesNotMatch(JSON.stringify(view), /you should|diagnos|getting sick/i);
+});
+
+test("personal ranges use strictly prior non-null observations", () => {
+  const source = [
+    ...Array.from({ length: 14 }, (_, index) => ({ date: `2026-01-${String(index + 1).padStart(2, "0")}`, value: index })),
+    { date: "2026-02-01", value: 100 },
+    { date: "2026-02-10", value: null },
+    { date: "2026-03-01", value: 7 },
+  ];
+  const points = metricPointsWithPersonalRanges(source, 4);
+  assert.ok(points.slice(0, 14).every((point) => point.personalRange === undefined));
+  assert.equal(points[14].personalRange?.sampleCount, 14);
+  assert.equal(points[14].personalRange?.center, 6.5);
+  assert.equal(points[14].personalRange?.status, "above");
+  assert.equal(points[15].personalRange, undefined);
+  assert.equal(points[16].personalRange?.sampleCount, 15);
+  assert.notEqual(points[16].personalRange?.center, points[14].personalRange?.center);
+});
+
+test("personal range is unavailable for insufficient history or zero MAD", () => {
+  const constant = metricPointsWithPersonalRanges(Array.from({ length: 20 }, (_, index) => ({
+    date: `2026-01-${String(index + 1).padStart(2, "0")}`,
+    value: index === 19 ? 90 : 60,
+  })));
+  assert.ok(constant.every((point) => point.personalRange === undefined));
+});
+
+test("the robust-z threshold boundary is classified as outside the range", () => {
+  const history = Array.from({ length: 14 }, (_, index) => ({ date: `2026-01-${String(index + 1).padStart(2, "0")}`, value: index }));
+  const center = 6.5;
+  const dispersion = 3.5;
+  const boundary = center + 2.5 * dispersion / 0.6745;
+  const points = metricPointsWithPersonalRanges([...history, { date: "2026-02-01", value: boundary }], 8);
+  assert.equal(points.at(-1)?.personalRange?.robustZScore, 2.5);
+  assert.equal(points.at(-1)?.personalRange?.status, "above");
 });
 
 test("sustained HRV increase and resting-heart-rate decrease are favorable trends", () => {
@@ -223,6 +261,19 @@ test("journal events remain a separate timeline and never become a health domain
   assert.equal(view.domainCards?.length, 6);
   assert.ok(view.domainCards?.every((card) => card.id !== "recordedBehaviors"));
   assert.equal(view.journalEvents?.length, 2);
+});
+
+test("overlapping legacy journal answers do not duplicate events or coverage", () => {
+  const cycleStart = `${date(-2)}T05:00:00.000Z`;
+  const view = buildLongitudinalHealthView(input({ journalRows: [
+    { id: "legacy", cycle_start: cycleStart, question_text: "Have any alcoholic drinks?", answered_yes: 1 },
+    { id: "stable", cycle_start: cycleStart, question_text: " HAVE any alcoholic   drinks? ", answered_yes: 1 },
+  ] }));
+  assert.equal(view.journalEvents?.length, 1);
+  assert.equal(view.alcoholLog?.entries.length, 1);
+  assert.equal(view.dataCoverage.bySource["WHOOP Journal"].covered, 1);
+  assert.equal(view.alcoholLog?.coverage.rawAnswerCount, 2);
+  assert.equal(view.alcoholLog?.coverage.deduplicatedAnswerCount, 1);
 });
 
 test("event timeline contains explicit positive journal rows only", () => {

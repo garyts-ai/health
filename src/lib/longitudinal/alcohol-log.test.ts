@@ -44,3 +44,37 @@ test("empty alcohol history stays explicit and renderable", () => {
   assert.equal(view.calendarDays.length, 42);
   assert.ok(view.heatmapDays.length >= 365);
 });
+
+test("recognizes WHOOP alcoholic wording and collapses overlapping exports", () => {
+  const rows = [
+    { id: "legacy-17", cycle_start: "2026-07-17T12:00:00.000Z", question_text: "Have any alcoholic drinks?", answered_yes: 1 },
+    { id: "stable-17", cycle_start: "2026-07-17T12:00:00.000Z", question_text: "  HAVE any alcoholic   drinks? ", answered_yes: 1 },
+    { id: "jul-18", cycle_start: "2026-07-18T12:00:00.000Z", question_text: "Have any alcoholic drinks?", answered_yes: 1 },
+    { id: "jul-19", cycle_start: "2026-07-19T12:00:00.000Z", question_text: "Have any alcoholic drinks?", answered_yes: 1 },
+    { id: "jul-20-no", cycle_start: "2026-07-20T12:00:00.000Z", question_text: "Have any alcoholic drinks?", answered_yes: 0 },
+  ];
+  const view = buildAlcoholLogView(rows, "2026-07-21", {
+    importCount: 2,
+    latestImportAt: "2026-07-20T18:00:00.000Z",
+    coverageEnd: "2026-07-20",
+  });
+
+  assert.deepEqual(view.entries.map((entry) => entry.physiologicalDate).sort(), ["2026-07-17", "2026-07-18", "2026-07-19"]);
+  assert.equal(view.coverage.sourceAvailable, true);
+  assert.equal(view.coverage.coverageEnd, "2026-07-20");
+  assert.equal(view.coverage.rawAnswerCount, 5);
+  assert.equal(view.coverage.deduplicatedAnswerCount, 4);
+  assert.equal(view.coverage.alcoholQuestionCount, 4);
+});
+
+test("journal coverage distinguishes no source from a covered zero", () => {
+  const missing = buildAlcoholLogView([], "2026-07-21");
+  const coveredZero = buildAlcoholLogView([], "2026-07-21", {
+    importCount: 1,
+    latestImportAt: "2026-07-21T13:00:00.000Z",
+    coverageEnd: "2026-07-21",
+  });
+  assert.equal(missing.coverage.sourceAvailable, false);
+  assert.equal(coveredZero.coverage.sourceAvailable, true);
+  assert.equal(coveredZero.entries.length, 0);
+});

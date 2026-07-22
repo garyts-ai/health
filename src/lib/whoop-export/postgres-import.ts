@@ -1,6 +1,7 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 import { dbAll, initializeDatabase } from "@/lib/db";
+import { normalizeJournalQuestion } from "@/lib/longitudinal/journal";
 import type { NormalizedWhoopExport } from "@/lib/whoop-export/importer";
 
 type QueryValue = string | number | null;
@@ -81,11 +82,34 @@ function buildBatchUpsert(
   return queries;
 }
 
+function buildJournalCleanupQueries(rows: QueryValue[][], batchSize = 250) {
+  const eligible = rows.filter((row) => typeof row[1] === "string");
+  const queries: ImportQuery[] = [];
+  for (let offset = 0; offset < eligible.length; offset += batchSize) {
+    const batch = eligible.slice(offset, offset + batchSize);
+    const params = batch.flatMap((row) => [row[0], row[1], normalizeJournalQuestion(String(row[4] ?? ""))]);
+    const values = batch.map((_row, rowIndex) => {
+      const start = rowIndex * 3;
+      return `($${start + 1}, $${start + 2}, $${start + 3})`;
+    });
+    queries.push({
+      text: `DELETE FROM "whoop_export_journal_answers" AS existing
+        USING (VALUES ${values.join(", ")}) AS incoming(id, cycle_start, question_key)
+        WHERE existing.cycle_start = incoming.cycle_start
+          AND lower(regexp_replace(trim(existing.question_text), '\\s+', ' ', 'g')) = incoming.question_key
+          AND existing.id <> incoming.id`,
+      params,
+    });
+  }
+  return queries;
+}
+
 export function buildPostgresImportQueries(data: NormalizedWhoopExport) {
   const queries = [
     ...buildBatchUpsert("whoop_export_cycles", data.cycles),
     ...buildBatchUpsert("whoop_export_sleeps", data.sleeps),
     ...buildBatchUpsert("whoop_export_workouts", data.workouts),
+    ...buildJournalCleanupQueries(data.journals),
     ...buildBatchUpsert("whoop_export_journal_answers", data.journals),
   ];
   queries.push({

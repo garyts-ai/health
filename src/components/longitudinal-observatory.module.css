@@ -43,7 +43,7 @@
 .sectionHeader h2 { margin: 0; color: var(--os-text-primary); font: 800 1.35rem/1 var(--font-big-shoulders), sans-serif; text-transform: uppercase; }
 .sectionHeader p { margin: 5px 0 0; color: var(--os-text-secondary); font-size: .72rem; line-height: 1.4; }
 .domainGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--os-line-subtle); }
-.domainCard { --domain-tone: var(--domain-physiology); min-width: 0; border: 0; border-top: 2px solid color-mix(in srgb, var(--domain-tone) 68%, transparent); border-radius: 0; background: linear-gradient(150deg, color-mix(in srgb, var(--domain-tone) 5%, #07101c), #07101c 62%); padding: 16px; color: var(--os-text-primary); text-align: left; cursor: pointer; transition: background .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.domainCard { --domain-tone: var(--domain-physiology); min-width: 0; border: 0; border-top: 2px solid color-mix(in srgb, var(--domain-tone) 68%, transparent); border-radius: 0; background: linear-gradient(150deg, color-mix(in srgb, var(--domain-tone) 5%, #07101c), #07101c 62%); padding: 16px; color: var(--os-text-primary); text-align: left; transition: background .18s ease, box-shadow .18s ease, border-color .18s ease; }
 .domainCard[data-domain="physiology"] { --domain-tone: var(--domain-physiology); }
 .domainCard[data-domain="sleep"] { --domain-tone: var(--domain-sleep); }
 .domainCard[data-domain="cardiovascularActivity"] { --domain-tone: var(--domain-cardio); }
@@ -59,27 +59,32 @@
 .cardDirection b { font-size: .9rem; }
 .cardConfidence { flex: 0 0 auto; color: var(--os-text-muted); font: .6rem var(--font-geist-mono), monospace; text-transform: uppercase; }
 .cardChartWrap { position: relative; margin-top: 10px; }
+.domainChartControl { outline: none; cursor: crosshair; }
+.domainChartControl:focus-visible { box-shadow: 0 0 0 2px var(--domain-tone); }
 .cardChart { display: block; width: 100%; height: 112px; overflow: visible; }
 .cardChartGrid { stroke: var(--os-line-subtle); stroke-width: .7; }
 .cardChartBaseline { stroke: color-mix(in srgb, var(--chart-tone) 62%, var(--os-text-muted)); stroke-dasharray: 4 4; stroke-width: .85; }
+.cardChartCorridor { fill: color-mix(in srgb, var(--chart-tone) 9%, transparent); stroke: color-mix(in srgb, var(--chart-tone) 24%, transparent); stroke-width: .65; vector-effect: non-scaling-stroke; }
 .cardChart path { fill: none; stroke: var(--chart-tone); stroke-width: 2.2; vector-effect: non-scaling-stroke; }
 .cardChartLatest { fill: var(--chart-tone); stroke: #07101c; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.cardChartTether { stroke: var(--os-signal-caution); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.cardChartBreach { fill: var(--chart-tone); stroke: var(--os-signal-caution); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .cardChartActive { fill: var(--chart-tone); stroke: #0f131d; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .cardChartCursor { stroke: var(--chart-tone); stroke-width: .7; stroke-dasharray: 2 3; opacity: .8; }
 .cardChartHit { fill: transparent; stroke: transparent; cursor: crosshair; }
-.cardChartAxisLabel, .cardChartDate { fill: var(--os-text-muted); font: 8px var(--font-geist-mono), monospace; }
-.cardChartDate { fill: var(--os-text-secondary); font-size: 8.5px; }
+.cardChartAxisLabel, .cardChartDate { fill: var(--os-text-muted); font: 12px var(--font-geist-mono), monospace; }
+.cardChartDate { fill: var(--os-text-secondary); }
 .cardChartTooltip { position: absolute; z-index: 2; top: 7px; right: 7px; min-width: 7.5rem; border: 1px solid color-mix(in srgb, var(--chart-tone) 45%, var(--os-line-strong)); background: color-mix(in srgb, var(--os-surface-raised) 92%, #07070b); padding: 7px 8px; pointer-events: none; box-shadow: 0 8px 20px rgb(0 0 0 / 25%); }
 .cardChartTooltip span, .cardChartTooltip strong, .cardChartTooltip em { display: block; }
-.cardChartTooltip span { color: var(--os-text-secondary); font: .58rem var(--font-geist-mono), monospace; }
+.cardChartTooltip span { color: var(--os-text-secondary); font: .75rem var(--font-geist-mono), monospace; }
 .cardChartTooltip strong { margin-top: 3px; color: var(--chart-tone); font: 700 .76rem var(--font-geist-mono), monospace; }
-.cardChartTooltip em { margin-top: 3px; color: var(--os-text-muted); font-size: .58rem; font-style: normal; }
+.cardChartTooltip em { margin-top: 3px; color: var(--os-text-muted); font-size: .75rem; font-style: normal; }
 .cardChartEmpty { display: grid; min-height: 112px; place-items: center; margin-top: 12px; border-top: 1px dashed var(--os-line-subtle); border-bottom: 1px dashed var(--os-line-subtle); color: var(--os-text-muted); font-size: .68rem; }
 .cardBars { position: relative; display: flex; align-items: end; gap: 6px; height: 112px; margin-top: 10px; border-bottom: 1px solid var(--os-line-subtle); padding: 14px 8px 20px 26px; }
 .cardBars::before, .cardBars::after { position: absolute; left: 26px; right: 8px; height: 1px; background: var(--os-line-subtle); content: ""; }
 .cardBars::before { top: 14px; }
 .cardBars::after { top: 48px; }
-.cardBarsAxis, .cardBarsBaseline { position: absolute; left: 0; color: var(--os-text-muted); font: 8px var(--font-geist-mono), monospace; }
+.cardBarsAxis, .cardBarsBaseline { position: absolute; left: 0; color: var(--os-text-muted); font: 12px var(--font-geist-mono), monospace; }
 .cardBarsAxis { top: 10px; }
 .cardBarsBaseline { bottom: 2px; }
 .cardBar { flex: 1; min-width: 8px; border: 0; background: var(--chart-tone); opacity: .68; cursor: crosshair; }
@@ -89,8 +94,9 @@
 .cardMetric span { overflow: hidden; color: var(--os-text-secondary); font-size: .66rem; text-overflow: ellipsis; white-space: nowrap; }
 .cardMetric strong { color: var(--os-text-primary); font: 750 .78rem var(--font-geist-mono), monospace; }
 .cardObservation { min-height: 2.7em; margin: 11px 0 0; color: var(--os-text-secondary); font-size: .7rem; line-height: 1.4; }
-.domainCard footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; color: var(--os-text-muted); font: .6rem var(--font-geist-mono), monospace; }
-.domainCard footer span:last-child { color: var(--domain-tone); }
+.domainCard footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; color: var(--os-text-muted); font: .75rem var(--font-geist-mono), monospace; }
+.domainOpen { min-height: 44px; border: 0; background: transparent; padding: 0 4px; color: var(--domain-tone); font: inherit; cursor: pointer; }
+.domainOpen:focus-visible { outline: 2px solid var(--domain-tone); outline-offset: 2px; }
 .clearFilter { min-height: 44px; border: 1px solid var(--os-line-strong); background: transparent; padding: 0 11px; color: var(--os-text-primary); font: .64rem var(--font-geist-mono), monospace; cursor: pointer; }
 .clearFilter:disabled { color: var(--os-text-muted); cursor: default; }
 .eventChips { display: flex; flex-wrap: wrap; gap: 6px; padding: 13px 18px 0; }
@@ -215,9 +221,9 @@
 .graphs { margin-top: 14px; border: 1px solid var(--os-line-strong); border-radius: var(--os-radius-md); background: var(--os-surface-base); overflow: hidden; }
 .graphsHeader { display: flex; align-items: end; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--os-line-strong); padding: 18px 20px; }
 .graphsHeader h2 { margin: 0; font: 800 1.5rem/1 var(--font-big-shoulders), sans-serif; text-transform: uppercase; }
-.graphsHeader p { margin: 7px 0 0; color: var(--os-text-secondary); font-size: .76rem; line-height: 1.45; }
+.graphsHeader p { margin: 7px 0 0; color: var(--os-text-secondary); font-size: .8rem; line-height: 1.45; }
 .rangeControls { display: flex; flex-wrap: wrap; justify-content: end; gap: 2px; }
-.rangeControls button { min-height: 44px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 7px 12px; color: var(--os-text-secondary); font: .66rem var(--font-geist-mono), monospace; cursor: pointer; }
+.rangeControls button { min-height: 44px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 7px 12px; color: var(--os-text-secondary); font: .75rem var(--font-geist-mono), monospace; cursor: pointer; }
 .rangeControls button:hover { color: var(--os-text-primary); background: var(--os-surface-raised); }
 .rangeControls button:focus-visible { outline: 2px solid var(--os-signal-caution); outline-offset: 2px; }
 .rangeControls button[aria-pressed="true"] { border-bottom-color: var(--os-signal-current); color: var(--os-text-primary); background: transparent; }
@@ -225,14 +231,20 @@
 .metricGraph { min-width: 0; background: #07101c; padding: 20px; }
 .metricGraph header, .metricGraph footer { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .metricGraph header > div { min-width: 0; }
-.metricGraph header span { display: block; margin-top: 6px; color: var(--os-text-secondary); font-size: .68rem; }
+.metricGraph header span { display: block; margin-top: 6px; color: var(--os-text-secondary); font-size: .75rem; }
 .metricGraph h3 { margin: 0; overflow: hidden; color: var(--os-text-primary); font-size: .92rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .metricGraphValue { display: grid; justify-items: end; gap: 4px; text-align: right; }
-.metricGraphValue strong { color: var(--metric-tone) !important; font: 750 1.2rem var(--font-geist-mono), monospace; }
-.metricGraphValue span { color: var(--os-text-secondary); font-size: .68rem; }
+.metricGraphValue { --metric-tone: var(--metric-current); }
+.metricGraphValue[data-metric="hrv"] { --metric-tone: var(--metric-hrv); }
+.metricGraphValue[data-metric="restingHeartRate"] { --metric-tone: var(--metric-resting-hr); }
+.metricGraphValue[data-metric="strain"] { --metric-tone: var(--metric-strain); }
+.metricGraphValue[data-metric="skinTemperature"] { --metric-tone: var(--metric-skin-temperature); }
+.metricGraphValue[data-metric="alcohol"] { --metric-tone: var(--metric-alcohol); }
+.metricGraphValue strong { color: var(--metric-tone); font: 750 1.2rem var(--font-geist-mono), monospace; }
+.metricGraphValue span { color: var(--os-text-secondary); font-size: .75rem; }
 .chartInteractive { position: relative; margin-top: 18px; outline: none; }
 .chartInteractive:focus-visible { box-shadow: 0 0 0 2px var(--os-signal-caution); }
-.metricGraphStats, .metricGraphDates { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--os-text-muted); font: .62rem var(--font-geist-mono), monospace; }
+.metricGraphStats, .metricGraphDates { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--os-text-muted); font: .75rem var(--font-geist-mono), monospace; }
 .metricGraphStats { margin-bottom: 8px; }
 .metricGraphSvg { display: block; width: 100%; height: 148px; overflow: visible; touch-action: pan-y; }
 .metricGraphSvg line { stroke: rgba(255,255,255,.12); stroke-width: .7; vector-effect: non-scaling-stroke; }
@@ -241,18 +253,35 @@
 .metricGraphSvg .chartBaseline { stroke: rgba(255,255,255,.28); stroke-dasharray: 3 3; }
 .metricGraphSvg .chartCursor { stroke: rgba(255,255,255,.25); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .metricGraphDates { margin-top: 10px; }
-.metricGraphDates strong { color: var(--os-text-primary); font-size: .66rem; }
+.metricGraphDates strong { color: var(--os-text-primary); font-size: .75rem; }
 .metricGraphEmpty { display: grid; min-height: 148px; place-items: center; margin-top: 12px; border-top: 1px dashed var(--os-line-subtle); border-bottom: 1px dashed var(--os-line-subtle); color: var(--os-text-secondary); font-size: .74rem; }
 .chartTooltip { position: absolute; z-index: 2; min-width: 8.5rem; transform: translate(-50%, -50%); border: 1px solid rgba(255,255,255,.12); background: #211a32; padding: 9px 10px; box-shadow: 0 2px 8px rgba(0,0,0,.28); pointer-events: none; }
 .chartTooltip span, .chartTooltip strong, .chartTooltip em { display: block; }
 .chartTooltip span { color: var(--os-text-secondary); font-size: .64rem; }
 .chartTooltip strong { margin-top: 5px; font: 700 .8rem var(--font-geist-mono), monospace; }
 .chartTooltip em { margin-top: 4px; color: var(--os-text-secondary); font-size: .62rem; font-style: normal; }
-.metricGraph footer { margin-top: 10px; color: var(--os-text-muted); font: .62rem var(--font-geist-mono), monospace; }
-.alcoholMiniChart { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 4px; min-height: 148px; margin-top: 18px; align-content: center; border-top: 1px solid var(--os-line-subtle); border-bottom: 1px solid var(--os-line-subtle); padding: 14px 2px; }
-.alcoholMiniDay { min-width: 6px; aspect-ratio: 1; border: 1px solid var(--os-line-subtle); background: #0a1421; }
-.alcoholMiniDay[data-logged="true"] { border-color: #ff9b62; background: #ff9b62; box-shadow: 0 0 8px rgb(255 155 98 / 25%); }
-.alcoholMiniDay:hover, .alcoholMiniDay:focus-visible { outline: 2px solid #ff9b62; outline-offset: 1px; }
+.metricGraph footer { margin-top: 10px; color: var(--os-text-muted); font: .75rem var(--font-geist-mono), monospace; }
+.alcoholMiniChart { display: grid; grid-auto-flow: column; grid-auto-columns: 44px; align-items: center; gap: 6px; min-height: 96px; margin-top: 18px; overflow-x: auto; border-top: 1px solid var(--os-line-subtle); border-bottom: 1px solid var(--os-line-subtle); padding: 14px 2px; outline: none; }
+.alcoholMiniChart[data-week="true"] { grid-template-columns: repeat(7, minmax(44px, 1fr)); grid-auto-flow: row; }
+.alcoholMiniChart:focus-visible { box-shadow: inset 0 0 0 2px var(--os-signal-caution); }
+.alcoholMiniDay { width: 44px; height: 44px; border: 1px solid var(--os-line-subtle); border-radius: 0; background: #0a1421; cursor: pointer; }
+.alcoholMiniDay[data-logged="true"] { border-color: var(--metric-alcohol); background: var(--metric-alcohol); box-shadow: 0 0 8px color-mix(in srgb, var(--metric-alcohol) 25%, transparent); }
+.alcoholMiniDay:hover, .alcoholMiniDay:focus-visible, .alcoholMiniDay[data-active="true"] { outline: 2px solid var(--metric-alcohol); outline-offset: 1px; }
+.alcoholMiniEmpty { grid-column: 1 / -1; color: var(--os-text-secondary); font-size: .75rem; }
+.metricGraph[data-alcohol-graph="true"] { grid-column: span 2; }
+.journalRail { display: grid; grid-template-columns: minmax(14rem, .8fr) minmax(0, 2.2fr); align-items: center; gap: 18px; border-top: 1px solid var(--os-line-strong); padding: 14px 20px; background: #07101c; }
+.journalRail h3 { margin: 0; color: var(--os-text-primary); font-size: .78rem; }
+.journalRail p { max-width: 58ch; margin: 4px 0 0; color: var(--os-text-secondary); font-size: .75rem; line-height: 1.4; }
+.journalRailPlot { position: relative; min-height: 44px; border-bottom: 1px solid var(--os-line-strong); }
+.journalRailPlot button { --event-tone: var(--metric-alcohol); position: absolute; bottom: -22px; width: 44px; height: 44px; border: 0; border-radius: 0; background: transparent; padding: 0; transform: translateX(-50%); cursor: pointer; }
+.journalRailPlot button::before { position: absolute; top: 16px; left: 16px; width: 12px; height: 12px; border: 2px solid var(--event-tone); background: var(--os-surface-base); content: ""; transform: rotate(45deg); }
+.journalRailPlot button[data-type="illness"] { --event-tone: var(--os-signal-caution); }
+.journalRailPlot button[data-type="travel"] { --event-tone: var(--metric-sleep); }
+.journalRailPlot button[data-type="stress"] { --event-tone: var(--metric-resting-hr); }
+.journalRailPlot button:hover::before, .journalRailPlot button:focus-visible::before, .journalRailPlot button[data-active="true"]::before { background: var(--event-tone); }
+.journalRailPlot button:focus-visible { outline: 2px solid var(--os-signal-caution); outline-offset: -8px; }
+.journalRailPlot button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+.journalRailEmpty { position: absolute; bottom: 9px; left: 0; color: var(--os-text-muted); font-size: .75rem; }
 .metricGraphPlaceholder { display: grid; min-height: 148px; place-items: center; align-content: center; gap: 6px; margin-top: 18px; border: 1px dashed var(--os-line-strong); background: color-mix(in srgb, var(--os-surface-raised) 55%, transparent); color: var(--os-text-muted); text-align: center; }
 .metricGraphPlaceholder span { color: var(--os-text-secondary); font: 700 .7rem var(--font-geist-mono), monospace; text-transform: uppercase; letter-spacing: .08em; }
 .metricGraphPlaceholder small { max-width: 18ch; font-size: .68rem; line-height: 1.35; }
@@ -291,9 +320,12 @@
 .detailChart { display: block; width: 100%; height: 280px; padding: 14px 16px 8px; }
 .detailAxis { stroke: var(--os-line-strong); stroke-width: .8; }
 .detailGrid { stroke: var(--os-line-subtle); stroke-width: .8; }
-.detailTick, .detailDateTick { fill: var(--os-text-muted); font: 10px var(--font-geist-mono), monospace; }
+.detailTick, .detailDateTick { fill: var(--os-text-muted); font: 12px var(--font-geist-mono), monospace; }
 .detailDateTick { fill: var(--os-text-secondary); }
 .detailBaseline { stroke: color-mix(in srgb, var(--domain-tone) 55%, var(--os-text-muted)); stroke-dasharray: 5 4; stroke-width: 1; }
+.detailRangeCorridor { fill: color-mix(in srgb, var(--domain-tone) 8%, transparent); stroke: color-mix(in srgb, var(--domain-tone) 20%, transparent); stroke-width: .7; vector-effect: non-scaling-stroke; }
+.detailRangeTether { stroke: var(--os-signal-caution); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.detailRangeBreach { fill: var(--domain-tone); stroke: var(--os-signal-caution); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .detailRawPath { fill: none; stroke: color-mix(in srgb, var(--domain-tone) 42%, var(--os-text-secondary)); stroke-width: 1.1; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
 .detailSmoothPath { fill: none; stroke: var(--domain-tone); stroke-width: 2.4; vector-effect: non-scaling-stroke; }
 .detailRawPoint { fill: var(--os-surface-base); stroke: color-mix(in srgb, var(--domain-tone) 70%, var(--os-text-secondary)); stroke-width: 1.2; }
@@ -327,6 +359,7 @@
 @media (max-width: 1040px) {
   .primary { grid-template-columns: minmax(0, 1.55fr) minmax(17rem, .85fr); }
   .graphsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metricGraph[data-alcohol-graph="true"] { grid-column: span 2; }
   .trajectoryHero { grid-template-columns: 1fr; }
   .heroFacts { border-top: 1px solid var(--os-line-strong); border-left: 0; }
   .domainGrid, .relationshipGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -369,6 +402,8 @@
   .graphsHeader { align-items: stretch; flex-direction: column; gap: 14px; padding: 16px; }
   .rangeControls { justify-content: start; }
   .graphsGrid { grid-template-columns: 1fr; }
+  .metricGraph[data-alcohol-graph="true"] { grid-column: auto; }
+  .journalRail { grid-template-columns: 1fr; }
   .metricGraph { padding-inline: 16px; }
   .domainTabs { grid-template-columns: repeat(2, 1fr); }
   .domainTabs button, .domainTabs button:nth-child(4) { border-right: 1px solid var(--os-line-subtle); border-top: 1px solid var(--os-line-subtle); }

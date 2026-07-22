@@ -8,6 +8,7 @@ import {
   normalizeWhoopTimestamp,
   parseCsv,
   readWhoopExportBuffer,
+  stableJournalAnswerId,
 } from "@/lib/whoop-export/importer";
 
 const cycleCsv = [
@@ -86,4 +87,19 @@ test("readWhoopExportBuffer fails clearly when a required CSV is missing", async
     readWhoopExportBuffer(await makeWhoopZip({ "sleeps.csv": null }), "missing.zip"),
     /missing sleeps\.csv/,
   );
+});
+
+test("journal IDs are stable across overlapping exports and duplicate answers collapse", () => {
+  const row = {
+    "Cycle start time": "2026-07-17 00:00:00",
+    "Cycle end time": "2026-07-18 00:00:00",
+    "Cycle timezone": "UTC-04:00",
+    "Question text": "Have any alcoholic drinks?",
+    "Answered yes": "true",
+  };
+  const first = normalizeWhoopArchive({ fingerprint: "first", sourceName: "first.zip", cycles: [], sleeps: [], workouts: [], journals: [row, { ...row, "Question text": " Have any alcoholic   drinks? " }] });
+  const second = normalizeWhoopArchive({ fingerprint: "second", sourceName: "second.zip", cycles: [], sleeps: [], workouts: [], journals: [row] });
+  assert.equal(first.journals.length, 1);
+  assert.equal(first.journals[0][0], second.journals[0][0]);
+  assert.equal(first.journals[0][0], stableJournalAnswerId("2026-07-17T04:00:00.000Z", row["Question text"]));
 });

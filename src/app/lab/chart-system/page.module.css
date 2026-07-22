@@ -1,0 +1,25 @@
+.page { min-height: 100vh; background: var(--os-canvas); padding: 32px; color: var(--os-text-primary); }
+:global(nextjs-portal) { display: none !important; }
+.header { max-width: 72rem; margin: 0 auto 24px; border-bottom: 1px solid var(--os-line-strong); padding-bottom: 16px; }
+.header h1 { margin: 0; font: 800 2rem/1 var(--font-big-shoulders), sans-serif; text-transform: uppercase; }
+.header p { max-width: 68ch; margin: 8px 0 0; color: var(--os-text-secondary); font-size: .85rem; line-height: 1.5; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 72rem; margin: 0 auto; border: 1px solid var(--os-line-strong); background: var(--os-line-subtle); gap: 1px; }
+.fixture { min-width: 0; background: var(--os-surface-base); padding: 20px; }
+.fixture > header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.fixture h2 { margin: 0; font-size: 1rem; }
+.fixture header p { margin: 4px 0 0; color: var(--os-text-secondary); font-size: .75rem; }
+.fixture header strong { color: var(--os-text-primary); font: 750 1rem var(--font-geist-mono), monospace; }
+.empty > div { display: grid; min-height: 182px; place-items: center; border-block: 1px dashed var(--os-line-subtle); color: var(--os-text-secondary); font-size: .8rem; }
+.source ol { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 20px 0 0; padding: 0; list-style: none; }
+.source li { min-height: 44px; border: 1px solid var(--os-line-subtle); padding: 13px 4px; color: var(--metric-alcohol); font: .7rem var(--font-geist-mono), monospace; text-align: center; }
+.source > p { margin: 16px 0 0; color: var(--os-text-secondary); font-size: .75rem; line-height: 1.5; }
+.coverageStates { display: grid; gap: 1px; margin: 16px 0 0; background: var(--os-line-subtle); }
+.coverageStates div { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.3fr); gap: 10px; background: var(--os-surface-base); padding: 9px 10px; }
+.coverageStates dt { color: var(--os-text-muted); font: .75rem var(--font-geist-mono), monospace; }
+.coverageStates dd { margin: 0; color: var(--os-text-secondary); font-size: .75rem; }
+
+@media (max-width: 760px) {
+  .page { padding: 20px 12px; }
+  .grid { grid-template-columns: 1fr; }
+  .fixture { padding: 16px; }
+}

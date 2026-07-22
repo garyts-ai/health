@@ -47,9 +47,10 @@ function fixture(): NormalizedWhoopExport {
 
 test("Postgres import batches all datasets and records metadata last", () => {
   const queries = buildPostgresImportQueries(fixture());
-  assert.equal(queries.length, 5);
+  assert.equal(queries.length, 6);
   assert.match(queries[0].text, /ON CONFLICT \("cycle_start"\) DO UPDATE/);
-  assert.match(queries[3].text, /whoop_export_journal_answers/);
+  assert.match(queries[3].text, /DELETE FROM "whoop_export_journal_answers"/);
+  assert.match(queries[4].text, /whoop_export_journal_answers/);
   assert.match(queries.at(-1)?.text ?? "", /INSERT INTO whoop_export_imports/);
   assert.deepEqual(queries.at(-1)?.params.slice(0, 2), ["fingerprint", "export.zip"]);
 });

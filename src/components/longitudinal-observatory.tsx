@@ -10,6 +10,7 @@ import {
 
 import type { LongitudinalHealthView } from "@/lib/longitudinal/types";
 import { alcoholHeatmapDays } from "@/lib/longitudinal/alcohol-log";
+import { TimeSeriesChart, buildTimeSeriesGeometry, downsampleTimeSeries, filterTimeSeriesRange, nearestTimeSeriesPoint, visiblePointDates, type TimeSeriesMetricIdentity, type TimeSeriesPersonalRange, type TimeSeriesPoint } from "@/components/training-os";
 
 import styles from "./longitudinal-observatory.module.css";
 
@@ -82,6 +83,21 @@ function strings(value: unknown): string[] {
 
 function records(value: unknown): UnknownRecord[] {
   return Array.isArray(value) ? value.map(record) : [];
+}
+
+function timeSeriesPoint(value: unknown): TimeSeriesPoint {
+  const point = record(value);
+  const range = record(point.personalRange);
+  const center = number(range.center);
+  const lower = number(range.lower);
+  const upper = number(range.upper);
+  const sampleCount = number(range.sampleCount);
+  const robustZScore = number(range.robustZScore);
+  const status = text(range.status);
+  const personalRange: TimeSeriesPersonalRange | undefined = center !== null && lower !== null && upper !== null && sampleCount !== null && robustZScore !== null && (status === "within" || status === "above" || status === "below")
+    ? { center, lower, upper, sampleCount, robustZScore, status }
+    : undefined;
+  return { date: text(point.date), value: number(point.value), ...(personalRange ? { personalRange } : {}) };
 }
 
 function direction(value: unknown): Direction {
@@ -189,21 +205,13 @@ const CHART_RANGES: Array<{ key: ChartRange; label: string; days: number | null 
   { key: "all", label: "All time", days: null },
 ];
 
-const CHART_RANGE_STORAGE_KEY = "healthmax:whoop-chart-range:v2";
-
 function shiftDate(date: string, days: number) {
   const value = new Date(`${date}T12:00:00.000Z`);
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
 
-type GraphPoint = { date: string; value: number; x: number; y: number; originalIndex: number };
-type GraphSeries = { key: string; label: string; unit: string; tone: "green" | "violet" | "cyan" | "coral" | "amber" | "rose"; baseline: number | null; values: Array<{ date: string; value: number | null }> };
-
-const GRAPH_TONES = {
-  green: { line: "#78e08f", fill: "#78e08f" }, violet: { line: "#8e80e8", fill: "#8e80e8" }, cyan: { line: "#35cfc0", fill: "#35cfc0" },
-  coral: { line: "#ef8069", fill: "#ef8069" }, amber: { line: "#d9a93f", fill: "#d9a93f" }, rose: { line: "#d77f98", fill: "#d77f98" },
-};
+type GraphSeries = { key: string; label: string; unit: string; metric: TimeSeriesMetricIdentity; baseline: number | null; values: TimeSeriesPoint[] };
 
 function graphDate(value: string | null) {
   return value ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`)) : "—";
@@ -219,75 +227,30 @@ function graphDirection(baseline: number | null, average: number | null) {
   return average > baseline ? "Above full-period baseline" : "Below full-period baseline";
 }
 
-function graphGeometry(values: Array<{ date: string; value: number | null }>, baseline: number | null) {
-  const present = values.map((point, index) => ({ ...point, originalIndex: index })).filter((point): point is { date: string; value: number; originalIndex: number } => point.value !== null && Number.isFinite(point.value));
-  const domain = baseline === null ? present.map((point) => point.value) : [...present.map((point) => point.value), baseline];
-  const min = domain.length ? Math.min(...domain) : 0;
-  const max = domain.length ? Math.max(...domain) : 1;
-  const span = max - min || 1;
-  const coordinates: GraphPoint[] = present.map((point) => ({ date: point.date, value: point.value, originalIndex: point.originalIndex, x: values.length <= 1 ? 50 : (point.originalIndex / (values.length - 1)) * 100, y: 88 - ((point.value - min) / span) * 72 }));
-  const coordinateByIndex = new Map(coordinates.map((point) => [point.originalIndex, point]));
-  const segments: GraphPoint[][] = [];
-  let current: GraphPoint[] = [];
-  values.forEach((point, index) => {
-    const coordinate = point.value === null ? undefined : coordinateByIndex.get(index);
-    if (!coordinate) { if (current.length) segments.push(current); current = []; return; }
-    current.push(coordinate);
-  });
-  if (current.length) segments.push(current);
-  return { present, coordinates, segments, latest: coordinates.at(-1), baselineY: baseline === null ? null : 88 - ((baseline - min) / span) * 72, min, max };
-}
-
 function rangeValues(series: GraphSeries, range: ChartRange, selectedDate: string) {
-  const days = CHART_RANGES.find((item) => item.key === range)?.days;
-  if (days === null || days === undefined) return series.values;
-  const start = shiftDate(selectedDate, -(days - 1));
-  return series.values.filter((point) => point.date >= start && point.date <= selectedDate);
+  return filterTimeSeriesRange(series.values, range, selectedDate);
 }
 
-function MetricGraph({ series, range, rangeLabel, selectedDate }: { series: GraphSeries; range: ChartRange; rangeLabel: string; selectedDate: string }) {
+function MetricGraph({ series, range, rangeLabel, selectedDate, activeDate, pinnedDate, onActiveDateChange, onPinnedDateChange }: { series: GraphSeries; range: ChartRange; rangeLabel: string; selectedDate: string; activeDate: string | null; pinnedDate: string | null; onActiveDateChange: (date: string) => void; onPinnedDateChange: (date: string | null) => void }) {
   const values = rangeValues(series, range, selectedDate);
   const summaryValues = values.map((point) => point.value).filter((value): value is number => value !== null && Number.isFinite(value));
   const average = summaryValues.length ? summaryValues.reduce((sum, value) => sum + value, 0) / summaryValues.length : null;
-  const geometry = graphGeometry(values, series.baseline);
-  const tone = GRAPH_TONES[series.tone];
-  const gradientId = `metric-graph-${series.key}`;
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const [activePoint, setActivePoint] = useState<GraphPoint | null>(null);
-  const nearestPoint = (x: number) => geometry.coordinates.reduce<GraphPoint | null>((best, point) => !best || Math.abs(point.x - x) < Math.abs(best.x - x) ? point : best, null);
-  const setNearest = (clientX: number) => {
-    const bounds = svgRef.current?.getBoundingClientRect();
-    if (!bounds || !geometry.coordinates.length) return;
-    setActivePoint(nearestPoint(Math.max(0, Math.min(100, ((clientX - bounds.left) / bounds.width) * 100))));
-  };
-  const latest = geometry.latest ?? null;
+  const present = values.filter((point): point is TimeSeriesPoint & { value: number } => point.value !== null && Number.isFinite(point.value));
+  const latest = present.at(-1) ?? null;
+  const active = present.find((point) => point.date === activeDate) ?? latest;
+  const outOfRange = active?.personalRange?.status === "above" || active?.personalRange?.status === "below";
 
   return (
     <article className={styles.metricGraph}>
       <header>
-        <div><h3>{series.label}</h3><span>{geometry.present.length} observation{geometry.present.length === 1 ? "" : "s"}</span></div>
-        <div className={styles.metricGraphValue} style={{ "--metric-tone": tone.line } as CSSProperties}><strong>{graphValue(latest?.value ?? null, series.unit)}</strong><span>{graphDirection(series.baseline, average)}</span></div>
+        <div><h3>{series.label}</h3><span>{present.length} observation{present.length === 1 ? "" : "s"}</span></div>
+        <div className={styles.metricGraphValue} data-metric={series.metric}><strong>{graphValue(active?.value ?? latest?.value ?? null, series.unit)}</strong><span>{outOfRange ? "Outside personal range" : graphDirection(series.baseline, average)}</span></div>
       </header>
-      {geometry.present.length < 2 ? <div className={styles.metricGraphEmpty}>No observations in {rangeLabel}</div> : (
-        <div className={styles.chartInteractive} tabIndex={0} role="group" aria-label={`${series.label} trend for ${rangeLabel}. Use left and right arrow keys to inspect points.`} onBlur={() => setActivePoint(null)} onKeyDown={(event) => {
-          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-          event.preventDefault();
-          const currentIndex = activePoint ? geometry.coordinates.findIndex((point) => point.originalIndex === activePoint.originalIndex) : geometry.coordinates.length - 1;
-          const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? geometry.coordinates.length - 1 : Math.max(0, Math.min(geometry.coordinates.length - 1, currentIndex + (event.key === "ArrowLeft" ? -1 : 1)));
-          setActivePoint(geometry.coordinates[nextIndex] ?? null);
-        }}>
-          <div className={styles.metricGraphStats}><span>max {graphValue(geometry.max, series.unit)}</span><span>avg {graphValue(average, series.unit)}</span><span>min {graphValue(geometry.min, series.unit)}</span></div>
-          <svg ref={svgRef} className={styles.metricGraphSvg} viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${series.label} ${rangeLabel} graph. Latest ${graphValue(latest?.value ?? null, series.unit)}.`} onPointerMove={(event) => setNearest(event.clientX)} onPointerDown={(event) => setNearest(event.clientX)} onPointerLeave={() => setActivePoint(null)}>
-            <defs><linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={tone.fill} stopOpacity=".28" /><stop offset="100%" stopColor={tone.fill} stopOpacity="0" /></linearGradient></defs>
-            <line x1="0" y1="88" x2="100" y2="88" /><line x1="0" y1="52" x2="100" y2="52" /><line x1="0" y1="16" x2="100" y2="16" />
-            {geometry.baselineY !== null ? <line className={styles.chartBaseline} x1="0" y1={geometry.baselineY} x2="100" y2={geometry.baselineY} /> : null}
-            {geometry.segments.map((segment, index) => { const points = segment.map((point) => `${point.x},${point.y}`).join(" "); const first = segment[0]; const last = segment.at(-1); if (!first || !last) return null; return <g key={`${series.key}-${index}`}><polygon points={`${first.x},92 ${points} ${last.x},92`} fill={`url(#${gradientId})`} /><polyline points={points} fill="none" stroke={tone.line} /></g>; })}
-            {latest && !activePoint ? <circle cx={latest.x} cy={latest.y} r="2.4" fill={tone.line} /> : null}
-            {activePoint ? <><line className={styles.chartCursor} x1={activePoint.x} y1="12" x2={activePoint.x} y2="92" /><circle cx={activePoint.x} cy={activePoint.y} r="3" fill={tone.line} stroke="#10131b" strokeWidth="1.4" /></> : null}
-            {geometry.coordinates.map((point) => <circle key={`${point.date}-${point.originalIndex}`} cx={point.x} cy={point.y} r="5" fill="transparent" onPointerEnter={() => setActivePoint(point)} />)}
-          </svg>
-          {activePoint ? <div className={styles.chartTooltip} style={{ left: `${Math.min(78, Math.max(22, activePoint.x))}%`, top: `${Math.min(78, Math.max(8, activePoint.y - 22))}%` }}><span>{graphDate(activePoint.date)}</span><strong style={{ color: tone.line }}>{graphValue(activePoint.value, series.unit)}</strong><em>{graphValue(activePoint.value - (series.baseline ?? activePoint.value), series.unit)} vs baseline</em></div> : null}
-          <div className={styles.metricGraphDates}><span>{graphDate(geometry.coordinates[0]?.date ?? null)}</span><strong>{activePoint ? `${graphDate(activePoint.date)} ${graphValue(activePoint.value, series.unit)}` : latest ? `Latest ${graphDate(latest.date)} ${graphValue(latest.value, series.unit)}` : "Select a point"}</strong><span>{graphDate(geometry.coordinates.at(-1)?.date ?? null)}</span></div>
+      {present.length < 2 ? <div className={styles.metricGraphEmpty}>No observations in {rangeLabel}</div> : (
+        <div className={styles.chartInteractive}>
+          <div className={styles.metricGraphStats}><span>max {graphValue(Math.max(...summaryValues), series.unit)}</span><span>avg {graphValue(average, series.unit)}</span><span>min {graphValue(Math.min(...summaryValues), series.unit)}</span></div>
+          <TimeSeriesChart metric={series.metric} label={series.label} unit={series.unit} points={values} baseline={series.baseline} presentation="area-line" range={range} activeDate={activeDate} pinnedDate={pinnedDate} showTooltip={Boolean(pinnedDate || (activeDate && activeDate !== selectedDate))} formatValue={(value) => graphValue(value, series.unit)} onActiveDateChange={onActiveDateChange} onPinnedDateChange={onPinnedDateChange} />
+          <div className={styles.metricGraphDates}><span>{graphDate(present[0]?.date ?? null)}</span><strong>{active ? `${graphDate(active.date)} ${graphValue(active.value, series.unit)}` : "Select a point"}</strong><span>{graphDate(latest?.date ?? null)}</span></div>
         </div>
       )}
       <footer><span>baseline {graphValue(series.baseline, series.unit)}</span><span>range avg {graphValue(average, series.unit)}</span></footer>
@@ -295,20 +258,43 @@ function MetricGraph({ series, range, rangeLabel, selectedDate }: { series: Grap
   );
 }
 
-function AlcoholLogGraph({ view, range }: { view: LongitudinalHealthView; range: ChartRange }) {
+function AlcoholLogGraph({ view, range, activeDate, pinnedDate, onActiveDateChange, onPinnedDateChange }: { view: LongitudinalHealthView; range: ChartRange; activeDate: string | null; pinnedDate: string | null; onActiveDateChange: (date: string) => void; onPinnedDateChange: (date: string | null) => void }) {
   const entries = view.alcoholLog?.entries ?? [];
+  const logMeta = record(view.alcoholLog);
+  const coverage = record(logMeta.coverage);
+  const sourceAvailable = typeof logMeta.sourceAvailable === "boolean" ? logMeta.sourceAvailable : typeof coverage.sourceAvailable === "boolean" ? coverage.sourceAvailable : Boolean(view.alcoholLog);
+  const coverageEnd = text(logMeta.coverageEnd, text(coverage.coverageEnd, text(coverage.endDate)));
+  const latestImport = text(logMeta.latestImportAt, text(logMeta.latestImport, text(coverage.latestImportAt)));
+  const rawCount = number(logMeta.rawCount) ?? number(coverage.rawCount) ?? number(coverage.rawAnswerCount);
+  const deduplicatedCount = number(logMeta.deduplicatedCount) ?? number(coverage.deduplicatedCount) ?? number(coverage.deduplicatedAnswerCount);
   const allDays = view.alcoholLog?.heatmapDays ?? alcoholHeatmapDays(view.selectedDate, entries);
   const daysToShow = range === "week" ? 7 : range === "30d" ? 30 : range === "3m" ? 90 : range === "1y" ? 365 : Math.max(365, allDays.length);
   const days = allDays.slice(-daysToShow);
+  const renderedDays = range === "week" ? days : days.filter((day) => day.hasAlcoholEntry).slice(-120);
   const logged = days.filter((day) => day.hasAlcoholEntry).reduce((sum, day) => sum + day.entryCount, 0);
   const latest = [...days].reverse().find((day) => day.hasAlcoholEntry)?.date ?? null;
+  const coverageCopy = !sourceAvailable
+    ? "WHOOP journal export required"
+    : coverageEnd && coverageEnd < view.selectedDate
+      ? `Journal data through ${graphDate(coverageEnd)}`
+      : logged === 0
+        ? "No recorded alcohol in this range"
+        : latest ? `Latest ${graphDate(latest)}` : "Recorded journal data available";
   return <article className={styles.metricGraph} data-alcohol-graph="true">
-    <header><div><h3>Alcohol log</h3><span>Explicit journal dates</span></div><div className={styles.metricGraphValue} style={{ "--metric-tone": "#ff9b62" } as CSSProperties}><strong>{logged} {logged === 1 ? "entry" : "entries"}</strong><span>{latest ? `Latest ${graphDate(latest)}` : "No entries"}</span></div></header>
-    <div className={styles.alcoholMiniChart} role="img" aria-label={`Alcohol log for ${range === "all" ? "all available history" : rangeLabelFor(range)}. ${logged} entries${latest ? `, latest ${graphDate(latest)}` : "."}`}>
-      {days.map((day) => <span key={day.date} className={styles.alcoholMiniDay} data-logged={day.hasAlcoholEntry} title={`${graphDate(day.date)}${day.hasAlcoholEntry ? ` · ${day.entryCount} ${day.entryCount === 1 ? "entry" : "entries"}` : " · No alcohol entry"}`} />)}
+    <header><div><h3>Alcohol log</h3><span>Explicit journal dates</span></div><div className={styles.metricGraphValue} data-metric="alcohol"><strong>{logged} {logged === 1 ? "entry" : "entries"}</strong><span>{coverageCopy}</span></div></header>
+    <div className={styles.alcoholMiniChart} data-week={range === "week"} role="group" tabIndex={0} aria-label={`Alcohol log for ${range === "all" ? "all available history" : rangeLabelFor(range)}. ${logged} entries${latest ? `, latest ${graphDate(latest)}` : "."} Use arrow keys to inspect, Enter to pin, and Escape to return to latest.`} onKeyDown={(event) => {
+      if (!renderedDays.length || !["ArrowLeft", "ArrowRight", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === "Escape") { const date = renderedDays.at(-1)!.date; onPinnedDateChange(null); onActiveDateChange(date); return; }
+      if (event.key === "Enter") { if (activeDate) onPinnedDateChange(activeDate); return; }
+      const current = Math.max(0, renderedDays.findIndex((day) => day.date === activeDate));
+      const index = event.key === "Home" ? 0 : event.key === "End" ? renderedDays.length - 1 : Math.max(0, Math.min(renderedDays.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1)));
+      onActiveDateChange(renderedDays[index].date);
+    }}>
+      {renderedDays.length ? renderedDays.map((day) => <button key={day.date} type="button" className={styles.alcoholMiniDay} data-logged={day.hasAlcoholEntry} data-active={day.date === activeDate} aria-pressed={day.date === pinnedDate} aria-label={`${graphDate(day.date)}${day.hasAlcoholEntry ? `, ${day.entryCount} ${day.entryCount === 1 ? "entry" : "entries"}` : ", no alcohol entry"}`} title={`${graphDate(day.date)}${day.hasAlcoholEntry ? ` · ${day.entryCount} ${day.entryCount === 1 ? "entry" : "entries"}` : " · No alcohol entry"}`} onPointerEnter={() => onActiveDateChange(day.date)} onClick={() => { onActiveDateChange(day.date); onPinnedDateChange(day.date); }} />) : <span className={styles.alcoholMiniEmpty}>{coverageCopy}</span>}
     </div>
-    <div className={styles.metricGraphDates}><span>{graphDate(days[0]?.date ?? null)}</span><strong>{logged ? `${logged} logged` : "No entries recorded"}</strong><span>{graphDate(days.at(-1)?.date ?? null)}</span></div>
-    <footer><span>Warm amber marks logged days</span><span>Tracking only</span></footer>
+    <div className={styles.metricGraphDates}><span>{graphDate(days[0]?.date ?? null)}</span><strong>{coverageCopy}</strong><span>{graphDate(days.at(-1)?.date ?? null)}</span></div>
+    <footer><span>{rawCount !== null && deduplicatedCount !== null ? `${deduplicatedCount} unique of ${rawCount} imported answers` : "Warm orange marks logged days"}</span><span>{latestImport ? `Imported ${graphDate(latestImport.slice(0, 10))}` : "Tracking only"}</span></footer>
   </article>;
 }
 
@@ -316,33 +302,41 @@ function rangeLabelFor(range: ChartRange) {
   return CHART_RANGES.find((item) => item.key === range)?.label ?? "selected period";
 }
 
-function PlaceholderGraph() {
-  return <article className={styles.metricGraph} data-placeholder-graph="true">
-    <header><div><h3>Open visualization slot</h3><span>Reserved for the next log</span></div><div className={styles.metricGraphValue}><strong>—</strong><span>Not selected</span></div></header>
-    <div className={styles.metricGraphPlaceholder} role="img" aria-label="Placeholder for a future visualization."><span>Placeholder</span><small>Choose the next log or data view</small></div>
-    <div className={styles.metricGraphDates}><span>—</span><strong>Awaiting selection</strong><span>—</span></div>
-    <footer><span>Intentional empty slot</span><span>Observation only</span></footer>
-  </article>;
+function JournalEventRail({ events, startDate, endDate, activeDate, onSelect }: { events: NonNullable<LongitudinalHealthView["journalEvents"]>; startDate: string; endDate: string; activeDate: string | null; onSelect: (date: string) => void }) {
+  const start = Date.parse(`${startDate}T12:00:00Z`);
+  const end = Date.parse(`${endDate}T12:00:00Z`);
+  const span = Math.max(86_400_000, end - start);
+  const visible = events.filter((event) => event.physiologicalDate >= startDate && event.physiologicalDate <= endDate);
+  return <section className={styles.journalRail} aria-labelledby="journal-event-rail-title">
+    <div><h3 id="journal-event-rail-title">Recorded events</h3><p>Journal records are separate from physiological deviations and do not establish what caused a change.</p></div>
+    <div className={styles.journalRailPlot} role="group" aria-label={`${visible.length} journal events in the chart window`}>
+      {visible.length ? visible.map((event) => {
+        const position = ((Date.parse(`${event.physiologicalDate}T12:00:00Z`) - start) / span) * 100;
+        return <button key={event.id} type="button" data-type={event.type} data-active={event.physiologicalDate === activeDate} style={{ left: `${Math.max(0, Math.min(100, position))}%` }} onClick={() => onSelect(event.physiologicalDate)} title={`${event.label} · ${graphDate(event.physiologicalDate)} · recorded event`}><span>{event.label}</span></button>;
+      }) : <span className={styles.journalRailEmpty}>No recorded journal events in this range</span>}
+    </div>
+  </section>;
 }
 
 function MetricGraphs({ view }: { view: LongitudinalHealthView }) {
-  const [range, setRange] = useState<ChartRange>(() => {
-    if (typeof window === "undefined") return "week";
-    const stored = window.localStorage.getItem(CHART_RANGE_STORAGE_KEY) as ChartRange | null;
-    return stored && CHART_RANGES.some((item) => item.key === stored) ? stored : "week";
-  });
+  const [range, setRange] = useState<ChartRange>("week");
+  const [activeDate, setActiveDate] = useState<string | null>(view.selectedDate);
+  const [pinnedDate, setPinnedDate] = useState<string | null>(null);
   const updateRange = (next: ChartRange) => {
     setRange(next);
-    window.localStorage.setItem(CHART_RANGE_STORAGE_KEY, next);
+    setPinnedDate(null);
+    setActiveDate(view.selectedDate);
   };
   const rangeLabel = CHART_RANGES.find((item) => item.key === range)?.label ?? "Week";
   const metricsById = new Map(Object.values(view.domains).flatMap((domain) => domain.metrics.map((metric) => [metric.id, metric] as const)));
   const series = [
-    ["recovery", "Recovery", "%", "green"], ["sleep_duration", "Sleep", "h", "violet"], ["hrv", "HRV", "ms", "cyan"],
-    ["resting_heart_rate", "Resting HR", "bpm", "coral"], ["day_strain", "Strain", "", "amber"], ["skin_temperature", "Skin temp", "°C", "rose"],
-  ].map(([key, label, unit, tone]) => { const metric = metricsById.get(key); return metric ? { key, label, unit, tone: tone as GraphSeries["tone"], baseline: metric.baselineValue, values: metric.points } : null; }).filter((item): item is GraphSeries => Boolean(item));
+    ["recovery", "Recovery", "%", "recovery"], ["sleep_duration", "Sleep", "h", "sleep"], ["hrv", "HRV", "ms", "hrv"],
+    ["resting_heart_rate", "Resting HR", "bpm", "restingHeartRate"], ["day_strain", "Strain", "", "strain"], ["skin_temperature", "Skin temp", "°C", "skinTemperature"],
+  ].map(([key, label, unit, metricIdentity]) => { const metric = metricsById.get(key); return metric ? { key, label, unit, metric: metricIdentity as TimeSeriesMetricIdentity, baseline: metric.baselineValue, values: metric.points as TimeSeriesPoint[] } : null; }).filter((item): item is GraphSeries => Boolean(item));
   const productionSeries = series.filter((item) => item.key !== "recovery" && item.key !== "sleep_duration");
   const visibleCount = productionSeries[0] ? rangeValues(productionSeries[0], range, view.selectedDate).filter((point) => point.value !== null).length : 0;
+  const rangeDays = CHART_RANGES.find((item) => item.key === range)?.days;
+  const rangeStart = rangeDays ? shiftDate(view.selectedDate, -(rangeDays - 1)) : productionSeries.flatMap((item) => item.values).map((point) => point.date).sort()[0] ?? view.selectedDate;
 
   return (
     <section className={`hud-frame ${styles.graphs}`} aria-labelledby="longitudinal-graphs-title">
@@ -356,10 +350,10 @@ function MetricGraphs({ view }: { view: LongitudinalHealthView }) {
         </div>
       </header>
       <div className={styles.graphsGrid}>
-        {productionSeries.map((item) => <MetricGraph key={item.key} series={item} range={range} rangeLabel={rangeLabel} selectedDate={view.selectedDate} />)}
-        <AlcoholLogGraph view={view} range={range} />
-        <PlaceholderGraph />
+        {productionSeries.map((item) => <MetricGraph key={item.key} series={item} range={range} rangeLabel={rangeLabel} selectedDate={view.selectedDate} activeDate={activeDate} pinnedDate={pinnedDate} onActiveDateChange={setActiveDate} onPinnedDateChange={(date) => { setPinnedDate(date); if (date) setActiveDate(date); }} />)}
+        <AlcoholLogGraph view={view} range={range} activeDate={activeDate} pinnedDate={pinnedDate} onActiveDateChange={setActiveDate} onPinnedDateChange={(date) => { setPinnedDate(date); if (date) setActiveDate(date); }} />
       </div>
+      <JournalEventRail events={view.journalEvents ?? []} startDate={rangeStart} endDate={view.selectedDate} activeDate={activeDate} onSelect={(date) => { setActiveDate(date); setPinnedDate(date); }} />
     </section>
   );
 }
@@ -472,64 +466,74 @@ function TrajectoryHorizon({ domains, selectedKey, windowDays }: { domains: Doma
 }
 
 function MetricChart({ domain, showRaw, showSmoothed, showBaseline, showEvents, events }: { domain: DomainModel; showRaw: boolean; showSmoothed: boolean; showBaseline: boolean; showEvents: boolean; events: NonNullable<LongitudinalHealthView["journalEvents"]> }) {
-  const source = records(domain.metric ? domain.metric.points : []).map((point) => ({ date: text(point.date), value: number(point.value) }));
+  const source = records(domain.metric ? domain.metric.points : []).map(timeSeriesPoint);
   const endDate = text(domain.metric?.endDate, source.at(-1)?.date);
   const windowDays = number(domain.metric?.windowDays) ?? 90;
   const startDate = endDate ? shiftDate(endDate, -(windowDays - 1)) : source[0]?.date ?? "";
-  const points = source.filter((point) => point.date >= startDate && (!endDate || point.date <= endDate));
-  const values = points.map((point) => point.value).filter((value): value is number => value !== null);
+  const windowPoints = source.filter((point) => point.date >= startDate && (!endDate || point.date <= endDate));
+  const sourceValues = windowPoints.map((point) => point.value).filter((value): value is number => value !== null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  if (values.length < 2) return <div className={styles.comparison} aria-label={`${domain.label} comparison`}><span>Long-term baseline</span><div><i /><b style={{ insetInlineStart: `${50 + (domain.direction === "improving" ? 1 : domain.direction === "weakening" ? -1 : 0) * ((domain.magnitude ?? 0) / 2)}%` }} /></div><strong>{domain.magnitude === null ? "Magnitude not established" : `${Math.round(domain.magnitude)}% measured displacement`}</strong></div>;
+  if (sourceValues.length < 2) return <div className={styles.comparison} aria-label={`${domain.label} comparison`}><span>Long-term baseline</span><div><i /><b style={{ insetInlineStart: `${50 + (domain.direction === "improving" ? 1 : domain.direction === "weakening" ? -1 : 0) * ((domain.magnitude ?? 0) / 2)}%` }} /></div><strong>{domain.magnitude === null ? "Magnitude not established" : `${Math.round(domain.magnitude)}% measured displacement`}</strong></div>;
   const width = 760;
   const height = 270;
   const left = 58;
   const right = 16;
   const top = 18;
   const bottom = 48;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
   const unit = text(domain.metric?.unit);
   const baseline = number(domain.metric?.baselineValue);
-  const minValue = Math.min(...values, ...(baseline === null ? [] : [baseline]));
-  const maxValue = Math.max(...values, ...(baseline === null ? [] : [baseline]));
-  const pad = Math.max((maxValue - minValue) * .12, unit === "lb" ? .5 : .2);
-  const min = minValue - pad;
-  const max = maxValue + pad;
+  const geometry = buildTimeSeriesGeometry(windowPoints, { baseline, left, right: width - right, top, bottom: height - bottom });
+  const points = geometry.points;
+  const values = geometry.coordinates.map((point) => point.value);
+  const min = geometry.min;
+  const max = geometry.max;
   const span = max - min || 1;
-  const xFor = (index: number) => left + (points.length <= 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
-  const yFor = (value: number) => top + (1 - (value - min) / span) * plotHeight;
-  const present = points.map((point, index) => ({ ...point, index })).filter((point): point is { date: string; value: number; index: number } => point.value !== null);
+  const xForDate = geometry.xForDate;
+  const xFor = (index: number) => xForDate(points[index]?.date ?? points[0]?.date);
+  const yFor = geometry.yForValue;
+  const present = geometry.coordinates.map((point) => ({ ...point, index: point.originalIndex }));
   const pathFor = (series: Array<{ date: string; value: number | null }>) => {
     const segments: string[] = [];
     let path = "";
-    series.forEach((point, index) => {
+    series.forEach((point) => {
       if (point.value === null) { if (path) segments.push(path); path = ""; return; }
-      path += `${path ? " L" : "M"} ${xFor(index).toFixed(1)} ${yFor(point.value).toFixed(1)}`;
+      path += `${path ? " L" : "M"} ${xForDate(point.date).toFixed(1)} ${yFor(point.value).toFixed(1)}`;
     });
     if (path) segments.push(path);
     return segments;
   };
   const smoothed = points.map((point, index) => ({ ...point, value: point.value === null ? null : median(points.slice(Math.max(0, index - 6), index + 1).map((item) => item.value).filter((value): value is number => value !== null)) }));
+  const rangeSegments = geometry.rangeSegments;
   const tickValues = [max, min + span / 2, min];
   const tickIndices = [0, Math.floor((points.length - 1) / 3), Math.floor((points.length - 1) * 2 / 3), points.length - 1].filter((index, i, all) => all.indexOf(index) === i);
-  const selected = activeIndex === null ? null : present.find((point) => point.index === activeIndex) ?? null;
-  const selectNearest = (clientX: number) => { const bounds = svgRef.current?.getBoundingClientRect(); if (!bounds) return; const local = ((clientX - bounds.left) / bounds.width) * width; const nearest = present.reduce((best, point) => Math.abs(xFor(point.index) - local) < Math.abs(xFor(best.index) - local) ? point : best, present[0]); setActiveIndex(nearest.index); };
-  const eventMarkers = showEvents ? events.filter((event) => event.physiologicalDate >= startDate && event.physiologicalDate <= endDate).map((event) => ({ ...event, x: left + (points.length <= 1 ? plotWidth / 2 : ((Math.max(0, points.findIndex((point) => point.date >= event.physiologicalDate)) / Math.max(1, points.length - 1)) * plotWidth)) })) : [];
+  const resolvedIndex = activeIndex ?? pinnedIndex ?? present.at(-1)?.index ?? null;
+  const selected = resolvedIndex === null ? null : present.find((point) => point.index === resolvedIndex) ?? null;
+  const selectNearest = (clientX: number) => { const bounds = svgRef.current?.getBoundingClientRect(); if (!bounds) return null; const local = ((clientX - bounds.left) / bounds.width) * width; const nearest = nearestTimeSeriesPoint(geometry.coordinates, local); if (nearest) setActiveIndex(nearest.originalIndex); return nearest; };
+  const eventMarkers = showEvents ? events.filter((event) => event.physiologicalDate >= startDate && event.physiologicalDate <= endDate).map((event) => ({ ...event, x: xForDate(event.physiologicalDate) })) : [];
   return <div className={styles.detailChartWrap} style={{ "--domain-tone": chartToneForDomain(domain.key) } as CSSProperties}>
-    <div className={styles.detailChartInteractive} tabIndex={0} role="group" aria-label={`${domain.label} chart with axes and exact-value inspection. Use arrow keys to inspect points.`} onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "Home", "End", "Escape"].includes(event.key)) return; event.preventDefault(); if (event.key === "Escape") { setActiveIndex(null); return; } const current = activeIndex === null ? present.length - 1 : Math.max(0, present.findIndex((point) => point.index === activeIndex)); const next = event.key === "Home" ? 0 : event.key === "End" ? present.length - 1 : Math.max(0, Math.min(present.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1))); setActiveIndex(present[next]?.index ?? null); }}>
-      <svg ref={svgRef} className={styles.detailChart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${domain.label} from ${points[0]?.date ?? "first observation"} to ${points.at(-1)?.date ?? "latest observation"}. Values range from ${displayNumber(Math.min(...values), unit)} to ${displayNumber(Math.max(...values), unit)}.`} onPointerMove={(event) => selectNearest(event.clientX)} onPointerDown={(event) => selectNearest(event.clientX)} onPointerLeave={() => setActiveIndex(null)}>
+    <div className={styles.detailChartInteractive} tabIndex={0} role="group" aria-label={`${domain.label} chart with axes and exact-value inspection. Use arrow keys to inspect, Enter to pin, and Escape to return to latest.`} onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "Home", "End", "Enter", "Escape"].includes(event.key)) return; event.preventDefault(); if (event.key === "Escape") { setActiveIndex(null); setPinnedIndex(null); return; } if (event.key === "Enter") { if (selected) setPinnedIndex(selected.index); return; } const current = resolvedIndex === null ? present.length - 1 : Math.max(0, present.findIndex((point) => point.index === resolvedIndex)); const next = event.key === "Home" ? 0 : event.key === "End" ? present.length - 1 : Math.max(0, Math.min(present.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1))); setActiveIndex(present[next]?.index ?? null); }}>
+      <svg ref={svgRef} className={styles.detailChart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${domain.label} from ${points[0]?.date ?? "first observation"} to ${points.at(-1)?.date ?? "latest observation"}. Values range from ${displayNumber(Math.min(...values), unit)} to ${displayNumber(Math.max(...values), unit)}.`} onPointerMove={(event) => selectNearest(event.clientX)} onPointerDown={(event) => { const point = selectNearest(event.clientX); if (point) setPinnedIndex(point.originalIndex); }} onPointerLeave={() => setActiveIndex(pinnedIndex)}>
         {tickValues.map((value) => <g key={value}><line className={styles.detailGrid} x1={left} x2={width - right} y1={yFor(value)} y2={yFor(value)} /><text className={styles.detailTick} x={left - 8} y={yFor(value) + 4} textAnchor="end">{displayNumber(value, unit)}</text></g>)}
         {tickIndices.map((index) => <text key={index} className={styles.detailDateTick} x={xFor(index)} y={height - 20} textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}>{chartDateLabel(points[index]?.date)}</text>)}
         <line className={styles.detailAxis} x1={left} x2={left} y1={top} y2={height - bottom} /><line className={styles.detailAxis} x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} />
+        {rangeSegments.map((segment, index) => <polygon key={`personal-range-${index}`} className={styles.detailRangeCorridor} points={`${segment.map((point) => `${xForDate(point.date)},${yFor(point.personalRange!.upper)}`).join(" ")} ${[...segment].reverse().map((point) => `${xForDate(point.date)},${yFor(point.personalRange!.lower)}`).join(" ")}`} />)}
         {showBaseline && baseline !== null ? <line className={styles.detailBaseline} x1={left} x2={width - right} y1={yFor(baseline)} y2={yFor(baseline)} /> : null}
         {showRaw ? pathFor(points).map((path, index) => <path key={`raw-${index}`} className={styles.detailRawPath} d={path} />) : null}
         {showSmoothed ? pathFor(smoothed).map((path, index) => <path key={`smooth-${index}`} className={styles.detailSmoothPath} d={path} />) : null}
-        {showRaw ? present.map((point) => <circle key={`${point.date}-${point.index}`} className={styles.detailRawPoint} cx={xFor(point.index)} cy={yFor(point.value)} r={selected?.index === point.index ? 4 : 2.2} />) : null}
+        {showRaw ? present.map((point) => {
+          const breach = point.personalRange?.status === "above" || point.personalRange?.status === "below";
+          const boundary = point.personalRange?.status === "above" ? point.personalRange.upper : point.personalRange?.status === "below" ? point.personalRange.lower : null;
+          return <g key={`${point.date}-${point.index}`}>
+            {breach && boundary !== null ? <line className={styles.detailRangeTether} x1={xFor(point.index)} x2={xFor(point.index)} y1={yFor(point.value)} y2={yFor(boundary)} /> : null}
+            <circle className={breach ? styles.detailRangeBreach : styles.detailRawPoint} cx={xFor(point.index)} cy={yFor(point.value)} r={selected?.index === point.index ? 4 : breach ? 3.2 : 2.2} />
+          </g>;
+        }) : null}
         {eventMarkers.map((event) => <g key={event.id}><line className={styles.detailEventMarker} x1={event.x} x2={event.x} y1={height - bottom + 4} y2={height - bottom + 16} /><title>{`${event.label} · ${event.physiologicalDate} · ${event.source}`}</title></g>)}
         {selected ? <><line className={styles.detailCrosshair} x1={xFor(selected.index)} x2={xFor(selected.index)} y1={top} y2={height - bottom} /><circle className={styles.detailActivePoint} cx={xFor(selected.index)} cy={yFor(selected.value)} r="5" /></> : null}
       </svg>
-      {selected ? <div className={styles.detailTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, unit)}</strong><em>{baseline === null ? "Recorded value" : `${displayNumber(selected.value - baseline, unit)} vs baseline`}</em></div> : null}
+      {selected ? <div className={styles.detailTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, unit)}</strong><em>{selected.personalRange?.status === "above" || selected.personalRange?.status === "below" ? `Outside personal range · ${displayNumber(selected.value - selected.personalRange.center, unit)} from baseline` : baseline === null ? "Recorded value" : `${displayNumber(selected.value - baseline, unit)} vs baseline`}</em></div> : null}
     </div>
   </div>;
 }
@@ -686,63 +690,62 @@ function chartToneForDomain(domainId: string) {
 
 type CompactChartPoint = { date: string; value: number };
 
-function CompactSparkline({ metric, timeframe, selectedDate, domainId, activeIndex, onActiveChange }: { metric: UnknownRecord | null; timeframe: Timeframe; selectedDate: string; domainId: string; activeIndex: number | null; onActiveChange: (index: number | null) => void }) {
-  const points = records(metric?.points)
-    .map((point) => ({ date: text(point.date), value: number(point.value) }))
-    .filter((point): point is CompactChartPoint => Boolean(point.date) && point.value !== null)
-    .filter((point) => point.date >= shiftDate(selectedDate, -(timeframe - 1)));
-  if (points.length < 2) return <div className={styles.cardChartEmpty}>No chartable observations</div>;
-  const values = points.map((point) => point.value as number);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
+function CompactSparkline({ metric, timeframe, selectedDate, domainId, activeDate, onActiveChange }: { metric: UnknownRecord | null; timeframe: Timeframe; selectedDate: string; domainId: string; activeDate: string | null; onActiveChange: (date: string | null) => void }) {
+  const source = records(metric?.points)
+    .map(timeSeriesPoint)
+    .filter((point) => Boolean(point.date) && point.date >= shiftDate(selectedDate, -(timeframe - 1)) && point.date <= selectedDate);
+  if (source.filter((point) => point.value !== null).length < 2) return <div className={styles.cardChartEmpty}>No chartable observations</div>;
   const left = 35;
   const right = 294;
   const top = 10;
   const bottom = 77;
-  const xFor = (index: number) => left + (index / Math.max(1, points.length - 1)) * (right - left);
-  const yFor = (value: number) => bottom - ((value - min) / span) * (bottom - top);
-  const path = points.map((point, index) => `${index ? "L" : "M"} ${xFor(index).toFixed(1)} ${yFor(point.value).toFixed(1)}`).join(" ");
-  const selected = activeIndex === null ? null : points[activeIndex] ?? null;
   const tone = chartToneForDomain(domainId);
   const baseline = number(metric?.baselineValue);
-  const baselineY = baseline === null ? null : yFor(baseline);
+  const geometry = buildTimeSeriesGeometry(source, { baseline, left, right, top, bottom });
+  const selected = activeDate ? geometry.coordinates.find((point) => point.date === activeDate) ?? null : null;
+  const visibleDates = visiblePointDates(geometry.coordinates, String(timeframe), activeDate);
+  const baselineY = baseline === null ? null : geometry.yForValue(baseline);
   const nearest = (clientX: number, target: SVGSVGElement) => {
     const bounds = target.getBoundingClientRect();
-    const x = Math.max(left, Math.min(right, left + ((clientX - bounds.left) / bounds.width) * 300));
-    return points.reduce((best, point, index) => Math.abs(xFor(index) - x) < Math.abs(xFor(best) - x) ? index : best, 0);
+    const x = Math.max(left, Math.min(right, ((clientX - bounds.left) / bounds.width) * 300));
+    return nearestTimeSeriesPoint(geometry.coordinates, x);
   };
   return (
     <div className={styles.cardChartWrap} style={{ "--chart-tone": tone } as CSSProperties}>
-      <svg className={styles.cardChart} viewBox="0 0 300 108" role="img" aria-label={`${text(metric?.label, "Metric")} trend from ${points[0]?.date} to ${points.at(-1)?.date}. Use arrow keys while focused on the card to inspect exact values.`} onPointerMove={(event) => onActiveChange(nearest(event.clientX, event.currentTarget))} onPointerLeave={() => onActiveChange(null)}>
+      <svg className={styles.cardChart} viewBox="0 0 300 108" role="img" aria-label={`${text(metric?.label, "Metric")} trend from ${geometry.points[0]?.date} to ${geometry.points.at(-1)?.date}. Use the chart control to inspect exact values.`} onPointerMove={(event) => onActiveChange(nearest(event.clientX, event.currentTarget)?.date ?? null)}>
         {[top, (top + bottom) / 2, bottom].map((y) => <line key={y} className={styles.cardChartGrid} x1={left} x2={right} y1={y} y2={y} />)}
         {baselineY !== null && baselineY >= top && baselineY <= bottom ? <line className={styles.cardChartBaseline} x1={left} x2={right} y1={baselineY} y2={baselineY} /> : null}
-        <text className={styles.cardChartAxisLabel} x="2" y={top + 3}>{displayNumber(max, text(metric?.unit))}</text>
-        <text className={styles.cardChartAxisLabel} x="2" y={(top + bottom) / 2 + 3}>{displayNumber((max + min) / 2, text(metric?.unit))}</text>
-        <text className={styles.cardChartAxisLabel} x="2" y={bottom + 3}>{displayNumber(min, text(metric?.unit))}</text>
-        <path d={path} />
-        <circle className={styles.cardChartLatest} cx={xFor(points.length - 1)} cy={yFor(points.at(-1)?.value ?? min)} r="3" />
-        {selected ? <><line className={styles.cardChartCursor} x1={xFor(activeIndex ?? 0)} y1={top} x2={xFor(activeIndex ?? 0)} y2={bottom} /><circle className={styles.cardChartActive} cx={xFor(activeIndex ?? 0)} cy={yFor(selected.value)} r="3.5" /></> : null}
-        {points.map((point, index) => <circle key={`${point.date}-${index}`} className={styles.cardChartHit} cx={xFor(index)} cy={yFor(point.value)} r="8" onPointerEnter={() => onActiveChange(index)} />)}
-        {[...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])].map((index) => <text key={index} className={styles.cardChartDate} x={xFor(index)} y="101" textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}>{chartDateLabel(points[index]?.date)}</text>)}
+        <text className={styles.cardChartAxisLabel} x="2" y={top + 3}>{displayNumber(geometry.max, text(metric?.unit))}</text>
+        <text className={styles.cardChartAxisLabel} x="2" y={(top + bottom) / 2 + 3}>{displayNumber((geometry.max + geometry.min) / 2, text(metric?.unit))}</text>
+        <text className={styles.cardChartAxisLabel} x="2" y={bottom + 3}>{displayNumber(geometry.min, text(metric?.unit))}</text>
+        {geometry.rangeSegments.map((segment, index) => <polygon key={`card-range-${index}`} className={styles.cardChartCorridor} points={`${segment.map((point) => `${point.x},${point.rangeUpperY}`).join(" ")} ${[...segment].reverse().map((point) => `${point.x},${point.rangeLowerY}`).join(" ")}`} />)}
+        {geometry.segments.map((segment, index) => <path key={`card-path-${index}`} d={segment.map((point, pointIndex) => `${pointIndex ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ")} />)}
+        {geometry.coordinates.filter((point) => visibleDates.has(point.date)).map((point) => {
+          const breach = point.personalRange?.status === "above" || point.personalRange?.status === "below";
+          const boundary = point.personalRange?.status === "above" ? point.rangeUpperY : point.personalRange?.status === "below" ? point.rangeLowerY : null;
+          return <g key={point.date}>{breach && boundary !== null ? <line className={styles.cardChartTether} x1={point.x} x2={point.x} y1={point.y} y2={boundary} /> : null}<circle className={breach ? styles.cardChartBreach : styles.cardChartLatest} cx={point.x} cy={point.y} r={breach ? 4 : 3} /></g>;
+        })}
+        {selected ? <><line className={styles.cardChartCursor} x1={selected.x} y1={top} x2={selected.x} y2={bottom} /><circle className={styles.cardChartActive} cx={selected.x} cy={selected.y} r="3.5" /></> : null}
+        {geometry.coordinates.map((point) => <circle key={`hit-${point.date}`} className={styles.cardChartHit} cx={point.x} cy={point.y} r="8" onPointerEnter={() => onActiveChange(point.date)} />)}
+        {[...new Set([0, Math.floor((geometry.points.length - 1) / 2), geometry.points.length - 1])].map((index) => <text key={index} className={styles.cardChartDate} x={geometry.xForDate(geometry.points[index]?.date ?? "")} y="101" textAnchor={index === 0 ? "start" : index === geometry.points.length - 1 ? "end" : "middle"}>{chartDateLabel(geometry.points[index]?.date)}</text>)}
       </svg>
-      {selected ? <div className={styles.cardChartTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, text(metric?.unit))}</strong><em>{baseline === null ? "Recorded value" : `${displayNumber(selected.value - baseline, text(metric?.unit))} vs baseline`}</em></div> : null}
+      {selected ? <div className={styles.cardChartTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, text(metric?.unit))}</strong><em>{selected.personalRange?.status === "above" || selected.personalRange?.status === "below" ? "Outside personal range" : baseline === null ? "Recorded value" : `${displayNumber(selected.value - baseline, text(metric?.unit))} vs baseline`}</em></div> : null}
     </div>
   );
 }
 
-function CompactDomainVisual({ card, timeframe, selectedDate, activeIndex, onActiveChange }: { card: UnknownRecord; timeframe: Timeframe; selectedDate: string; activeIndex: number | null; onActiveChange: (index: number | null) => void }) {
+function CompactDomainVisual({ card, timeframe, selectedDate, activeDate, onActiveChange }: { card: UnknownRecord; timeframe: Timeframe; selectedDate: string; activeDate: string | null; onActiveChange: (date: string | null) => void }) {
   const metric = record(card.primaryMetric);
-  if (text(card.chartType) !== "weekly_bars") return <CompactSparkline metric={metric} timeframe={timeframe} selectedDate={selectedDate} domainId={text(card.id)} activeIndex={activeIndex} onActiveChange={onActiveChange} />;
+  if (text(card.chartType) !== "weekly_bars") return <CompactSparkline metric={metric} timeframe={timeframe} selectedDate={selectedDate} domainId={text(card.id)} activeDate={activeDate} onActiveChange={onActiveChange} />;
   const points = records(metric.points).map((point) => ({ date: text(point.date), value: number(point.value) })).filter((point): point is CompactChartPoint => point.value !== null && Boolean(point.date) && point.date >= shiftDate(selectedDate, -(timeframe - 1))).slice(-8);
   if (points.length < 2) return <div className={styles.cardChartEmpty}>No chartable observations</div>;
   const max = Math.max(...points.map((point) => point.value), 1);
   const tone = chartToneForDomain(text(card.id));
-  const selected = activeIndex === null ? null : points[activeIndex] ?? null;
+  const selected = activeDate ? points.find((point) => point.date === activeDate) ?? null : null;
   return <div className={styles.cardChartWrap} style={{ "--chart-tone": tone } as CSSProperties}>
     <div className={styles.cardBars} role="img" aria-label={`${text(metric.label, "Weekly metric")} weekly bars. Use arrow keys while focused on the card to inspect exact values.`}>
       <span className={styles.cardBarsAxis}>{displayNumber(max, text(metric.unit))}</span>
-      {points.map((point, index) => <i key={`${point.date}-${index}`} role="img" aria-label={`${chartDateLabel(point.date)} ${displayNumber(point.value, text(metric.unit))}`} className={styles.cardBar} data-active={activeIndex === index} style={{ height: `${Math.max(8, (point.value / max) * 100)}%` }} onPointerEnter={(event) => { event.stopPropagation(); onActiveChange(index); }} />)}
+      {points.map((point, index) => <i key={`${point.date}-${index}`} role="img" aria-label={`${chartDateLabel(point.date)} ${displayNumber(point.value, text(metric.unit))}`} className={styles.cardBar} data-active={activeDate === point.date} style={{ height: `${Math.max(8, (point.value / max) * 100)}%` }} onPointerEnter={(event) => { event.stopPropagation(); onActiveChange(point.date); }} />)}
       <span className={styles.cardBarsBaseline}>{displayNumber(0, text(metric.unit))}</span>
     </div>
     {selected ? <div className={styles.cardChartTooltip}><span>{chartDateLabel(selected.date)}</span><strong>{displayNumber(selected.value, text(metric.unit))}</strong><em>Recorded week</em></div> : null}
@@ -750,7 +753,6 @@ function CompactDomainVisual({ card, timeframe, selectedDate, activeIndex, onAct
 }
 
 function DomainSnapshotCard({ card, timeframe, selectedDate, onSelect, selected }: { card: UnknownRecord; timeframe: Timeframe; selectedDate: string; onSelect: () => void; selected: boolean }) {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const primary = record(card.primaryMetric);
   const secondary = record(card.secondaryMetric);
   const cardDirection = direction(card.direction);
@@ -758,10 +760,14 @@ function DomainSnapshotCard({ card, timeframe, selectedDate, onSelect, selected 
   const primaryChange = number(primary.absoluteChange);
   const secondaryChange = number(secondary.absoluteChange);
   const filteredChartPoints = records(primary.points)
-    .map((point) => ({ date: text(point.date), value: number(point.value) }))
-    .filter((point): point is CompactChartPoint => Boolean(point.date) && point.value !== null && point.date >= shiftDate(selectedDate, -(timeframe - 1)) && point.date <= selectedDate);
-  const chartPoints = text(card.chartType) === "weekly_bars" ? filteredChartPoints.slice(-8) : filteredChartPoints;
-  const activePoint = activeIndex === null ? null : chartPoints[activeIndex] ?? null;
+    .map(timeSeriesPoint)
+    .filter((point): point is TimeSeriesPoint & { value: number } => Boolean(point.date) && point.value !== null && point.date >= shiftDate(selectedDate, -(timeframe - 1)) && point.date <= selectedDate);
+  const chartPoints = text(card.chartType) === "weekly_bars" ? filteredChartPoints.slice(-8) : downsampleTimeSeries(filteredChartPoints);
+  const latestDate = chartPoints.at(-1)?.date ?? null;
+  const [activeDate, setActiveDate] = useState<string | null>(latestDate);
+  const [pinnedDate, setPinnedDate] = useState<string | null>(null);
+  const resolvedActiveDate = activeDate && chartPoints.some((point) => point.date === activeDate) ? activeDate : latestDate;
+  const activePoint = resolvedActiveDate ? chartPoints.find((point) => point.date === resolvedActiveDate) ?? null : null;
   const metricLine = (metric: UnknownRecord, change: number | null) => {
     if (!text(metric.label)) return null;
     const unit = text(metric.unit);
@@ -769,21 +775,25 @@ function DomainSnapshotCard({ card, timeframe, selectedDate, onSelect, selected 
     return <div className={styles.cardMetric}><span>{text(metric.label)}</span><strong>{change === null ? displayNumber(number(metric.currentValue), unit) : `${sign}${displayNumber(Math.abs(change), unit)}`}</strong></div>;
   };
   return (
-    <button type="button" className={styles.domainCard} data-domain={text(card.id)} data-direction={cardDirection} data-selected={selected} onClick={onSelect} onKeyDown={(event) => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-      event.preventDefault();
-      const count = chartPoints.length;
-      if (!count) return;
-      const current = activeIndex ?? count - 1;
-      const next = event.key === "Home" ? 0 : event.key === "End" ? count - 1 : Math.max(0, Math.min(count - 1, current + (event.key === "ArrowLeft" ? -1 : 1)));
-      setActiveIndex(next);
-    }} aria-label={`${title}, ${DIRECTION_LABELS[cardDirection]}. Use arrow keys to inspect chart values.${activePoint ? ` Selected ${chartDateLabel(activePoint.date)} ${displayNumber(activePoint.value, text(primary.unit))}.` : ""}`}>
+    <article className={styles.domainCard} data-domain={text(card.id)} data-direction={cardDirection} data-selected={selected}>
       <header><div><h3>{title}</h3><span className={styles.cardDirection}><b aria-hidden="true">{glyphForStatus(cardDirection)}</b>{DIRECTION_LABELS[cardDirection]}</span></div><span className={styles.cardConfidence}>{text(card.confidence, "Not established")}</span></header>
-      <CompactDomainVisual card={card} timeframe={timeframe} selectedDate={selectedDate} activeIndex={activeIndex} onActiveChange={setActiveIndex} />
+      <div className={styles.domainChartControl} role="group" tabIndex={0} aria-label={`${title} chart. Use arrow keys to inspect, Enter to pin, and Escape to return to latest.${activePoint ? ` Selected ${chartDateLabel(activePoint.date)} ${displayNumber(activePoint.value, text(primary.unit))}.` : ""}`} onPointerLeave={() => setActiveDate(pinnedDate ?? latestDate)} onClick={() => { if (resolvedActiveDate) setPinnedDate(resolvedActiveDate); }} onKeyDown={(event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
+        event.preventDefault();
+        if (event.key === "Escape") { setPinnedDate(null); setActiveDate(latestDate); return; }
+        if (event.key === "Enter") { if (resolvedActiveDate) setPinnedDate(resolvedActiveDate); return; }
+        const count = chartPoints.length;
+        if (!count) return;
+        const current = resolvedActiveDate ? Math.max(0, chartPoints.findIndex((point) => point.date === resolvedActiveDate)) : count - 1;
+        const next = event.key === "Home" ? 0 : event.key === "End" ? count - 1 : Math.max(0, Math.min(count - 1, current + (event.key === "ArrowLeft" ? -1 : 1)));
+        setActiveDate(chartPoints[next]?.date ?? latestDate);
+      }}>
+        <CompactDomainVisual card={card} timeframe={timeframe} selectedDate={selectedDate} activeDate={resolvedActiveDate} onActiveChange={setActiveDate} />
+      </div>
       <div className={styles.cardMetrics}>{metricLine(primary, primaryChange)}{metricLine(secondary, secondaryChange)}</div>
       <p className={styles.cardObservation}>{shortObservation(text(card.observation, "No supported observation is available."))}</p>
-      <footer><span>{number(card.coveredDays) ?? 0} / {number(card.expectedDays) ?? 0} days</span><span>Open detail →</span></footer>
-    </button>
+      <footer><span>{number(card.coveredDays) ?? 0} / {number(card.expectedDays) ?? 0} days</span><button type="button" className={styles.domainOpen} onClick={onSelect} aria-expanded={selected}>Open detail →</button></footer>
+    </article>
   );
 }
 
@@ -814,7 +824,7 @@ function TrajectoryHero({ view, timeframe, setTimeframe, observations }: { view:
 function CurrentDeviationBanner({ view }: { view: LongitudinalHealthView }) {
   const deviation = view.currentDeviation;
   if (!deviation.active || !deviation.metrics.length) return null;
-  return <section className={styles.deviationBanner} aria-labelledby="current-deviation-title"><div><span>Current deviation</span><h2 id="current-deviation-title">Outside recent personal ranges today</h2></div><div className={styles.deviationMetrics}>{deviation.metrics.map((item) => <span key={item.metricId}>{item.label}</span>)}</div><small>{deviation.date} · Long-term direction unchanged</small></section>;
+  return <section className={styles.deviationBanner} aria-labelledby="current-deviation-title"><div><span>Current deviation</span><h2 id="current-deviation-title">Outside personal ranges today</h2></div><div className={styles.deviationMetrics}>{deviation.metrics.map((item) => <span key={item.metricId}>{item.label}</span>)}</div><small>{deviation.date} · Long-term direction unchanged</small></section>;
 }
 
 void TrajectoryHorizon;
@@ -844,7 +854,7 @@ export function LongitudinalObservatory({ view }: { view: LongitudinalHealthView
           })}
         </div>
       </section>
-      {selectedDomain ? <DomainDetail domain={selectedDomain} observations={observations} panelId={panelId} events={(view.journalEvents ?? []).filter((event) => event.type === "alcohol")} /> : null}
+      {selectedDomain ? <DomainDetail domain={selectedDomain} observations={observations} panelId={panelId} events={view.journalEvents ?? []} /> : null}
       <MetricGraphs view={view} />
     </div>
   );

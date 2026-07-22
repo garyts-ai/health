@@ -1,14 +1,14 @@
 import { calendarDateKey, shiftCalendarDateKey } from "@/lib/calendar";
 import type { AlcoholCalendarDay, AlcoholLogEntry, AlcoholLogSummary, AlcoholLogViewModel } from "@/lib/longitudinal/types";
+import { deduplicateJournalRows, isAlcoholJournalQuestion, type JournalAnswerRow } from "@/lib/longitudinal/journal";
 
-export type AlcoholJournalRow = {
-  id: string;
-  cycle_start: string | null;
-  question_text: string;
-  answered_yes: number;
+export type AlcoholJournalRow = JournalAnswerRow;
+
+export type AlcoholJournalSource = {
+  importCount: number;
+  latestImportAt: string | null;
+  coverageEnd: string | null;
 };
-
-const ALCOHOL_PATTERN = /\balcohol\b/i;
 
 function daysBetween(start: string, end: string) {
   return Math.max(0, Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86_400_000));
@@ -55,7 +55,7 @@ export function alcoholLogSummary(entries: AlcoholLogEntry[], selectedDate: stri
 }
 
 export function normalizeAlcoholEntries(rows: AlcoholJournalRow[], selectedDate: string): AlcoholLogEntry[] {
-  return rows.filter((row) => row.answered_yes === 1 && Boolean(row.cycle_start) && ALCOHOL_PATTERN.test(row.question_text)).map((row) => {
+  return deduplicateJournalRows(rows).filter((row) => row.answered_yes === 1 && Boolean(row.cycle_start) && isAlcoholJournalQuestion(row.question_text)).map((row) => {
     const occurredAt = row.cycle_start!;
     return {
       id: row.id,
@@ -86,8 +86,9 @@ function longestAlcoholFreeStreak(entries: AlcoholLogEntry[], selectedDate: stri
   return longest;
 }
 
-export function buildAlcoholLogView(rows: AlcoholJournalRow[], selectedDate: string): AlcoholLogViewModel {
-  const entries = normalizeAlcoholEntries(rows, selectedDate);
+export function buildAlcoholLogView(rows: AlcoholJournalRow[], selectedDate: string, source?: AlcoholJournalSource): AlcoholLogViewModel {
+  const deduplicatedRows = deduplicateJournalRows(rows);
+  const entries = normalizeAlcoholEntries(deduplicatedRows, selectedDate);
   const grouped = dayEntries(entries);
   const selectedMonth = selectedDate.slice(0, 7);
   const calendarDays = alcoholCalendarDays(selectedMonth, entries, selectedDate);
@@ -96,5 +97,15 @@ export function buildAlcoholLogView(rows: AlcoholJournalRow[], selectedDate: str
   const heatmapStart = shiftCalendarDateKey(selectedDate, -(heatmapLength - 1));
   const heatmapDays = Array.from({ length: heatmapLength }, (_, index) => calendarDay(shiftCalendarDateKey(heatmapStart, index), selectedMonth, selectedDate, grouped));
   const summary = alcoholLogSummary(entries, selectedDate);
-  return { summary, selectedMonth, calendarDays, heatmapDays, entries };
+  return {
+    summary, selectedMonth, calendarDays, heatmapDays, entries,
+    coverage: {
+      sourceAvailable: (source?.importCount ?? 0) > 0 || rows.length > 0,
+      latestImportAt: source?.latestImportAt ?? null,
+      coverageEnd: source?.coverageEnd ?? deduplicatedRows.flatMap((row) => row.cycle_start ? [calendarDateKey(row.cycle_start)] : []).sort().at(-1) ?? null,
+      rawAnswerCount: rows.length,
+      deduplicatedAnswerCount: deduplicatedRows.length,
+      alcoholQuestionCount: deduplicatedRows.filter((row) => isAlcoholJournalQuestion(row.question_text)).length,
+    },
+  };
 }

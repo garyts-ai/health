@@ -5,6 +5,7 @@ import path from "node:path";
 import JSZip from "jszip";
 
 import { getDb, shouldUsePostgres } from "@/lib/db";
+import { normalizeJournalQuestion } from "@/lib/longitudinal/journal";
 import { persistPostgresWhoopExport } from "@/lib/whoop-export/postgres-import";
 
 export type CsvRow = Record<string, string>;
@@ -118,6 +119,12 @@ function numberValue(row: CsvRow, key: string) {
 
 function booleanValue(row: CsvRow, key: string) {
   return row[key]?.trim().toLowerCase() === "true" ? 1 : 0;
+}
+
+export function stableJournalAnswerId(cycleStart: string, question: string) {
+  return createHash("sha256")
+    .update(`${new Date(cycleStart).toISOString()}\u0000${normalizeJournalQuestion(question)}`)
+    .digest("hex");
 }
 
 export async function readWhoopExportBuffer(
@@ -236,19 +243,26 @@ export function normalizeWhoopArchive(
     ]];
   });
 
-  const journals = archive.journals.map((row, index) => {
+  const journalsByKey = new Map<string, Array<string | number | null>>();
+  archive.journals.forEach((row, index) => {
     const timezone = row["Cycle timezone"];
-    return [
-      createHash("sha256")
-        .update(`${archive.fingerprint}:${index}:${row["Question text"]}`)
-        .digest("hex"),
-      normalizeWhoopTimestamp(row["Cycle start time"], timezone),
+    const cycleStart = normalizeWhoopTimestamp(row["Cycle start time"], timezone);
+    const question = row["Question text"] ?? "";
+    const id = cycleStart
+      ? stableJournalAnswerId(cycleStart, question)
+      : createHash("sha256").update(`${archive.fingerprint}:missing-cycle:${index}:${normalizeJournalQuestion(question)}`).digest("hex");
+    const normalized = [
+      id,
+      cycleStart,
       normalizeWhoopTimestamp(row["Cycle end time"], timezone),
       timezone || null,
-      row["Question text"],
+      question,
       booleanValue(row, "Answered yes"),
     ];
+    const key = cycleStart ? `${cycleStart}\u0000${normalizeJournalQuestion(question)}` : `missing-cycle\u0000${id}`;
+    journalsByKey.set(key, normalized);
   });
+  const journals = [...journalsByKey.values()];
 
   const starts = cycles.map((row) => String(row[0])).sort();
   return {
@@ -312,13 +326,26 @@ function persistSqliteWhoopExport(normalized: NormalizedWhoopExport) {
   const insertJournal = db.prepare(`
     INSERT OR REPLACE INTO whoop_export_journal_answers VALUES (?, ?, ?, ?, ?, ?)
   `);
+  const selectLegacyJournals = db.prepare(`
+    SELECT id, question_text FROM whoop_export_journal_answers WHERE cycle_start = ?
+  `);
+  const deleteLegacyJournal = db.prepare(`DELETE FROM whoop_export_journal_answers WHERE id = ?`);
 
   db.exec("BEGIN");
   try {
     normalized.cycles.forEach((row) => insertCycle.run(...row));
     normalized.sleeps.forEach((row) => insertSleep.run(...row));
     normalized.workouts.forEach((row) => insertWorkout.run(...row));
-    normalized.journals.forEach((row) => insertJournal.run(...row));
+    normalized.journals.forEach((row) => {
+      if (row[1]) {
+        const questionKey = normalizeJournalQuestion(String(row[4] ?? ""));
+        const legacyRows = selectLegacyJournals.all(row[1]) as Array<{ id: string; question_text: string }>;
+        legacyRows
+          .filter((legacy) => legacy.id !== row[0] && normalizeJournalQuestion(legacy.question_text) === questionKey)
+          .forEach((legacy) => deleteLegacyJournal.run(legacy.id));
+      }
+      insertJournal.run(...row);
+    });
     db.prepare(`
       INSERT INTO whoop_export_imports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
