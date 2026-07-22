@@ -34,6 +34,7 @@ export function DataRail({ metrics, label = "Today telemetry" }: { metrics: Toda
     event.preventDefault();
     if (event.key === "Escape") {
       setHoveredKey(undefined);
+      setSelectedKey(telemetryPointKey(representativePoints[Math.max(0, pointCount - 1)]));
       return;
     }
     if (event.key === "Enter") {
@@ -61,7 +62,7 @@ export function DataRail({ metrics, label = "Today telemetry" }: { metrics: Toda
   }
 
   return <GlassPanel as="div" level="raised" className={styles.shell}>
-    <div className={styles.interaction} role="group" tabIndex={0} aria-label={`${label}. Use left and right arrow keys to inspect each day. Press Enter to pin a day, or Escape to restore the selected day.`} aria-describedby={readoutId} onKeyDown={handleKeyDown} onPointerLeave={() => setHoveredKey(undefined)}>
+    <div className={styles.interaction} role="group" tabIndex={0} aria-label={`${label}. Use left and right arrow keys to inspect each day. Press Enter to pin a day, or Escape to return to latest.`} aria-describedby={readoutId} onKeyDown={handleKeyDown} onPointerLeave={() => setHoveredKey(undefined)}>
       <header className={styles.telemetryHeader} id={readoutId} aria-live="polite">
         <div className={styles.headerTitle}>
           <span className={styles.eyebrow}>Daily telemetry</span>
@@ -77,7 +78,7 @@ export function DataRail({ metrics, label = "Today telemetry" }: { metrics: Toda
         {readout.map((item) => <b key={item.label}><small>{item.label}</small>{item.value}</b>)}
       </div> : null}
       <dl className={styles.rail} aria-label={label}>
-        {metrics.map((metric) => <MetricInstrument {...metric} key={metric.label} selectedIndex={activeIndex} permanentIndex={selectedIndex} onPointerMove={selectFromPointer} onPointerLeave={() => setHoveredKey(undefined)} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); pinFromPointer(event); }} onDayFocus={(index) => setHoveredKey(telemetryPointKey(representativePoints[index]))} />)}
+        {metrics.map((metric) => <MetricInstrument {...metric} key={metric.label} selectedIndex={activeIndex} permanentIndex={selectedIndex} onPointerMove={selectFromPointer} onPointerLeave={() => setHoveredKey(undefined)} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); pinFromPointer(event); }} onDayFocus={(index) => setHoveredKey(telemetryPointKey(representativePoints[index]))} onDayPin={(index) => { const next = index ?? Math.max(0, pointCount - 1); setSelectedKey(telemetryPointKey(representativePoints[next])); setHoveredKey(undefined); }} />)}
       </dl>
     </div>
   </GlassPanel>;

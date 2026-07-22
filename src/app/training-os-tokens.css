@@ -11,6 +11,15 @@
   --os-signal-danger: #ff7b79;
   --os-signal-volume-low: #9a72ff;
 
+  --metric-recovery: #72e3a6;
+  --metric-sleep: #a98cff;
+  --metric-hrv: #45d9e6;
+  --metric-resting-hr: #f0806b;
+  --metric-strain: #e7ad3f;
+  --metric-skin-temperature: #df83a2;
+  --metric-alcohol: #ff9b62;
+  --metric-current: var(--os-signal-current);
+
   --os-text-primary: #f3f5f8;
   --os-text-secondary: #aab1c0;
   --os-text-muted: #858e9f;

@@ -2,15 +2,16 @@ import { dbAll } from "@/lib/db";
 import { calendarDateKey, shiftCalendarDateKey, HEALTH_TIME_ZONE } from "@/lib/calendar";
 import { clamp01, mad, median, percentile, round, theilSen } from "@/lib/longitudinal/statistics";
 import { buildAlcoholLogView } from "@/lib/longitudinal/alcohol-log";
+import { classifyJournalQuestion, deduplicateJournalRows, normalizeJournalQuestion } from "@/lib/longitudinal/journal";
 import type {
   AggregateTrend,
   CurrentDeviation,
   DataCoverage,
   DomainCardViewModel,
   HealthDomainTrend,
-  JournalEventType,
   JournalEventViewModel,
   LongitudinalHealthView,
+  MetricPoint,
   MetricTrend,
   RecordedAssociation,
   SourceProvenance,
@@ -88,6 +89,11 @@ type JournalRow = {
   answered_yes: number;
 };
 
+type JournalImportRow = {
+  imported_at: string;
+  date_end: string | null;
+};
+
 export type LongitudinalEngineInput = {
   now: Date;
   liveDays: LiveDayRow[];
@@ -96,6 +102,7 @@ export type LongitudinalEngineInput = {
   hevyRows: HevyRow[];
   workoutRows: WorkoutRow[];
   journalRows: JournalRow[];
+  journalImports?: JournalImportRow[];
   exportWorkoutRows: ExportWorkoutRow[];
 };
 
@@ -334,12 +341,47 @@ function buildMetric(config: MetricConfig, allPoints: SeriesPoint[], selectedDat
     absoluteChange: round(absoluteChange, digits), relativeChange: round(relativeChange, 3), slopePerWeek: round(slopePerWeek, digits),
     persistenceDays, personalPercentile: percentile(values, points.at(-1)?.value ?? null), variability: round(mad(values), digits),
     coveredDays, expectedDays, coverage: round(coverage, 3) ?? 0,
-    points: chartPoints.map((point) => ({ date: point.date, value: round(point.value, digits) })), provenance: provenance(points),
+    points: metricPointsWithPersonalRanges(chartPoints, digits), provenance: provenance(points),
     limitations: [
       ...(confidence === "low" || confidence === "insufficient" ? ["Limited coverage reduces confidence in the estimated direction."] : []),
       ...(!persistenceMet && thresholdMet ? ["The measured change did not persist in enough recent weekly medians."] : []),
     ],
   };
+}
+
+export function metricPointsWithPersonalRanges(points: Array<{ date: string; value: number | null }>, digits = 2): MetricPoint[] {
+  const ordered = [...points].sort((left, right) => left.date.localeCompare(right.date));
+  const history: number[] = [];
+  const decorated: MetricPoint[] = [];
+  for (let index = 0; index < ordered.length;) {
+    const date = ordered[index].date;
+    const group: Array<{ date: string; value: number | null }> = [];
+    while (index < ordered.length && ordered[index].date === date) {
+      group.push(ordered[index]);
+      index += 1;
+    }
+    const center = median(history);
+    const dispersion = mad(history);
+    const rangeDistance = dispersion === null || dispersion === 0 ? null : ROBUST_Z_THRESHOLD * dispersion / 0.6745;
+    for (const point of group) {
+      const robustZ = point.value === null || center === null || dispersion === null || dispersion === 0 || history.length < 14
+        ? null
+        : 0.6745 * (point.value - center) / dispersion;
+      const personalRange = robustZ === null || center === null || rangeDistance === null
+        ? undefined
+        : {
+            center: round(center, digits) ?? center,
+            lower: round(center - rangeDistance, digits) ?? center - rangeDistance,
+            upper: round(center + rangeDistance, digits) ?? center + rangeDistance,
+            sampleCount: history.length,
+            robustZScore: round(robustZ, 2) ?? robustZ,
+            status: robustZ >= ROBUST_Z_THRESHOLD ? "above" as const : robustZ <= -ROBUST_Z_THRESHOLD ? "below" as const : "within" as const,
+          };
+      decorated.push({ date: point.date, value: round(point.value, digits), ...(personalRange ? { personalRange } : {}) });
+    }
+    history.push(...group.map((point) => point.value).filter((value): value is number => value !== null && Number.isFinite(value)));
+  }
+  return decorated;
 }
 
 function domain(id: string, label: string, metrics: MetricTrend[], extraLimitations: string[] = []): HealthDomainTrend {
@@ -403,13 +445,16 @@ function aggregate(metrics: MetricTrend[]): AggregateTrend {
 function currentDeviation(metrics: MetricTrend[], selectedDate: string): CurrentDeviation {
   const deviations = metrics.flatMap((metric) => {
     const latest = metric.points.findLast((point) => point.date === selectedDate);
-    const history = metric.points.filter((point) => point.date < selectedDate).map((point) => point.value).filter((value): value is number => value !== null);
-    const center = median(history);
-    const dispersion = mad(history);
-    if (!latest || latest.value === null || center === null || dispersion === null || dispersion === 0 || history.length < 14) return [];
-    const z = 0.6745 * (latest.value - center) / dispersion;
-    if (Math.abs(z) < ROBUST_Z_THRESHOLD) return [];
-    return [{ metricId: metric.id, label: metric.label, value: latest.value, baselineMedian: center, robustZScore: round(z, 2) ?? z, direction: z > 0 ? "above" as const : "below" as const, provenance: metric.provenance }];
+    if (!latest || latest.value === null || !latest.personalRange || latest.personalRange.status === "within") return [];
+    return [{
+      metricId: metric.id,
+      label: metric.label,
+      value: latest.value,
+      baselineMedian: latest.personalRange.center,
+      robustZScore: latest.personalRange.robustZScore,
+      direction: latest.personalRange.status,
+      provenance: metric.provenance,
+    }];
   });
   const labels = deviations.map((item) => item.label);
   return {
@@ -456,7 +501,8 @@ function bootstrapMedianInterval(exposed: number[], comparison: number[], iterat
 function associations(journals: JournalRow[], days: CanonicalDay[], windowDays: number): RecordedAssociation[] {
   const questionGroups = new Map<string, JournalRow[]>();
   for (const row of journals.filter((row) => row.cycle_start)) {
-    questionGroups.set(row.question_text, [...(questionGroups.get(row.question_text) ?? []), row]);
+    const questionKey = normalizeJournalQuestion(row.question_text);
+    questionGroups.set(questionKey, [...(questionGroups.get(questionKey) ?? []), row]);
   }
   const outcomes = [
     { key: "recovery", label: "Recovery", read: (day: CanonicalDay) => day.recovery },
@@ -464,7 +510,8 @@ function associations(journals: JournalRow[], days: CanonicalDay[], windowDays: 
     { key: "resting_heart_rate", label: "resting heart rate", read: (day: CanonicalDay) => day.rhr },
   ];
   const byDate = new Map(days.map((day) => [day.date, day]));
-  return [...questionGroups.entries()].flatMap(([question, rows]) => outcomes.map((outcome) => {
+  return [...questionGroups.values()].flatMap((rows) => outcomes.map((outcome) => {
+    const question = rows[0].question_text;
     const exposureDates = new Set(rows.filter((row) => row.answered_yes === 1).map((row) => calendarDateKey(row.cycle_start!)));
     const explicitlyUnexposedDates = new Set(rows.filter((row) => row.answered_yes === 0).map((row) => calendarDateKey(row.cycle_start!)));
     const exposedObservations = [...exposureDates].flatMap((date) => {
@@ -533,32 +580,20 @@ function associations(journals: JournalRow[], days: CanonicalDay[], windowDays: 
   })).sort((a, b) => (a.claim === "association_detected" ? -1 : 1) - (b.claim === "association_detected" ? -1 : 1));
 }
 
-const JOURNAL_EVENT_RULES: Array<{ type: JournalEventType; icon: string; pattern: RegExp; label: string }> = [
-  { type: "alcohol", icon: "circle", pattern: /\balcohol\b/i, label: "Alcohol" },
-  { type: "caffeine", icon: "diamond", pattern: /caffeine|coffee/i, label: "Caffeine" },
-  { type: "late_meal", icon: "square", pattern: /late.?meal|late.?food|eat.*late/i, label: "Late meal" },
-  { type: "travel", icon: "plane", pattern: /travel|flight|jet.?lag/i, label: "Travel" },
-  { type: "illness", icon: "triangle", pattern: /ill|sick|symptom/i, label: "Illness" },
-  { type: "stress", icon: "pulse", pattern: /stress/i, label: "Stress" },
-  { type: "medication", icon: "capsule", pattern: /medication|medicine|drug/i, label: "Medication" },
-  { type: "hydration", icon: "drop", pattern: /hydrat|water/i, label: "Hydration" },
-  { type: "menstrual_cycle", icon: "ring", pattern: /menstrual|period|cycle/i, label: "Menstrual cycle" },
-];
-
 function journalEvents(rows: JournalRow[], selectedDate: string, windowDays: number): JournalEventViewModel[] {
   const startDate = shiftCalendarDateKey(selectedDate, -(windowDays - 1));
   return rows.flatMap((row) => {
     if (row.answered_yes !== 1 || !row.cycle_start) return [];
     const physiologicalDate = calendarDateKey(row.cycle_start);
     if (physiologicalDate < startDate || physiologicalDate > selectedDate) return [];
-    const rule = JOURNAL_EVENT_RULES.find((candidate) => candidate.pattern.test(row.question_text));
+    const rule = classifyJournalQuestion(row.question_text);
     return [{
       id: row.id,
-      type: rule?.type ?? "other",
-      label: rule?.label ?? row.question_text.replace(/\?$/, ""),
+      type: rule.type,
+      label: rule.label,
       occurredAt: row.cycle_start,
       physiologicalDate,
-      icon: rule?.icon ?? "tag",
+      icon: rule.icon,
       metadata: { answeredYes: true, questionText: row.question_text },
       source: "WHOOP Journal" as const,
     }];
@@ -658,6 +693,7 @@ function selectWindowDays(days: CanonicalDay[], selectedDate: string) {
 export function buildLongitudinalHealthView(input: LongitudinalEngineInput): LongitudinalHealthView {
   const generatedAt = input.now.toISOString();
   const selectedDate = calendarDateKey(input.now);
+  const journalRows = deduplicateJournalRows(input.journalRows);
   const allCanonical = canonicalize(input);
   const windowDays = selectWindowDays(allCanonical, selectedDate);
   const startDate = shiftCalendarDateKey(selectedDate, -(windowDays - 1));
@@ -731,20 +767,26 @@ export function buildLongitudinalHealthView(input: LongitudinalEngineInput): Lon
     persistenceDays: metric.persistenceDays, confidence: metric.confidence, statementType: metric.statementType,
     provenance: metric.provenance, limitations: metric.limitations,
   }));
-  const dataCoverage = buildCoverage(selectedDate, windowDays, canonical, input.bodyRows, input.hevyRows, workoutPoints, walkingPoints, input.journalRows);
+  const dataCoverage = buildCoverage(selectedDate, windowDays, canonical, input.bodyRows, input.hevyRows, workoutPoints, walkingPoints, journalRows);
+  const latestJournalImport = [...(input.journalImports ?? [])].sort((left, right) => right.imported_at.localeCompare(left.imported_at))[0];
+  const journalCoverageEnd = (input.journalImports ?? []).flatMap((item) => item.date_end ? [calendarDateKey(item.date_end)] : []).sort().at(-1) ?? null;
   return {
     generatedAt, selectedDate, timezone: HEALTH_TIME_ZONE, windowDays,
     aggregateTrend: aggregate(metrics), domains, currentDeviation: currentDeviation([...physiological, ...sleep], selectedDate),
-    notableTrends, recordedAssociations: associations(input.journalRows, canonical, windowDays),
-    journalEvents: journalEvents(input.journalRows, selectedDate, windowDays),
-    alcoholLog: buildAlcoholLogView(input.journalRows, selectedDate),
+    notableTrends, recordedAssociations: associations(journalRows, canonical, windowDays),
+    journalEvents: journalEvents(journalRows, selectedDate, windowDays),
+    alcoholLog: buildAlcoholLogView(input.journalRows, selectedDate, {
+      importCount: input.journalImports?.length ?? 0,
+      latestImportAt: latestJournalImport?.imported_at ?? null,
+      coverageEnd: journalCoverageEnd,
+    }),
     domainCards: domainCards(domains, dataCoverage),
     dataCoverage,
   };
 }
 
 export async function getLongitudinalHealthView(): Promise<LongitudinalHealthView> {
-  const [liveDays, exportDays, bodyRows, hevyRows, workoutRows, journalRows, exportWorkoutRows] = await Promise.all([
+  const [liveDays, exportDays, bodyRows, hevyRows, workoutRows, journalRows, exportWorkoutRows, journalImports] = await Promise.all([
     dbAll<LiveDayRow>(`
       SELECT c.id AS source_record_id, c.start AS cycle_start, s."end" AS sleep_end,
              c.timezone_offset, c.synced_at, r.recovery_score, r.resting_heart_rate,
@@ -770,6 +812,7 @@ export async function getLongitudinalHealthView(): Promise<LongitudinalHealthVie
     dbAll<ExportWorkoutRow>(`SELECT workout_start, workout_end, activity_name, duration_minutes,
       zone_2_percentage, zone_3_percentage, zone_4_percentage, zone_5_percentage
       FROM whoop_export_workouts ORDER BY workout_start`),
+    dbAll<JournalImportRow>(`SELECT imported_at, date_end FROM whoop_export_imports ORDER BY imported_at DESC`),
   ]);
-  return buildLongitudinalHealthView({ now: new Date(), liveDays, exportDays, bodyRows, hevyRows, workoutRows, journalRows, exportWorkoutRows });
+  return buildLongitudinalHealthView({ now: new Date(), liveDays, exportDays, bodyRows, hevyRows, workoutRows, journalRows, exportWorkoutRows, journalImports });
 }

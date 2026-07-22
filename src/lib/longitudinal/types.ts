@@ -33,6 +33,14 @@ export type SourceProvenance = {
 export type MetricPoint = {
   date: string;
   value: number | null;
+  personalRange?: {
+    center: number;
+    lower: number;
+    upper: number;
+    sampleCount: number;
+    robustZScore: number;
+    status: "within" | "above" | "below";
+  };
 };
 
 export type MetricTrend = {
@@ -197,6 +205,14 @@ export type AlcoholLogViewModel = {
   calendarDays: AlcoholCalendarDay[];
   heatmapDays: AlcoholCalendarDay[];
   entries: AlcoholLogEntry[];
+  coverage: {
+    sourceAvailable: boolean;
+    latestImportAt: string | null;
+    coverageEnd: string | null;
+    rawAnswerCount: number;
+    deduplicatedAnswerCount: number;
+    alcoholQuestionCount: number;
+  };
 };
 
 export type DomainDisplayMetric = {
