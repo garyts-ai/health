@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { ANATOMY_HERO_FRONT_LAYERS, ANATOMY_HERO_VIEWBOX } from "@/lib/anatomy-hero-manifest";
 import { activeAnatomyRegions, regionsIntersect } from "./anatomy-hero-state";
@@ -15,6 +15,7 @@ import {
   keyframesForLayer,
   timingForLayer,
 } from "./anatomy-assembly";
+import { cycleTiming, recurringKeyframesForLayer } from "./anatomy-cycle";
 import type { AnatomyHeroProps } from "./types";
 import styles from "./anatomy-hero.module.css";
 
@@ -29,25 +30,54 @@ function AnatomyHeroStage({
   weeklyHighlights,
   latestHighlights,
   targetRegionIds = [],
+  autoCycle = false,
   glowEnabled = true,
   className,
 }: AnatomyHeroStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const figureRef = useRef<HTMLDivElement>(null);
-  const animationsRef = useRef<Animation[]>([]);
+  const replayAnimationsRef = useRef<Animation[]>([]);
+  const cycleAnimationsRef = useRef<Animation[]>([]);
+  const motionPausedRef = useRef(controller.state.motionPaused);
+  const [stageVisible, setStageVisible] = useState(true);
   const { completeAssembly, enterLockIn, reducedMotion } = controller;
   const assemblyRun = controller.state.assemblyRun;
 
-  const cancelAnimations = useCallback(() => {
-    animationsRef.current.forEach((animation) => animation.cancel());
-    animationsRef.current = [];
+  useEffect(() => {
+    motionPausedRef.current = controller.state.motionPaused;
+  }, [controller.state.motionPaused]);
+
+  const cancelReplay = useCallback(() => {
+    replayAnimationsRef.current.forEach((animation) => animation.cancel());
+    replayAnimationsRef.current = [];
   }, []);
 
-  useEffect(() => cancelAnimations, [cancelAnimations]);
+  const cancelCycle = useCallback(() => {
+    cycleAnimationsRef.current.forEach((animation) => animation.cancel());
+    cycleAnimationsRef.current = [];
+    if (stageRef.current) delete stageRef.current.dataset.cycling;
+  }, []);
+
+  useEffect(() => () => {
+    cancelReplay();
+    cancelCycle();
+  }, [cancelCycle, cancelReplay]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setStageVisible(entry.isIntersecting && entry.intersectionRatio >= .12),
+      { threshold: [0, .12] },
+    );
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (assemblyRun <= 0) return;
-    cancelAnimations();
+    cancelCycle();
+    cancelReplay();
     if (reducedMotion) {
       completeAssembly();
       return;
@@ -62,7 +92,7 @@ function AnatomyHeroStage({
     for (const asset of ANATOMY_HERO_FRONT_LAYERS) {
       const timing = timingForLayer(asset, width);
       if (!timing) continue;
-      const element = figure.querySelector<HTMLElement>(`[data-layer-id="${asset.id}"]`);
+      const element = figure.querySelector<HTMLElement>(`[data-motion-layer-id="${asset.id}"]`);
       if (!element) continue;
       animations.push(element.animate(keyframesForLayer(asset), {
         delay: timing.delay,
@@ -70,9 +100,9 @@ function AnatomyHeroStage({
         easing: "cubic-bezier(.16, 1, .3, 1)",
         fill: "both",
       }));
-      const hitPath = figure.querySelector<SVGPathElement>(`[data-hit-layer="${asset.id}"]`);
-      if (hitPath) {
-        animations.push(hitPath.animate(keyframesForLayer(asset).map(({ transform, offset }) => ({ transform, offset })), {
+      const hitLayer = figure.querySelector<SVGGElement>(`[data-motion-hit-layer="${asset.id}"]`);
+      if (hitLayer) {
+        animations.push(hitLayer.animate(keyframesForLayer(asset).map(({ transform, offset }) => ({ transform, offset })), {
           delay: timing.delay,
           duration: timing.duration,
           easing: "cubic-bezier(.16, 1, .3, 1)",
@@ -92,11 +122,52 @@ function AnatomyHeroStage({
     energizeMarker.finished.then(() => { stage.dataset.energized = "true"; }).catch(() => undefined);
     lockMarker.finished.then(enterLockIn).catch(() => undefined);
     completeMarker.finished.then(completeAssembly).catch(() => undefined);
-    animationsRef.current = [...animations, energizeMarker, lockMarker, completeMarker];
-  }, [assemblyRun, cancelAnimations, completeAssembly, enterLockIn, reducedMotion]);
+    replayAnimationsRef.current = [...animations, energizeMarker, lockMarker, completeMarker];
+    if (motionPausedRef.current) replayAnimationsRef.current.forEach((animation) => animation.pause());
+  }, [assemblyRun, cancelCycle, cancelReplay, completeAssembly, enterLockIn, reducedMotion]);
 
   useEffect(() => {
-    animationsRef.current.forEach((animation) => {
+    const stage = stageRef.current;
+    const figure = figureRef.current;
+    const canCycle = autoCycle
+      && !reducedMotion
+      && stageVisible
+      && controller.state.phase === "idle"
+      && controller.state.previewRegionIds.length === 0
+      && controller.state.selectedRegionIds.length === 0;
+    if (!stage || !figure || !canCycle) {
+      cancelCycle();
+      return;
+    }
+
+    cancelCycle();
+    stage.dataset.cycling = "true";
+    const timing = cycleTiming();
+    const animations: Animation[] = [];
+    for (const asset of ANATOMY_HERO_FRONT_LAYERS) {
+      const element = figure.querySelector<HTMLElement>(`[data-motion-layer-id="${asset.id}"]`);
+      if (element) animations.push(element.animate(recurringKeyframesForLayer(asset), timing));
+      const hitLayer = figure.querySelector<SVGGElement>(`[data-motion-hit-layer="${asset.id}"]`);
+      if (hitLayer) {
+        const hitFrames = recurringKeyframesForLayer(asset).map(({ transform, offset }) => ({ transform, offset }));
+        animations.push(hitLayer.animate(hitFrames, timing));
+      }
+    }
+    cycleAnimationsRef.current = animations;
+    if (motionPausedRef.current) animations.forEach((animation) => animation.pause());
+    return cancelCycle;
+  }, [
+    autoCycle,
+    cancelCycle,
+    controller.state.phase,
+    controller.state.previewRegionIds.length,
+    controller.state.selectedRegionIds.length,
+    reducedMotion,
+    stageVisible,
+  ]);
+
+  useEffect(() => {
+    [...replayAnimationsRef.current, ...cycleAnimationsRef.current].forEach((animation) => {
       if (controller.state.motionPaused) animation.pause();
       else if (animation.playState === "paused") animation.play();
     });
@@ -104,8 +175,8 @@ function AnatomyHeroStage({
 
   useEffect(() => {
     if (controller.state.phase === "assembling" || controller.state.phase === "lockIn") return;
-    cancelAnimations();
-  }, [cancelAnimations, controller.state.phase]);
+    cancelReplay();
+  }, [cancelReplay, controller.state.phase]);
 
   const setParallax = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (controller.reducedMotion || event.pointerType === "touch" || controller.state.phase === "assembling") return;
@@ -171,17 +242,18 @@ function AnatomyHeroStage({
               .filter((asset) => asset.hitPath && asset.regionIds.length > 0)
               .sort((left, right) => left.z - right.z)
               .map((asset) => (
-                <path
-                  key={asset.id}
-                  data-hit-layer={asset.id}
-                  data-preview={regionsIntersect(asset.regionIds, controller.state.previewRegionIds) || undefined}
-                  data-selected={regionsIntersect(asset.regionIds, controller.state.selectedRegionIds) || undefined}
-                  d={asset.hitPath ?? undefined}
-                  style={{ "--hit-focus-x": `${asset.focusOffset.x}px`, "--hit-focus-y": `${asset.focusOffset.y}px` } as CSSProperties}
-                  onPointerEnter={() => controller.preview(asset.regionIds)}
-                  onPointerLeave={() => controller.preview([])}
-                  onClick={() => controller.toggleSelection(asset.regionIds)}
-                />
+                <g data-motion-hit-layer={asset.id} key={asset.id}>
+                  <path
+                    data-hit-layer={asset.id}
+                    data-preview={regionsIntersect(asset.regionIds, controller.state.previewRegionIds) || undefined}
+                    data-selected={regionsIntersect(asset.regionIds, controller.state.selectedRegionIds) || undefined}
+                    d={asset.hitPath ?? undefined}
+                    style={{ "--hit-focus-x": `${asset.focusOffset.x}px`, "--hit-focus-y": `${asset.focusOffset.y}px` } as CSSProperties}
+                    onPointerEnter={() => controller.preview(asset.regionIds)}
+                    onPointerLeave={() => controller.preview([])}
+                    onClick={() => controller.toggleSelection(asset.regionIds)}
+                  />
+                </g>
               ))}
           </svg>
         </div>
@@ -198,6 +270,7 @@ export function AnatomyHero({
   mode = "idle",
   targetRegionIds = [],
   assemblyRun = 0,
+  autoCycle = false,
   previewRegionIds,
   selectedRegionIds,
   onPreviewChange,
@@ -222,6 +295,7 @@ export function AnatomyHero({
           weeklyHighlights={weeklyHighlights}
           latestHighlights={latestHighlights}
           targetRegionIds={targetRegionIds}
+          autoCycle={autoCycle}
           previewRegionIds={previewRegionIds}
           selectedRegionIds={selectedRegionIds}
           onPreviewChange={onPreviewChange}

@@ -57,6 +57,7 @@ export function AnatomyFigure({
       }}
       glowEnabled={motionMode !== "static"}
       forceReducedMotion={motionMode === "static"}
+      autoCycle={motionMode === "charged"}
     />
   );
 }

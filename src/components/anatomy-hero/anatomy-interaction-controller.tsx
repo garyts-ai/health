@@ -27,6 +27,10 @@ type AnatomyInteractionControllerProps = {
   children: (controller: AnatomyInteractionControllerValue) => React.ReactNode;
 };
 
+function sameRegions(left: readonly BodyRegionId[], right: readonly BodyRegionId[]) {
+  return left.length === right.length && left.every((regionId) => right.includes(regionId));
+}
+
 export function AnatomyInteractionController({
   mode,
   assemblyRun = 0,
@@ -58,12 +62,18 @@ export function AnatomyInteractionController({
   }, []);
 
   useEffect(() => {
-    if (previewRegionIds) dispatch({ type: "preview", regionIds: previewRegionIds });
-  }, [previewRegionIds]);
+    if (state.phase === "assembling" || state.phase === "lockIn") return;
+    if (previewRegionIds && !sameRegions(previewRegionIds, state.previewRegionIds)) {
+      dispatch({ type: "preview", regionIds: previewRegionIds });
+    }
+  }, [previewRegionIds, state.phase, state.previewRegionIds]);
 
   useEffect(() => {
-    if (selectedRegionIds) dispatch({ type: "setSelection", regionIds: selectedRegionIds });
-  }, [selectedRegionIds]);
+    if (state.phase === "assembling" || state.phase === "lockIn") return;
+    if (selectedRegionIds && !sameRegions(selectedRegionIds, state.selectedRegionIds)) {
+      dispatch({ type: "setSelection", regionIds: selectedRegionIds });
+    }
+  }, [selectedRegionIds, state.phase, state.selectedRegionIds]);
 
   useEffect(() => {
     if (assemblyRun <= 0) return;

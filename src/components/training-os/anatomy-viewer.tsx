@@ -104,6 +104,7 @@ export function AnatomyViewer({
             mode="idle"
             targetRegionIds={targetRegionIds}
             assemblyRun={activationRun}
+            autoCycle
             previewRegionIds={previewRegions}
             selectedRegionIds={selectedRegions}
             onPreviewChange={setPreviewRegions}

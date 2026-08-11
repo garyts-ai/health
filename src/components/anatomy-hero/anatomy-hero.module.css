@@ -42,13 +42,21 @@
   transition: transform 180ms cubic-bezier(.16, 1, .3, 1);
 }
 
-.layer {
+.motionLayer {
   position: absolute;
   left: var(--layer-x);
   top: var(--layer-y);
   width: var(--layer-width);
   height: var(--layer-height);
   z-index: var(--layer-z);
+  display: block;
+  transform: translate3d(0, 0, 0);
+  transform-origin: 50% 58%;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
   display: block;
   opacity: 1;
   transform: translate3d(0, 0, 0);
@@ -60,6 +68,7 @@
 }
 
 .hitMap { position: absolute; inset: 0; z-index: 12; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.hitMap g { transform-origin: center; }
 .hitMap path { fill: rgb(255 255 255 / .001); stroke: none; pointer-events: visiblePainted; cursor: pointer; transition: transform 220ms cubic-bezier(.16, 1, .3, 1); }
 .hitMap path[data-preview],
 .hitMap path[data-selected] { transform: translate3d(var(--hit-focus-x), var(--hit-focus-y), 0); }
@@ -130,7 +139,7 @@
   opacity: .78;
   filter: drop-shadow(0 0 calc(8px * var(--glow-limit)) rgb(69 232 255 / .62));
 }
-.stage[data-glow] .layer[data-latest] .energy { opacity: .78; animation: latestEnergySweep 3.4s cubic-bezier(.16, 1, .3, 1) infinite; }
+.stage[data-glow] .layer[data-latest] .energy { opacity: .66; animation: latestEnergyFlow 6.8s linear infinite; }
 
 .stage:not([data-glow]) .art { animation: none !important; filter: saturate(.88) brightness(.93) !important; }
 .stage:not([data-glow]) .rim,
@@ -175,6 +184,8 @@
 .stage[data-has-active] .depthField { opacity: .82; }
 .stage[data-has-active] .floor { filter: blur(2px) brightness(1.22); }
 .stage[data-phase="lockIn"] .floor { animation: floorLock 240ms cubic-bezier(.16, 1, .3, 1) both; }
+.stage[data-cycling] .depthField { animation: orbitField 10.8s linear 1.4s infinite; }
+.stage[data-cycling] .floor { animation: orbitFloor 10.8s linear 1.4s infinite; }
 
 .stage[data-motion-paused] *,
 .stage[data-motion-paused] *::before,
@@ -182,11 +193,23 @@
 
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-@keyframes latestEnergySweep {
-  0%, 46% { background-position: 50% 135%; opacity: .36; }
-  58% { opacity: .9; }
-  76% { background-position: 50% -35%; opacity: .7; }
-  82%, 100% { background-position: 50% -35%; opacity: .36; }
+@keyframes latestEnergyFlow {
+  0% { background-position: 50% 130%; opacity: .5; }
+  52% { opacity: .72; }
+  100% { background-position: 50% -28%; opacity: .5; }
+}
+
+@keyframes orbitField {
+  0%, 26%, 84%, 100% { transform: translate(calc(var(--parallax-x) * -.45), calc(var(--parallax-y) * -.45)) scaleX(1); opacity: .62; }
+  38% { transform: translate(calc(var(--parallax-x) * -.45 - 5px), calc(var(--parallax-y) * -.45)) scaleX(.96); opacity: .78; }
+  55% { transform: translate(calc(var(--parallax-x) * -.45 + 5px), calc(var(--parallax-y) * -.45)) scaleX(1.04); opacity: .86; }
+  76% { transform: translate(calc(var(--parallax-x) * -.45), calc(var(--parallax-y) * -.45)) scaleX(1); opacity: .72; }
+}
+
+@keyframes orbitFloor {
+  0%, 26%, 84%, 100% { transform: perspective(300px) rotateX(65deg) rotateZ(0deg) translate(calc(var(--parallax-x) * .1), calc(var(--parallax-y) * .1)); }
+  45% { transform: perspective(300px) rotateX(65deg) rotateZ(-3deg) translate(calc(var(--parallax-x) * .1 - 6px), calc(var(--parallax-y) * .1)); }
+  62% { transform: perspective(300px) rotateX(65deg) rotateZ(3deg) translate(calc(var(--parallax-x) * .1 + 6px), calc(var(--parallax-y) * .1)); }
 }
 
 @keyframes suitLock {

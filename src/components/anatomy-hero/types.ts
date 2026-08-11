@@ -10,6 +10,7 @@ export type AnatomyHeroProps = {
   mode?: AnatomyHeroMode;
   targetRegionIds?: BodyRegionId[];
   assemblyRun?: number;
+  autoCycle?: boolean;
   previewRegionIds?: BodyRegionId[];
   selectedRegionIds?: BodyRegionId[];
   onPreviewChange?: (regions: BodyRegionId[]) => void;
