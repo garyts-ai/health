@@ -29,20 +29,20 @@
 .header p,
 .session p {
   margin: 0;
-  color: var(--os-text-muted);
-  font-size: .68rem;
+  color: var(--os-text-secondary);
+  font-size: .75rem;
 }
 
 .kicker {
   color: var(--os-signal-current);
-  font: .6rem var(--font-geist-mono), monospace;
+  font: .75rem var(--font-geist-mono), monospace;
   letter-spacing: .1em;
   text-transform: uppercase;
 }
 
 .online {
   color: var(--os-signal-positive);
-  font: .64rem var(--font-geist-mono), monospace;
+  font: .75rem var(--font-geist-mono), monospace;
   text-transform: uppercase;
 }
 
@@ -150,7 +150,7 @@
   border: 1px solid var(--os-line-subtle);
   background: #090b11;
   color: var(--os-text-secondary);
-  font: .65rem var(--font-geist-mono), monospace;
+  font: .75rem var(--font-geist-mono), monospace;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -161,8 +161,8 @@
 
 .session { padding: 4px 18px 8px; }
 .session span,
-.volumeHeading span { color: var(--os-text-muted); font: .58rem var(--font-geist-mono), monospace; text-transform: uppercase; }
-.session strong { display: block; margin: 2px 0; font-size: .76rem; }
+.volumeHeading span { color: var(--os-text-secondary); font: .75rem var(--font-geist-mono), monospace; text-transform: uppercase; }
+.session strong { display: block; margin: 2px 0; font-size: .875rem; }
 
 .legend {
   display: flex;
@@ -170,7 +170,7 @@
   gap: 8px 16px;
   padding: 4px 18px 10px;
   color: var(--os-text-secondary);
-  font-size: .64rem;
+  font-size: .75rem;
 }
 
 .legend span::before {
@@ -210,7 +210,7 @@
   text-transform: uppercase;
 }
 
-.empty { color: var(--os-text-muted); font-size: .72rem; }
+.empty { color: var(--os-text-secondary); font-size: .75rem; }
 
 @container (max-width: 680px) {
   .volume { grid-template-columns: repeat(2, minmax(0, 1fr)); }

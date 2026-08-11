@@ -68,6 +68,8 @@ The visible-by-default hero is fully assembled before hydration. Standard hover,
 
 The Today telemetry rail has one shared interaction state. Pointer, touch, and keyboard input scrub the same seven-day index across all three charts, with a visible exact-date readout and explicit null states. Charts never autoplay or interpolate missing observations.
 
+The default dashboard is expert-density, not onboarding-density. A closed chart contains its metric name, one decision-relevant KPI, and the plot. Exact observations, baseline and range statistics, coverage, confidence, and provenance move to hover/focus readouts or native disclosures. Persistent supporting copy is reserved for exceptional states such as stale, sparse, missing, failed, disconnected, or outside-range data.
+
 The Observatory uses small multiples for rapid comprehension: each domain card shows a real metric unit, actual variation, confidence, coverage, and an inline drill-down. Recorded journal answers are dated event marks with explicit filters; they are never rendered as a seventh health domain. Recorded relationship cards show samples, lag, robust difference, confidence, and a non-causal limitation. The production Visual analysis section retains its six interactive metric cards and range controls.
 
 Observatory charts share a quiet telemetry treatment: three-tick compact axes, date anchors, baseline guides, pointer/keyboard crosshairs, and exact-value inspection. Domain identity accents stay distinct from trend status (mint physiology, violet sleep, amber cardio, cyan movement, magenta strength, ion-blue body weight). Body weight is displayed in pounds; source storage remains kilograms.

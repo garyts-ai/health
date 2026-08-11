@@ -1,0 +1,10 @@
+.header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.header h3 { margin: 0; color: var(--os-text-primary); font-size: .92rem; line-height: 1.2; }
+.figure { display: grid; justify-items: end; gap: 4px; min-width: 0; text-align: right; }
+.figure[data-metric="hrv"] { --metric-tone: var(--metric-hrv); }
+.figure[data-metric="restingHeartRate"] { --metric-tone: var(--metric-resting-hr); }
+.figure[data-metric="strain"] { --metric-tone: var(--metric-strain); }
+.figure[data-metric="skinTemperature"] { --metric-tone: var(--metric-skin-temperature); }
+.figure[data-metric="alcohol"] { --metric-tone: var(--metric-alcohol); }
+.figure strong { color: var(--metric-tone, var(--os-signal-current)); font: 750 1.35rem/1 var(--font-geist-mono), monospace; font-variant-numeric: tabular-nums; }
+.figure span { color: var(--os-signal-caution); font-size: .75rem; line-height: 1.25; }

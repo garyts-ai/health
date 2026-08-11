@@ -10,7 +10,7 @@ import {
 
 import type { LongitudinalHealthView } from "@/lib/longitudinal/types";
 import { alcoholHeatmapDays } from "@/lib/longitudinal/alcohol-log";
-import { TimeSeriesChart, buildTimeSeriesGeometry, downsampleTimeSeries, filterTimeSeriesRange, nearestTimeSeriesPoint, visiblePointDates, type TimeSeriesMetricIdentity, type TimeSeriesPersonalRange, type TimeSeriesPoint } from "@/components/training-os";
+import { ChartDataDisclosure, ChartHeader, TimeSeriesChart, buildTimeSeriesGeometry, downsampleTimeSeries, filterTimeSeriesRange, nearestTimeSeriesPoint, visiblePointDates, type TimeSeriesMetricIdentity, type TimeSeriesPersonalRange, type TimeSeriesPoint } from "@/components/training-os";
 
 import styles from "./longitudinal-observatory.module.css";
 
@@ -221,12 +221,6 @@ function graphValue(value: number | null, unit: string) {
   return value === null || !Number.isFinite(value) ? "—" : `${Number(value.toFixed(1))}${unit}`;
 }
 
-function graphDirection(baseline: number | null, average: number | null) {
-  if (baseline === null || average === null) return "No comparison";
-  if (Math.abs(average - baseline) < 0.05) return "Near baseline";
-  return average > baseline ? "Above full-period baseline" : "Below full-period baseline";
-}
-
 function rangeValues(series: GraphSeries, range: ChartRange, selectedDate: string) {
   return filterTimeSeriesRange(series.values, range, selectedDate);
 }
@@ -242,18 +236,19 @@ function MetricGraph({ series, range, rangeLabel, selectedDate, activeDate, pinn
 
   return (
     <article className={styles.metricGraph}>
-      <header>
-        <div><h3>{series.label}</h3><span>{present.length} observation{present.length === 1 ? "" : "s"}</span></div>
-        <div className={styles.metricGraphValue} data-metric={series.metric}><strong>{graphValue(active?.value ?? latest?.value ?? null, series.unit)}</strong><span>{outOfRange ? "Outside personal range" : graphDirection(series.baseline, average)}</span></div>
-      </header>
+      <ChartHeader title={series.label} value={graphValue(active?.value ?? latest?.value ?? null, series.unit)} metric={series.metric} status={outOfRange ? "Outside personal range" : undefined} />
       {present.length < 2 ? <div className={styles.metricGraphEmpty}>No observations in {rangeLabel}</div> : (
         <div className={styles.chartInteractive}>
-          <div className={styles.metricGraphStats}><span>max {graphValue(Math.max(...summaryValues), series.unit)}</span><span>avg {graphValue(average, series.unit)}</span><span>min {graphValue(Math.min(...summaryValues), series.unit)}</span></div>
           <TimeSeriesChart metric={series.metric} label={series.label} unit={series.unit} points={values} baseline={series.baseline} presentation="area-line" range={range} activeDate={activeDate} pinnedDate={pinnedDate} showTooltip={Boolean(pinnedDate || (activeDate && activeDate !== selectedDate))} formatValue={(value) => graphValue(value, series.unit)} onActiveDateChange={onActiveDateChange} onPinnedDateChange={onPinnedDateChange} />
-          <div className={styles.metricGraphDates}><span>{graphDate(present[0]?.date ?? null)}</span><strong>{active ? `${graphDate(active.date)} ${graphValue(active.value, series.unit)}` : "Select a point"}</strong><span>{graphDate(latest?.date ?? null)}</span></div>
         </div>
       )}
-      <footer><span>baseline {graphValue(series.baseline, series.unit)}</span><span>range avg {graphValue(average, series.unit)}</span></footer>
+      <ChartDataDisclosure rows={[
+        { label: "Observations", value: present.length },
+        { label: "Baseline", value: graphValue(series.baseline, series.unit) },
+        { label: "Range average", value: graphValue(average, series.unit) },
+        ...(summaryValues.length ? [{ label: "Range", value: `${graphValue(Math.min(...summaryValues), series.unit)} – ${graphValue(Math.max(...summaryValues), series.unit)}` }] : []),
+        ...present.map((point) => ({ label: graphDate(point.date), value: graphValue(point.value, series.unit) })),
+      ]} />
     </article>
   );
 }
@@ -280,8 +275,9 @@ function AlcoholLogGraph({ view, range, activeDate, pinnedDate, onActiveDateChan
       : logged === 0
         ? "No recorded alcohol in this range"
         : latest ? `Latest ${graphDate(latest)}` : "Recorded journal data available";
+  const exceptionalStatus = !sourceAvailable || (coverageEnd && coverageEnd < view.selectedDate) || logged === 0 ? coverageCopy : undefined;
   return <article className={styles.metricGraph} data-alcohol-graph="true">
-    <header><div><h3>Alcohol log</h3><span>Explicit journal dates</span></div><div className={styles.metricGraphValue} data-metric="alcohol"><strong>{logged} {logged === 1 ? "entry" : "entries"}</strong><span>{coverageCopy}</span></div></header>
+    <ChartHeader title="Alcohol log" value={`${logged} ${logged === 1 ? "entry" : "entries"}`} metric="alcohol" status={exceptionalStatus} />
     <div className={styles.alcoholMiniChart} data-week={range === "week"} role="group" tabIndex={0} aria-label={`Alcohol log for ${range === "all" ? "all available history" : rangeLabelFor(range)}. ${logged} entries${latest ? `, latest ${graphDate(latest)}` : "."} Use arrow keys to inspect, Enter to pin, and Escape to return to latest.`} onKeyDown={(event) => {
       if (!renderedDays.length || !["ArrowLeft", "ArrowRight", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
       event.preventDefault();
@@ -293,8 +289,13 @@ function AlcoholLogGraph({ view, range, activeDate, pinnedDate, onActiveDateChan
     }}>
       {renderedDays.length ? renderedDays.map((day) => <button key={day.date} type="button" className={styles.alcoholMiniDay} data-logged={day.hasAlcoholEntry} data-active={day.date === activeDate} aria-pressed={day.date === pinnedDate} aria-label={`${graphDate(day.date)}${day.hasAlcoholEntry ? `, ${day.entryCount} ${day.entryCount === 1 ? "entry" : "entries"}` : ", no alcohol entry"}`} title={`${graphDate(day.date)}${day.hasAlcoholEntry ? ` · ${day.entryCount} ${day.entryCount === 1 ? "entry" : "entries"}` : " · No alcohol entry"}`} onPointerEnter={() => onActiveDateChange(day.date)} onClick={() => { onActiveDateChange(day.date); onPinnedDateChange(day.date); }} />) : <span className={styles.alcoholMiniEmpty}>{coverageCopy}</span>}
     </div>
-    <div className={styles.metricGraphDates}><span>{graphDate(days[0]?.date ?? null)}</span><strong>{coverageCopy}</strong><span>{graphDate(days.at(-1)?.date ?? null)}</span></div>
-    <footer><span>{rawCount !== null && deduplicatedCount !== null ? `${deduplicatedCount} unique of ${rawCount} imported answers` : "Warm orange marks logged days"}</span><span>{latestImport ? `Imported ${graphDate(latestImport.slice(0, 10))}` : "Tracking only"}</span></footer>
+    <ChartDataDisclosure label="Log details" rows={[
+      { label: "Coverage", value: coverageCopy },
+      { label: "First day", value: graphDate(days[0]?.date ?? null) },
+      { label: "Latest day", value: graphDate(days.at(-1)?.date ?? null) },
+      ...(rawCount !== null && deduplicatedCount !== null ? [{ label: "Imported answers", value: `${deduplicatedCount} unique of ${rawCount}` }] : []),
+      { label: "Latest import", value: latestImport ? graphDate(latestImport.slice(0, 10)) : "Tracking only" },
+    ]} />
   </article>;
 }
 
@@ -341,14 +342,12 @@ function MetricGraphs({ view }: { view: LongitudinalHealthView }) {
   return (
     <section className={`hud-frame ${styles.graphs}`} aria-labelledby="longitudinal-graphs-title">
       <header className={styles.graphsHeader}>
-        <div>
-          <h2 id="longitudinal-graphs-title">Visual analysis</h2>
-          <p>Chart window only: {rangeLabel} ending {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${view.selectedDate}T12:00:00Z`))} · {visibleCount} recorded cycles. Report findings use the independent 28-day analysis window.</p>
-        </div>
+        <h2 id="longitudinal-graphs-title">Visual analysis</h2>
         <div className={styles.rangeControls} role="group" aria-label="Metric graph range">
           {CHART_RANGES.map((item) => <button key={item.key} type="button" aria-pressed={range === item.key} onClick={() => updateRange(item.key)}>{item.label}</button>)}
         </div>
       </header>
+      <ChartDataDisclosure label="Analysis window" rows={[{ label: "Range", value: `${rangeLabel} through ${graphDate(view.selectedDate)}` }, { label: "Recorded cycles", value: visibleCount }, { label: "Finding window", value: "Independent 28-day analysis" }]} />
       <div className={styles.graphsGrid}>
         {productionSeries.map((item) => <MetricGraph key={item.key} series={item} range={range} rangeLabel={rangeLabel} selectedDate={view.selectedDate} activeDate={activeDate} pinnedDate={pinnedDate} onActiveDateChange={setActiveDate} onPinnedDateChange={(date) => { setPinnedDate(date); if (date) setActiveDate(date); }} />)}
         <AlcoholLogGraph view={view} range={range} activeDate={activeDate} pinnedDate={pinnedDate} onActiveDateChange={setActiveDate} onPinnedDateChange={(date) => { setPinnedDate(date); if (date) setActiveDate(date); }} />
@@ -401,16 +400,6 @@ function topObservations(view: LongitudinalHealthView, observations: Observation
     });
   }
   return result.slice(0, 3);
-}
-
-function aggregateCounts(view: LongitudinalHealthView, domains: DomainModel[]) {
-  const aggregate = record(record(view).aggregateTrend);
-  const count = (key: "improving" | "stable" | "weakening") => number(aggregate[`${key}Count`]) ?? domains.filter((item) => item.direction === key).length;
-  return {
-    improving: count("improving"),
-    stable: count("stable"),
-    weakening: count("weakening"),
-  };
 }
 
 function endpoint(directionValue: Direction, x: number, y: number) {
@@ -552,13 +541,8 @@ function DomainDetail({ domain, observations, panelId, events = [] }: { domain: 
       <header className={styles.detailHeader}>
         <div>
           <h3 id={`${panelId}-title`}>{domain.label}</h3>
-          <p>{domain.summary}</p>
         </div>
-        <dl>
-          <div><dt>Direction</dt><dd>{DIRECTION_LABELS[domain.direction]}</dd></div>
-          <div><dt>Confidence</dt><dd>{domain.confidence}</dd></div>
-          <div><dt>Coverage</dt><dd>{formatPercent(domain.coverage)}</dd></div>
-        </dl>
+        <ChartDataDisclosure label="Domain evidence" rows={[{ label: "Direction", value: DIRECTION_LABELS[domain.direction] }, { label: "Confidence", value: domain.confidence }, { label: "Coverage", value: formatPercent(domain.coverage) }]} />
       </header>
       <div className={styles.detailControls} role="group" aria-label="Detail chart controls">
         {domain.metrics.length > 1 ? <label className={styles.metricSelector}>Metric<select value={domain.metrics.some((metric) => text(metric.id) === activeMetricId) ? activeMetricId : text(domain.metric?.id)} onChange={(event) => setActiveMetricId(event.target.value)}>{domain.metrics.map((metric) => <option key={text(metric.id)} value={text(metric.id)}>{text(metric.label, text(metric.id))}</option>)}</select></label> : null}
@@ -569,10 +553,12 @@ function DomainDetail({ domain, observations, panelId, events = [] }: { domain: 
       </div>
       <MetricChart domain={activeDomain} showRaw={showRaw} showSmoothed={showSmoothed} showBaseline={showBaseline} showEvents={showEvents} events={events} />
       {matching.length ? <ol className={styles.domainObservations}>{matching.map((item) => <li key={item.id}><strong>{item.title}</strong><p>{item.observation}</p></li>)}</ol> : null}
-      <div className={styles.knownUnknown}>
-        <section><h4>Known</h4><p>{domain.summary}</p><p className={styles.provenance}>{matching.length ? `${matching[0].startDate ?? "Start unavailable"} – ${matching[0].endDate ?? "end unavailable"} · ${sentenceCase(matching[0].statementType)} · ${matching[0].sourceRecordIds.length} source records` : `${domain.confidence} confidence · ${formatPercent(domain.coverage)} coverage`}</p></section>
-        <section><h4>Unknown</h4>{domain.limitations.length ? <ul>{domain.limitations.map((item) => <li key={item}>{item}</li>)}</ul> : <p>The connected data does not establish why this pattern occurred.</p>}</section>
-      </div>
+      <ChartDataDisclosure label="Limitations and provenance">
+        <div className={styles.knownUnknown}>
+          <section><h4>Provenance</h4><p>{matching.length ? `${matching[0].startDate ?? "Start unavailable"} – ${matching[0].endDate ?? "end unavailable"} · ${sentenceCase(matching[0].statementType)} · ${matching[0].sourceRecordIds.length} source records` : `${domain.confidence} confidence · ${formatPercent(domain.coverage)} coverage`}</p></section>
+          <section><h4>Limitations</h4>{domain.limitations.length ? <ul>{domain.limitations.map((item) => <li key={item}>{item}</li>)}</ul> : <p>The connected data does not establish why this pattern occurred.</p>}</section>
+        </div>
+      </ChartDataDisclosure>
     </section>
   );
 }
@@ -754,11 +740,8 @@ function CompactDomainVisual({ card, timeframe, selectedDate, activeDate, onActi
 
 function DomainSnapshotCard({ card, timeframe, selectedDate, onSelect, selected }: { card: UnknownRecord; timeframe: Timeframe; selectedDate: string; onSelect: () => void; selected: boolean }) {
   const primary = record(card.primaryMetric);
-  const secondary = record(card.secondaryMetric);
   const cardDirection = direction(card.direction);
   const title = DOMAIN_LABELS[text(card.id)] ?? text(card.title, "Health domain");
-  const primaryChange = number(primary.absoluteChange);
-  const secondaryChange = number(secondary.absoluteChange);
   const filteredChartPoints = records(primary.points)
     .map(timeSeriesPoint)
     .filter((point): point is TimeSeriesPoint & { value: number } => Boolean(point.date) && point.value !== null && point.date >= shiftDate(selectedDate, -(timeframe - 1)) && point.date <= selectedDate);
@@ -768,15 +751,9 @@ function DomainSnapshotCard({ card, timeframe, selectedDate, onSelect, selected 
   const [pinnedDate, setPinnedDate] = useState<string | null>(null);
   const resolvedActiveDate = activeDate && chartPoints.some((point) => point.date === activeDate) ? activeDate : latestDate;
   const activePoint = resolvedActiveDate ? chartPoints.find((point) => point.date === resolvedActiveDate) ?? null : null;
-  const metricLine = (metric: UnknownRecord, change: number | null) => {
-    if (!text(metric.label)) return null;
-    const unit = text(metric.unit);
-    const sign = change === null ? "" : change > 0 ? "↑ " : change < 0 ? "↓ " : "→ ";
-    return <div className={styles.cardMetric}><span>{text(metric.label)}</span><strong>{change === null ? displayNumber(number(metric.currentValue), unit) : `${sign}${displayNumber(Math.abs(change), unit)}`}</strong></div>;
-  };
   return (
     <article className={styles.domainCard} data-domain={text(card.id)} data-direction={cardDirection} data-selected={selected}>
-      <header><div><h3>{title}</h3><span className={styles.cardDirection}><b aria-hidden="true">{glyphForStatus(cardDirection)}</b>{DIRECTION_LABELS[cardDirection]}</span></div><span className={styles.cardConfidence}>{text(card.confidence, "Not established")}</span></header>
+      <header><div><h3>{title}</h3><span className={styles.cardDirection}><b aria-hidden="true">{glyphForStatus(cardDirection)}</b>{DIRECTION_LABELS[cardDirection]}</span></div><strong className={styles.cardKpi}>{displayNumber(activePoint?.value ?? number(primary.currentValue), text(primary.unit))}</strong></header>
       <div className={styles.domainChartControl} role="group" tabIndex={0} aria-label={`${title} chart. Use arrow keys to inspect, Enter to pin, and Escape to return to latest.${activePoint ? ` Selected ${chartDateLabel(activePoint.date)} ${displayNumber(activePoint.value, text(primary.unit))}.` : ""}`} onPointerLeave={() => setActiveDate(pinnedDate ?? latestDate)} onClick={() => { if (resolvedActiveDate) setPinnedDate(resolvedActiveDate); }} onKeyDown={(event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
         event.preventDefault();
@@ -790,32 +767,24 @@ function DomainSnapshotCard({ card, timeframe, selectedDate, onSelect, selected 
       }}>
         <CompactDomainVisual card={card} timeframe={timeframe} selectedDate={selectedDate} activeDate={resolvedActiveDate} onActiveChange={setActiveDate} />
       </div>
-      <div className={styles.cardMetrics}>{metricLine(primary, primaryChange)}{metricLine(secondary, secondaryChange)}</div>
-      <p className={styles.cardObservation}>{shortObservation(text(card.observation, "No supported observation is available."))}</p>
-      <footer><span>{number(card.coveredDays) ?? 0} / {number(card.expectedDays) ?? 0} days</span><button type="button" className={styles.domainOpen} onClick={onSelect} aria-expanded={selected}>Open detail →</button></footer>
+      <footer><button type="button" className={styles.domainOpen} onClick={onSelect} aria-expanded={selected}>Open detail →</button></footer>
     </article>
   );
 }
 
 function TrajectoryHero({ view, timeframe, setTimeframe, observations }: { view: LongitudinalHealthView; timeframe: Timeframe; setTimeframe: (value: Timeframe) => void; observations: ObservationModel[] }) {
   const aggregate = record(view.aggregateTrend);
-  const counts = aggregateCounts(view, domainModels(view).filter((domain) => domain.key !== "recordedBehaviors"));
   const largest = observations.find((item) => item.id !== "current-deviation") ?? null;
-  const current = record(view.currentDeviation);
   const coverage = record(view.dataCoverage);
   const overall = normalizedCoverage(number(coverage.overall));
   const covered = number(coverage.coveredDays) ?? (overall === null ? null : Math.round((overall / 100) * view.windowDays));
   const expected = number(coverage.expectedDays) ?? view.windowDays;
   return (
     <section className={`hud-frame ${styles.trajectoryHero}`} aria-labelledby="trajectory-hero-title">
-      <div className={styles.heroMain}><div className={styles.heroTitleRow}><div><h2 id="trajectory-hero-title">Long-term signals</h2><p>Describes connected-data trends, not overall health or medical risk.</p></div><div className={styles.timeframeControls} role="group" aria-label="Trajectory timeframe">{TIMEFRAMES.map((item) => <button key={item.value} type="button" aria-pressed={timeframe === item.value} onClick={() => setTimeframe(item.value)}>{item.label}</button>)}</div></div>
+      <div className={styles.heroMain}><div className={styles.heroTitleRow}><div><h2 id="trajectory-hero-title">Long-term signals</h2><p>Connected-data trends, not medical risk.</p></div><div className={styles.timeframeControls} role="group" aria-label="Trajectory timeframe">{TIMEFRAMES.map((item) => <button key={item.value} type="button" aria-pressed={timeframe === item.value} onClick={() => setTimeframe(item.value)}>{item.label}</button>)}</div></div>
         <h3 className={styles.heroStatus}>{text(aggregate.summary, DIRECTION_LABELS[direction(aggregate.direction)])}</h3>
-        <div className={styles.countChips}><span><b>{counts.improving}</b> improving</span><span><b>{counts.stable}</b> stable</span><span><b>{counts.weakening}</b> weakening</span></div>
-      </div>
-      <div className={styles.heroFacts}>
-        <div><span>Largest measured shift</span><strong>{largest ? shortObservation(largest.observation) : "No supported shift"}</strong></div>
-        <div><span>Current deviation</span><strong>{current.active === true && Array.isArray(current.metrics) && current.metrics.length ? `${current.metrics.length} metrics outside recent ranges today` : "No active deviation today"}</strong></div>
-        <div><span>Coverage</span><strong>{overall === null ? "Not established" : `${Math.round(overall)}% · ${covered ?? 0} of ${expected} days`}</strong><details className={styles.coverageDetail}><summary>View breakdown</summary><ul>{Object.entries(record(coverage.bySource)).map(([source, detail]) => <li key={source}><span>{source}</span><b>{Math.round((number(record(detail).ratio) ?? 0) * 100)}%</b></li>)}{strings(coverage.unavailableInputs).length > 0 ? <li><span>Unavailable</span><b>{strings(coverage.unavailableInputs).join(", ")}</b></li> : null}</ul></details></div>
+        <p className={styles.heroShift}>{largest ? shortObservation(largest.observation) : "No supported shift"}</p>
+        <details className={styles.coverageDetail}><summary>Coverage {overall === null ? "not established" : `${Math.round(overall)}% · ${covered ?? 0} of ${expected} days`}</summary><ul>{Object.entries(record(coverage.bySource)).map(([source, detail]) => <li key={source}><span>{source}</span><b>{Math.round((number(record(detail).ratio) ?? 0) * 100)}%</b></li>)}{strings(coverage.unavailableInputs).length > 0 ? <li><span>Unavailable</span><b>{strings(coverage.unavailableInputs).join(", ")}</b></li> : null}</ul></details>
       </div>
     </section>
   );
@@ -846,7 +815,7 @@ export function LongitudinalObservatory({ view }: { view: LongitudinalHealthView
       <TrajectoryHero view={view} timeframe={timeframe} setTimeframe={setTimeframe} observations={observations} />
       <CurrentDeviationBanner view={view} />
       <section className={styles.domainGridSection} aria-labelledby="domain-snapshot-title">
-        <header className={styles.sectionHeader}><div><h2 id="domain-snapshot-title">Domain snapshots</h2><p>Six connected domains, one primary visual, and real metric units.</p></div></header>
+        <header className={styles.sectionHeader}><h2 id="domain-snapshot-title">Domain snapshots</h2></header>
         <div className={styles.domainGrid}>
           {domains.map((domain) => {
             const card = cardById.get(domain.key) ?? { id: domain.key, title: domain.label, direction: domain.direction, confidence: domain.confidence, observation: domain.summary, primaryMetric: domain.metric, secondaryMetric: null, coveredDays: domain.coverage ? Math.round((domain.coverage / 100) * view.windowDays) : 0, expectedDays: view.windowDays };

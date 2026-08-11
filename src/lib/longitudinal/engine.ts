@@ -614,7 +614,7 @@ function domainCards(domains: Omit<LongitudinalHealthView["domains"], "recordedB
     sleep: ["sleep_duration", "sleep_consistency"],
     cardiovascularActivity: ["aerobic_minutes", "day_strain"],
     dailyMovement: ["walking_minutes"],
-    strength: ["strength_frequency", "strength_sets"],
+    strength: ["strength_sets", "strength_frequency"],
     bodyWeight: ["body_weight"],
   };
   return Object.values(domains).map((item) => {

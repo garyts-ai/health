@@ -8,17 +8,18 @@
   color: var(--os-text-primary);
 }
 
-.trajectoryHero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(24rem, 1fr); min-height: 190px; overflow: hidden; }
+.trajectoryHero { min-height: 180px; overflow: hidden; }
 .heroMain { min-width: 0; padding: 18px 20px; }
 .heroTitleRow { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
 .heroTitleRow h2 { margin: 0; color: var(--os-text-primary); font: 800 1.9rem/1 var(--font-big-shoulders), sans-serif; text-transform: uppercase; }
 .heroTitleRow p { max-width: 48ch; margin: 7px 0 0; color: var(--os-text-secondary); font-size: .76rem; line-height: 1.45; }
 .timeframeControls { display: flex; flex-wrap: nowrap; justify-content: end; gap: 2px; }
-.timeframeControls button { min-height: 44px; border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 6px 9px; color: var(--os-text-secondary); font: .62rem var(--font-geist-mono), monospace; cursor: pointer; }
+.timeframeControls button { min-height: 44px; border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 6px 9px; color: var(--os-text-secondary); font: .75rem var(--font-geist-mono), monospace; cursor: pointer; }
 .timeframeControls button:hover, .timeframeControls button:focus-visible { color: var(--os-text-primary); }
 .timeframeControls button:focus-visible { outline: 2px solid var(--os-signal-caution); outline-offset: 2px; }
 .timeframeControls button[aria-pressed="true"] { border-bottom-color: var(--os-signal-current); color: var(--os-text-primary); }
 .heroStatus { margin: 18px 0 10px; color: var(--os-signal-positive); font: 800 1.55rem/1 var(--font-big-shoulders), sans-serif; text-transform: uppercase; }
+.heroShift { max-width: 70ch; margin: 0; color: var(--os-text-primary); font-size: .875rem; line-height: 1.5; }
 .countChips { display: flex; flex-wrap: wrap; gap: 6px; }
 .countChips span { border: 1px solid var(--os-line-subtle); background: #07101c; padding: 7px 9px; color: var(--os-text-secondary); font-size: .68rem; }
 .countChips b { color: var(--os-text-primary); font: 750 .72rem var(--font-geist-mono), monospace; }
@@ -27,8 +28,8 @@
 .heroFacts > div:first-child { border-left: 0; }
 .heroFacts span { color: var(--os-text-muted); font: .6rem var(--font-geist-mono), monospace; text-transform: uppercase; }
 .heroFacts strong { display: block; margin-top: 8px; color: var(--os-text-primary); font-size: .78rem; font-weight: 650; line-height: 1.4; }
-.coverageDetail { margin-top: 8px; color: var(--os-text-secondary); font-size: .64rem; }
-.coverageDetail summary { min-height: 32px; padding-top: 6px; color: var(--os-signal-current); cursor: pointer; }
+.coverageDetail { margin-top: 10px; color: var(--os-text-secondary); font-size: .75rem; }
+.coverageDetail summary { min-height: 44px; color: var(--os-signal-current); line-height: 44px; cursor: pointer; }
 .coverageDetail ul { display: grid; gap: 4px; margin: 3px 0 0; padding: 0; list-style: none; }
 .coverageDetail li { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--os-line-subtle); padding-top: 4px; }
 .coverageDetail b { color: var(--os-text-primary); font: 650 .6rem var(--font-geist-mono), monospace; }
@@ -55,9 +56,10 @@
 .domainCard:focus-visible { z-index: 1; outline: 2px solid var(--domain-tone); outline-offset: -2px; }
 .domainCard header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
 .domainCard h3 { margin: 0; color: var(--os-text-primary); font-size: .88rem; }
-.cardDirection { display: flex; align-items: center; gap: 5px; margin-top: 5px; color: var(--domain-tone); font: .64rem var(--font-geist-mono), monospace; }
+.cardDirection { display: flex; align-items: center; gap: 5px; margin-top: 5px; color: var(--domain-tone); font: .75rem var(--font-geist-mono), monospace; }
 .cardDirection b { font-size: .9rem; }
 .cardConfidence { flex: 0 0 auto; color: var(--os-text-muted); font: .6rem var(--font-geist-mono), monospace; text-transform: uppercase; }
+.cardKpi { flex: 0 0 auto; color: var(--domain-tone); font: 750 1.25rem var(--font-geist-mono), monospace; font-variant-numeric: tabular-nums; }
 .cardChartWrap { position: relative; margin-top: 10px; }
 .domainChartControl { outline: none; cursor: crosshair; }
 .domainChartControl:focus-visible { box-shadow: 0 0 0 2px var(--domain-tone); }
@@ -94,7 +96,7 @@
 .cardMetric span { overflow: hidden; color: var(--os-text-secondary); font-size: .66rem; text-overflow: ellipsis; white-space: nowrap; }
 .cardMetric strong { color: var(--os-text-primary); font: 750 .78rem var(--font-geist-mono), monospace; }
 .cardObservation { min-height: 2.7em; margin: 11px 0 0; color: var(--os-text-secondary); font-size: .7rem; line-height: 1.4; }
-.domainCard footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; color: var(--os-text-muted); font: .75rem var(--font-geist-mono), monospace; }
+.domainCard footer { display: flex; justify-content: flex-end; margin-top: 12px; }
 .domainOpen { min-height: 44px; border: 0; background: transparent; padding: 0 4px; color: var(--domain-tone); font: inherit; cursor: pointer; }
 .domainOpen:focus-visible { outline: 2px solid var(--domain-tone); outline-offset: 2px; }
 .clearFilter { min-height: 44px; border: 1px solid var(--os-line-strong); background: transparent; padding: 0 11px; color: var(--os-text-primary); font: .64rem var(--font-geist-mono), monospace; cursor: pointer; }
@@ -229,10 +231,7 @@
 .rangeControls button[aria-pressed="true"] { border-bottom-color: var(--os-signal-current); color: var(--os-text-primary); background: transparent; }
 .graphsGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--os-line-subtle); }
 .metricGraph { min-width: 0; background: #07101c; padding: 20px; }
-.metricGraph header, .metricGraph footer { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.metricGraph header > div { min-width: 0; }
-.metricGraph header span { display: block; margin-top: 6px; color: var(--os-text-secondary); font-size: .75rem; }
-.metricGraph h3 { margin: 0; overflow: hidden; color: var(--os-text-primary); font-size: .92rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.metricGraph h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .metricGraphValue { display: grid; justify-items: end; gap: 4px; text-align: right; }
 .metricGraphValue { --metric-tone: var(--metric-current); }
 .metricGraphValue[data-metric="hrv"] { --metric-tone: var(--metric-hrv); }
@@ -260,7 +259,6 @@
 .chartTooltip span { color: var(--os-text-secondary); font-size: .64rem; }
 .chartTooltip strong { margin-top: 5px; font: 700 .8rem var(--font-geist-mono), monospace; }
 .chartTooltip em { margin-top: 4px; color: var(--os-text-secondary); font-size: .62rem; font-style: normal; }
-.metricGraph footer { margin-top: 10px; color: var(--os-text-muted); font: .75rem var(--font-geist-mono), monospace; }
 .alcoholMiniChart { display: grid; grid-auto-flow: column; grid-auto-columns: 44px; align-items: center; gap: 6px; min-height: 96px; margin-top: 18px; overflow-x: auto; border-top: 1px solid var(--os-line-subtle); border-bottom: 1px solid var(--os-line-subtle); padding: 14px 2px; outline: none; }
 .alcoholMiniChart[data-week="true"] { grid-template-columns: repeat(7, minmax(44px, 1fr)); grid-auto-flow: row; }
 .alcoholMiniChart:focus-visible { box-shadow: inset 0 0 0 2px var(--os-signal-caution); }
@@ -301,7 +299,7 @@
 .domainTabs .tabState { color: var(--os-text-muted); font: .58rem var(--font-geist-mono), monospace; white-space: nowrap; }
 
 .detail { --domain-tone: var(--os-signal-current); margin-top: 14px; border: 1px solid var(--os-line-strong); border-top: 2px solid var(--domain-tone); border-radius: var(--os-radius-md); background: var(--os-surface-base); box-shadow: inset 0 0 34px color-mix(in srgb, var(--domain-tone) 4%, transparent); }
-.detailHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; border-bottom: 1px solid var(--os-line-strong); padding: 20px; }
+.detailHeader { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 20rem); gap: 24px; align-items: start; border-bottom: 1px solid var(--os-line-strong); padding: 20px; }
 .detailHeader h3 { margin: 0; font: 800 1.7rem var(--font-big-shoulders), sans-serif; text-transform: uppercase; }
 .detailHeader p { max-width: 68ch; margin: 6px 0 0; color: var(--os-text-secondary); font-size: .8rem; line-height: 1.5; }
 .detailHeader dl { display: flex; gap: 1px; margin: 0; background: var(--os-line-subtle); }

@@ -16,8 +16,8 @@ import type { WhoopConnectionStatus } from "@/lib/whoop/types";
 
 type MasterDashboardProps = { anatomyDebug?: boolean; hevy: HevyConnectionStatus; summary: DailySummary; utilityBannerMessage?: string | null; syncStatus?: { whoop?: string; hevy?: string }; whoop: WhoopConnectionStatus; whoopImportReason?: string; whoopImportState?: string; };
 
-function SectionHeading({ id, title, description }: { id: string; title: string; description: string }) {
-  return <header className="district-section-heading"><h2 id={id}>{title}</h2><p>{description}</p></header>;
+function SectionHeading({ id, title, description }: { id: string; title: string; description?: string }) {
+  return <header className="district-section-heading"><h2 id={id}>{title}</h2>{description ? <p>{description}</p> : null}</header>;
 }
 
 export async function MasterDashboard({ anatomyDebug = false, hevy, summary, utilityBannerMessage, syncStatus, whoop, whoopImportReason, whoopImportState }: MasterDashboardProps) {
@@ -50,15 +50,15 @@ export async function MasterDashboard({ anatomyDebug = false, hevy, summary, uti
     </PageTransition>
 
     <PageTransition id="weekly" className="district-section district-ledger-section" labelledBy="weekly-title">
-      <div className="district-container"><SectionHeading id="weekly-title" title="Weekly plan" description="The Monday-to-Sunday plan, completed work, and the training volume still needed this week." /><WeeklyPlanView summary={summary} /></div>
+      <div className="district-container"><SectionHeading id="weekly-title" title="Weekly plan" /><WeeklyPlanView summary={summary} /></div>
     </PageTransition>
 
     <PageTransition id="whoop" className="district-section district-whoop-section" labelledBy="whoop-title">
-      <div className="district-container"><SectionHeading id="whoop-title" title="WHOOP analysis" description="Long-range baselines and the strongest supported patterns from your private export." /><div className="district-whoop-stack"><SectionErrorBoundary label="Longitudinal Health Observatory"><Suspense fallback={<div className="district-whoop-loading" role="status"><span>WHOOP / ANALYSIS</span><strong>Loading the latest physiological record…</strong></div>}><WhoopDistrictContent /></Suspense></SectionErrorBoundary></div></div>
+      <div className="district-container"><SectionHeading id="whoop-title" title="WHOOP analysis" /><div className="district-whoop-stack"><SectionErrorBoundary label="Longitudinal Health Observatory"><Suspense fallback={<div className="district-whoop-loading" role="status"><strong>Loading physiological record…</strong></div>}><WhoopDistrictContent /></Suspense></SectionErrorBoundary></div></div>
     </PageTransition>
 
     <PageTransition id="utilities" className="district-section district-utilities" labelledBy="utilities-title">
-      <div className="district-container"><SectionHeading id="utilities-title" title="Utilities" description="Manage connected records, import long-range WHOOP history, and prepare an evidence packet for external analysis." /><div className="district-utilities__body"><SectionErrorBoundary label="Utilities"><ProtectedSettingsActions hevy={hevy} syncStatus={syncStatus} whoop={whoop} /><Suspense fallback={<div className="district-whoop-loading" role="status"><span>LONGITUDINAL CONTEXT</span><strong>Preparing data coverage and evidence…</strong></div>}><LongitudinalUtilitiesContent importReason={whoopImportReason} importState={whoopImportState} /></Suspense></SectionErrorBoundary></div></div>
+      <div className="district-container"><SectionHeading id="utilities-title" title="Utilities" /><div className="district-utilities__body"><SectionErrorBoundary label="Utilities"><ProtectedSettingsActions hevy={hevy} syncStatus={syncStatus} whoop={whoop} /><Suspense fallback={<div className="district-whoop-loading" role="status"><strong>Preparing evidence…</strong></div>}><LongitudinalUtilitiesContent importReason={whoopImportReason} importState={whoopImportState} /></Suspense></SectionErrorBoundary></div></div>
     </PageTransition>
   </AppShell>;
 }

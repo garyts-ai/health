@@ -73,15 +73,11 @@ export function ProtectedSettingsActions({ hevy, syncStatus, whoop }: { hevy: He
     <fieldset className={styles.fieldset}>
       <legend>Connections</legend>
       <GlassPanel level="base" className={styles.connectionSurface}>
-        <div className={styles.connectionIntro}>
-          <h3>Data sources</h3>
-          <p>Refresh the physiological and lifting records used by the dashboard and context packet.</p>
-        </div>
         <div className={styles.providerList}>
           {providers.map((provider) => {
             const state = !provider.configured ? "Not configured" : !provider.connected ? "Needs attention" : provider.lastSyncStatus === "failed" ? "Sync failed" : provider.stale ? "Connected, stale" : "Connected";
             return <article className={styles.provider} key={provider.name} data-state={state.toLowerCase().replaceAll(",", "").replaceAll(" ", "-")}>
-              <div><h4>{provider.name}</h4><p>Last sync {formatTimestamp(provider.lastSyncCompletedAt)}</p>{provider.grantedScopes ? <p>Granted scope: {provider.grantedScopes.length ? provider.grantedScopes.join(", ") : "none returned"}</p> : null}</div>
+              <div><h4>{provider.name}</h4><p>Last sync {formatTimestamp(provider.lastSyncCompletedAt)}</p>{provider.grantedScopes ? <details className={styles.providerDetail}><summary>Scopes</summary><p>{provider.grantedScopes.length ? provider.grantedScopes.join(", ") : "None returned"}</p></details> : null}</div>
               <span className={styles.state}>{state}</span>
               {provider.lastSyncStatus === "failed" && provider.lastSyncError ? <p className={styles.error}>Last error: {provider.lastSyncError}</p> : null}
               {provider.syncNotice ? <p className={styles.notice} role="status">{provider.syncNotice}</p> : null}

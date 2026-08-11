@@ -1,17 +1,15 @@
 .prescription { display: flex; height: 100%; min-width: 0; flex-direction: column; justify-content: center; padding: 12px 0; }
-.date { margin: 0 0 8px; color: var(--os-signal-current); font: .7rem var(--font-geist-mono),monospace; letter-spacing: .08em; text-transform: uppercase; }
+.date { margin: 0 0 8px; color: var(--os-signal-current); font: .75rem var(--font-geist-mono),monospace; letter-spacing: .08em; text-transform: uppercase; }
 .title { display: grid; width: min-content; margin: 0; font-family: var(--font-big-shoulders),sans-serif; font-weight: 850; line-height: .82; letter-spacing: -.025em; text-transform: uppercase; }
 .title span { color: var(--os-text-primary); font-size: clamp(3.7rem,6vw,5.6rem); -webkit-text-stroke: 1px var(--os-signal-emphasis); text-shadow: 0 0 12px color-mix(in srgb,var(--os-signal-emphasis) 28%,transparent); }
 .title strong { color: var(--os-text-primary); font-size: clamp(4rem,6.8vw,6.3rem); -webkit-text-stroke: 1px var(--os-signal-current); text-shadow: 0 0 14px color-mix(in srgb,var(--os-signal-current) 25%,transparent); }
-.intensity { margin: 15px 0 5px; color: var(--os-text-secondary); font: .68rem var(--font-geist-mono),monospace; text-transform: uppercase; }
+.intensity { margin: 15px 0 8px; color: var(--os-text-secondary); font: .75rem var(--font-geist-mono),monospace; text-transform: uppercase; }
 .intensity strong { color: var(--os-signal-caution); }
-.reason { max-width: 55ch; margin: 0 0 12px; color: var(--os-text-secondary); font-size: .8rem; line-height: 1.55; }
 .mission { padding: 14px 16px; }
-.mission > span { color: var(--os-signal-current); font: .58rem var(--font-geist-mono),monospace; letter-spacing: .08em; text-transform: uppercase; }
-.mission h2 { margin: 4px 0; font-size: 1rem; }
-.mission p { margin: 0; color: var(--os-text-secondary); font-size: .76rem; }
+.mission h2 { margin: 0 0 4px; font-size: 1rem; }
+.mission p { margin: 0; color: var(--os-text-secondary); font-size: .875rem; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.tags span { padding: 5px 8px; background: var(--os-surface-base); color: var(--os-text-secondary); font: .61rem var(--font-geist-mono),monospace; }
+.tags span { padding: 5px 8px; background: var(--os-surface-base); color: var(--os-text-secondary); font: .75rem var(--font-geist-mono),monospace; }
 .evidence article { display: grid; grid-template-columns: 28px 1fr; gap: 8px; padding: 12px 0; border-top: 1px solid var(--os-line-subtle); }
 .evidence article > span { color: var(--os-signal-current); font: .62rem var(--font-geist-mono),monospace; }
 .evidence h3,.changes h3 { margin: 0 0 4px; font-size: .8rem; }.evidence p,.changes p { margin: 0; color: var(--os-text-secondary); font-size: .72rem; line-height: 1.45; }
@@ -29,4 +27,4 @@
 .ruleTrace article > div { display: flex; justify-content: space-between; gap: 8px; }
 .ruleTrace article span { color: var(--os-signal-caution); font: .62rem var(--font-geist-mono),monospace; text-transform: uppercase; }
 .ruleTrace article span[data-outcome="applied"] { color: var(--os-signal-current); }
-@media (min-width:961px) and (max-height:800px) { .prescription { padding-block: 4px; }.title span { font-size: 3.2rem; }.title strong { font-size: 3.8rem; }.reason { margin-bottom: 7px; }.mission { padding: 10px 13px; }.tags { margin-top: 6px; } }
+@media (min-width:961px) and (max-height:800px) { .prescription { padding-block: 4px; }.title span { font-size: 3.2rem; }.title strong { font-size: 3.8rem; }.mission { padding: 10px 13px; }.tags { margin-top: 6px; } }
