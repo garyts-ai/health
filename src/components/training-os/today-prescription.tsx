@@ -35,10 +35,10 @@ export function TodayPrescription({ date, call, intensityLabel, intensity, reaso
     <p className={styles.date}>{date}</p>
     <h1 id="today-title" className={styles.title}><span>Today</span><strong>{call}</strong></h1>
     <p className={styles.intensity}>{intensityLabel}: <strong>{intensity}</strong></p>
-    <p className={styles.reason}>{reason}</p>
-    {recommendation ? <GlassPanel level="raised" className={styles.mission}><span>Mission prescription</span><h2>{recommendation.title}</h2><p>{recommendation.why}</p><div className={styles.tags}>{recommendation.primaryActions.slice(0,3).map((tile)=><span key={tile.label}>{tile.label}</span>)}</div></GlassPanel> : null}
+    {recommendation ? <GlassPanel level="raised" className={styles.mission}><h2>{recommendation.title}</h2><p>{recommendation.why}</p><div className={styles.tags}>{recommendation.primaryActions.slice(0,3).map((tile)=><span key={tile.label}>{tile.label}</span>)}</div></GlassPanel> : null}
     <EvidenceDrawer><div className={styles.evidence}>
       <div className={styles.evidenceSummary}>
+        <p>{reason}</p>
         <p><strong>{decisionEvidence.readinessStatus === "available" ? "Readiness available" : "Readiness unavailable"}</strong> · {decisionEvidence.confidence} confidence</p>
         <p className={styles.evidenceMeta}>Decision recorded {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(decisionEvidence.decisionAt))}</p>
       </div>

@@ -1,5 +1,9 @@
 export { AnatomyViewer } from "./anatomy-viewer";
 export { AppShell } from "./app-shell";
+export { ChartDataDisclosure } from "./chart-data-disclosure";
+export type { ChartDataRow } from "./chart-data-disclosure";
+export { ChartHeader } from "./chart-header";
+export type { ChartHeaderProps } from "./chart-header";
 export { DataRail } from "./data-rail";
 export { EvidenceDrawer } from "./evidence-drawer";
 export { GlassPanel } from "./glass-panel";

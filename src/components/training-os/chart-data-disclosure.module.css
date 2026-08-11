@@ -1,0 +1,6 @@
+.details { margin-top: 10px; border-top: 1px solid var(--os-line-subtle); }
+.details summary { display: flex; min-height: 44px; align-items: center; color: var(--os-text-secondary); font-size: .75rem; font-weight: 700; cursor: pointer; }
+.details dl { margin: 0 0 12px; }
+.details dl > div { display: flex; justify-content: space-between; gap: 18px; padding: 7px 0; border-top: 1px solid var(--os-line-subtle); }
+.details dt, .details dd { margin: 0; color: var(--os-text-secondary); font: .75rem/1.4 var(--font-geist-mono), monospace; }
+.details dd { color: var(--os-text-primary); text-align: right; font-variant-numeric: tabular-nums; }

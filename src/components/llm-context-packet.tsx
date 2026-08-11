@@ -26,14 +26,13 @@ export function LlmContextPacket({ handoff }: LlmContextPacketProps) {
 
   return <GlassPanel level="raised" className={styles.packet}>
     <div className={styles.heading}>
-      <div><h3>Copy longitudinal context</h3><p>Paste the evidence packet into your preferred LLM with a separate question. Measurements, calculations, associations, limitations, and unknowns remain distinct.</p></div>
-      <span>{handoff.contextPacketText.length.toLocaleString()} chars</span>
+      <h3>Copy longitudinal context</h3>
     </div>
     <label className={styles.goal} htmlFor="llm-packet-goal"><span>Question for external analysis</span><textarea id="llm-packet-goal" value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="Example: What additional data would help distinguish plausible explanations for these trends?" /></label>
     <div className={styles.toolbar}>
       <button type="button" onClick={copy}>{copyState === "copied" ? "Copied" : "Copy context packet"}</button>
-      <p role="status">{copyState === "copied" ? "Packet copied to clipboard." : copyState === "error" ? "Clipboard access failed. Open the preview and copy manually." : "Observations and supporting evidence only; no app-authored explanation."}</p>
+      {copyState !== "idle" ? <p role="status">{copyState === "copied" ? "Packet copied." : "Clipboard failed. Open the preview to copy manually."}</p> : null}
     </div>
-    <details className={styles.preview}><summary>Preview packet</summary><pre>{prompt}</pre></details>
+    <details className={styles.preview}><summary>Preview packet</summary><p>Evidence and limitations only; no app-authored explanation.</p><pre>{prompt}</pre></details>
   </GlassPanel>;
 }

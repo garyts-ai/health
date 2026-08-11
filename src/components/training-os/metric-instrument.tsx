@@ -1,6 +1,7 @@
 import type { PointerEventHandler } from "react";
 import type { InstrumentVisual, TodayTelemetryMetric } from "./types";
 import { chartSummary, formatInstrumentValue } from "./telemetry-model";
+import { ChartDataDisclosure } from "./chart-data-disclosure";
 import { TimeSeriesChart, type TimeSeriesMetricIdentity } from "./time-series-chart";
 import styles from "./metric-instrument.module.css";
 
@@ -63,20 +64,30 @@ type Props = TodayTelemetryMetric & {
   onDayPin: (index: number | null) => void;
 };
 
-export function MetricInstrument({ label, value, detail, tone, visual, selectedIndex, permanentIndex, onPointerMove, onPointerLeave, onPointerDown, onDayFocus, onDayPin }: Props) {
+export function MetricInstrument({ label, value, tone, visual, selectedIndex, permanentIndex, onPointerMove, onPointerLeave, onPointerDown, onDayFocus, onDayPin }: Props) {
   const summary = visual ? chartSummary(visual) : null;
   const med = visual ? median(chartValues(visual)) : null;
   const metricId = label.toLowerCase();
   const rangeLabels = metricId === "sleep" ? ["Shortest", "Median", "Longest"] : metricId === "strain" ? ["Low", "Average", "High"] : ["Low", "Median", "High"];
+  const selectedPoint = visual?.points[Math.max(0, Math.min((visual?.points.length ?? 1) - 1, selectedIndex))];
+  const inspectedValue = selectedPoint?.value == null || !visual ? value : formatInstrumentValue(visual, selectedPoint.value);
+  const rows = visual ? [
+    ...visual.points.map((point) => ({ label: dateLabel(point), value: point.value == null ? "No data" : formatInstrumentValue(visual, point.value) })),
+    ...(summary ? [
+      { label: rangeLabels[0], value: formatInstrumentValue(visual, summary.min) },
+      { label: rangeLabels[1], value: formatInstrumentValue(visual, med ?? summary.average) },
+      { label: rangeLabels[2], value: formatInstrumentValue(visual, summary.max) },
+    ] : []),
+    ...(visual.baseline === undefined ? [] : [{ label: "Baseline", value: formatInstrumentValue(visual, visual.baseline) }]),
+  ] : [];
   return <div className={styles.instrument} data-tone={tone} data-metric={metricId}>
     <dt>{label}</dt><dd>
-      <div className={styles.heading}><strong>{value}</strong><p>{detail}</p></div>
+      <div className={styles.heading}><strong>{inspectedValue}</strong></div>
       {visual ? <div className={styles.plot} aria-label={`${label} seven-day chart. Focus the daily telemetry module and use arrow keys to inspect dates.`} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} onPointerDown={onPointerDown}>
         <InstrumentChart visual={visual} label={label} selectedIndex={selectedIndex} permanentIndex={permanentIndex} onDayFocus={onDayFocus} onDayPin={onDayPin} />
         <div className={styles.dayLabels} aria-hidden="true">{visual.points.map((point, index) => <span className={index === selectedIndex ? styles.activeDay : undefined} key={`${point.label}-${index}`}>{point.label.slice(0, 1)}</span>)}</div>
       </div> : null}
-      {summary && visual ? <div className={styles.range} aria-label={`${label} ${rangeLabels[0].toLowerCase()} ${formatInstrumentValue(visual, summary.min)}, ${rangeLabels[1].toLowerCase()} ${formatInstrumentValue(visual, med ?? summary.average)}, ${rangeLabels[2].toLowerCase()} ${formatInstrumentValue(visual, summary.max)}`}><span><small>{rangeLabels[0]}</small>{formatInstrumentValue(visual, summary.min)}</span><span><small>{rangeLabels[1]}</small>{formatInstrumentValue(visual, med ?? summary.average)}</span><span><small>{rangeLabels[2]}</small>{formatInstrumentValue(visual, summary.max)}</span></div> : <p className={styles.empty}>No seven-day data</p>}
-      {visual ? <ul className={styles.srOnly} aria-label={`${label} exact daily observations`}>{visual.points.map((point, index) => <li key={`${point.label}-${index}`} tabIndex={0} onFocus={() => onDayFocus(index)}>{dateLabel(point)}: {point.value == null ? "No data" : formatInstrumentValue(visual, point.value)}</li>)}</ul> : null}
+      {visual?.points.length ? <ChartDataDisclosure rows={rows} /> : <p className={styles.empty}>No seven-day data</p>}
     </dd>
   </div>;
 }

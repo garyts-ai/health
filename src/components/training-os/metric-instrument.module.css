@@ -7,7 +7,7 @@
   --strain-primary: #ff6f91;
   position: relative;
   min-width: 0;
-  min-height: 242px;
+  min-height: 250px;
   padding: 17px 18px 14px;
   background: radial-gradient(circle at 50% 48%, var(--tone-glow), transparent 62%), linear-gradient(180deg, rgba(255, 255, 255, .018), transparent 65%);
 }
@@ -19,11 +19,10 @@
 .instrument[data-metric="sleep"] { --tone: var(--sleep-primary, #9f8cff); --tone-glow: var(--sleep-glow, rgba(159, 140, 255, .15)); }
 .instrument[data-metric="strain"] { --tone: var(--strain-primary, #ff6f91); --tone-glow: var(--strain-glow, rgba(255, 111, 145, .15)); }
 
-.instrument dt { color: var(--os-text-secondary); font: 700 .67rem/1 var(--font-geist-mono), monospace; letter-spacing: .13em; text-transform: uppercase; }
+.instrument > dt { color: var(--os-text-secondary); font: 700 .75rem/1 var(--font-geist-mono), monospace; letter-spacing: .08em; text-transform: uppercase; }
 .instrument dd { margin: 8px 0 0; }
-.heading { display: flex; align-items: baseline; gap: 10px; min-height: 34px; }
+.heading { min-height: 40px; }
 .heading strong { flex: 0 0 auto; color: var(--tone); font: 750 2.15rem/.95 var(--font-big-shoulders), sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; text-shadow: 0 0 20px var(--tone-glow); }
-.heading p { min-width: 0; margin: 0; color: var(--os-text-muted); font-size: .65rem; line-height: 1.35; }
 
 .plot { position: relative; min-height: 143px; margin-top: 9px; cursor: crosshair; touch-action: pan-y; user-select: none; }
 .chart { display: block; width: 100%; height: 122px; overflow: visible; color: var(--tone); }
@@ -41,16 +40,10 @@
 .cursor { stroke: var(--tone); stroke-width: 1; opacity: .55; vector-effect: non-scaling-stroke; }
 .cursor[data-permanent="true"] { opacity: .8; }
 .permanentCursor { stroke: var(--tone); stroke-width: .8; opacity: .3; stroke-dasharray: 1 3; vector-effect: non-scaling-stroke; }
-.dayLabels { display: grid; grid-template-columns: repeat(7, 1fr); margin: 2px 3% 0; color: var(--os-text-muted); font: 650 .58rem/1 var(--font-geist-mono), monospace; text-align: center; }
+.dayLabels { display: grid; grid-template-columns: repeat(7, 1fr); margin: 2px 3% 0; color: var(--os-text-secondary); font: 650 .7rem/1 var(--font-geist-mono), monospace; text-align: center; }
 .activeDay { color: var(--os-text-primary); font-weight: 800; }
 
-.range { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 11px; padding-top: 9px; border-top: 1px solid rgba(185, 200, 222, .11); color: var(--os-text-primary); font: 700 .68rem/1.2 var(--font-geist-mono), monospace; font-variant-numeric: tabular-nums; }
-.range span { display: grid; gap: 4px; }
-.range span + span { border-left: 1px solid rgba(185, 200, 222, .1); padding-left: 8px; }
-.range small { color: var(--os-text-muted); font-size: .53rem; letter-spacing: .1em; text-transform: uppercase; }
-.empty { min-height: 1.2em; margin: 11px 0 0; color: var(--os-text-muted); font-size: .65rem; }
-.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: auto; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.srOnly li:focus { position: fixed; z-index: 5; width: auto; height: auto; padding: 8px; margin: 0; clip: auto; color: var(--os-text-primary); background: var(--os-surface-overlay); }
+.empty { min-height: 44px; margin: 10px 0 0; color: var(--os-text-secondary); font-size: .75rem; }
 
 @media (max-width: 760px) {
   .instrument { min-height: 244px; padding-inline: 16px; }
@@ -63,7 +56,6 @@
   .heading strong { font-size: 1.7rem; }
   .plot { min-height: 115px; margin-top: 4px; }
   .chart { height: 98px; }
-  .range { margin-top: 6px; padding-top: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

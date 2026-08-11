@@ -98,3 +98,34 @@ test("projects callouts from the illustrated asset geometry", () => {
   assert.ok(fullBody.xPercent > 0 && fullBody.xPercent < 100);
   assert.ok(fullBody.yPercent > 0 && fullBody.yPercent < 100);
 });
+
+test("expert-density charts keep one closed KPI and disclose supporting data", () => {
+  const chartHeader = readFileSync(new URL("./chart-header.tsx", import.meta.url), "utf8");
+  const disclosure = readFileSync(new URL("./chart-data-disclosure.tsx", import.meta.url), "utf8");
+  const instrument = readFileSync(new URL("./metric-instrument.tsx", import.meta.url), "utf8");
+  const observatory = readFileSync(new URL("../longitudinal-observatory.tsx", import.meta.url), "utf8");
+
+  assert.match(chartHeader, /<h3>\{title\}<\/h3>/);
+  assert.match(chartHeader, /<strong>\{value\}<\/strong>/);
+  assert.match(disclosure, /<details/);
+  assert.match(disclosure, /<dl>/);
+  assert.match(instrument, /ChartDataDisclosure rows=\{rows\}/);
+  assert.doesNotMatch(instrument, /styles\.range/);
+  assert.doesNotMatch(instrument, /styles\.srOnly/);
+  assert.doesNotMatch(observatory, /styles\.metricGraphStats/);
+  assert.doesNotMatch(observatory, /styles\.metricGraphDates/);
+  assert.doesNotMatch(observatory, /styles\.cardObservation/);
+  assert.doesNotMatch(observatory, /styles\.cardMetrics/);
+});
+
+test("expert workflow metadata remains available through native disclosures", () => {
+  const weekly = readFileSync(new URL("../weekly-plan-view.tsx", import.meta.url), "utf8");
+  const utilities = readFileSync(new URL("../protected-settings-actions.tsx", import.meta.url), "utf8");
+  const packet = readFileSync(new URL("../llm-context-packet.tsx", import.meta.url), "utf8");
+
+  assert.match(weekly, /Plan provenance/);
+  assert.match(weekly, /Score detail/);
+  assert.match(utilities, /<details/);
+  assert.match(packet, /Preview packet/);
+  assert.doesNotMatch(packet, /contextPacketText\.length/);
+});

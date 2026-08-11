@@ -65,13 +65,9 @@ export function DataRail({ metrics, label = "Today telemetry" }: { metrics: Toda
     <div className={styles.interaction} role="group" tabIndex={0} aria-label={`${label}. Use left and right arrow keys to inspect each day. Press Enter to pin a day, or Escape to return to latest.`} aria-describedby={readoutId} onKeyDown={handleKeyDown} onPointerLeave={() => setHoveredKey(undefined)}>
       <header className={styles.telemetryHeader} id={readoutId} aria-live="polite">
         <div className={styles.headerTitle}>
-          <span className={styles.eyebrow}>Daily telemetry</span>
           <strong>{activeLabel}</strong>
-          <span className={styles.selectionState}>{hoveredKey ? "Inspecting day" : "Selected day"}</span>
+          <span className={styles.selectionState}>{hoveredKey ? "Inspecting" : "Pinned"}</span>
         </div>
-        <dl className={styles.headerValues}>
-          {readout.map((item) => <div key={item.label} data-metric={item.label.toLowerCase()}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}
-        </dl>
       </header>
       {hoveredKey ? <div className={styles.tooltip} role="tooltip" aria-label={`Telemetry for ${activeLabel}`}>
         <span>{activeLabel}</span>
