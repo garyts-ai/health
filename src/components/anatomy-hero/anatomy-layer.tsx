@@ -63,33 +63,38 @@ export function AnatomyLayer({
 
   return (
     <span
-      className={styles.layer}
+      className={styles.motionLayer}
       style={style}
-      data-layer-id={asset.id}
+      data-motion-layer-id={asset.id}
       data-depth={asset.depthPlane}
-      data-region-layer={regionLayer || undefined}
-      data-intensity={weeklyIntensity ?? "none"}
-      data-latest={latest || undefined}
-      data-active={active || undefined}
-      data-preview={preview || undefined}
-      data-selected={selected || undefined}
-      data-target={target || undefined}
-      data-dimmed={activeRegionIds.length > 0 && regionLayer && !active || undefined}
-      data-assembling={phase === "assembling" || undefined}
-      data-glow={glowEnabled || undefined}
     >
-      <Image
-        className={styles.art}
-        src={asset.src}
-        alt=""
-        fill
-        sizes="(max-width: 700px) 94vw, 52vw"
-        loading="eager"
-        unoptimized
-        draggable={false}
-      />
-      {regionLayer ? <span className={styles.rim} /> : null}
-      {regionLayer ? <span className={styles.energy} /> : null}
+      <span
+        className={styles.layer}
+        data-layer-id={asset.id}
+        data-region-layer={regionLayer || undefined}
+        data-intensity={weeklyIntensity ?? "none"}
+        data-latest={latest || undefined}
+        data-active={active || undefined}
+        data-preview={preview || undefined}
+        data-selected={selected || undefined}
+        data-target={target || undefined}
+        data-dimmed={activeRegionIds.length > 0 && regionLayer && !active || undefined}
+        data-assembling={phase === "assembling" || undefined}
+        data-glow={glowEnabled || undefined}
+      >
+        <Image
+          className={styles.art}
+          src={asset.src}
+          alt=""
+          fill
+          sizes="(max-width: 700px) 94vw, 52vw"
+          loading="eager"
+          unoptimized
+          draggable={false}
+        />
+        {regionLayer ? <span className={styles.rim} /> : null}
+        {regionLayer ? <span className={styles.energy} /> : null}
+      </span>
     </span>
   );
 }

@@ -97,6 +97,7 @@ export default function AnatomyHeroV2LabPage() {
             mode={mode}
             targetRegionIds={["chest", "frontDelts", "sideDelts", "biceps", "triceps", "forearms", "lats"]}
             assemblyRun={heroRun}
+            autoCycle
             previewRegionIds={previewRegions}
             selectedRegionIds={selectedRegions}
             onPreviewChange={setPreviewRegions}
