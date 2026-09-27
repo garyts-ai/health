@@ -11,7 +11,7 @@ const whoopMessages: Record<string, string> = {
 };
 
 const hevyMessages: Record<string, string> = {
-  "not-configured": "Hevy sync is disabled until HEVY_API_KEY is added to .env.local.",
+  "not-configured": "Hevy sync is disabled until HEVY_API_KEY is configured in the server environment.",
   "sync-success": "Hevy sync completed successfully.",
   "sync-unchanged": "Hevy sync completed; no newer workouts were found.",
   "sync-skipped": "Hevy sync was skipped because the provider is not connected.",

@@ -14,17 +14,19 @@ export async function POST(request: Request) {
 
   try {
     const connection = await getHevyConnectionStatus();
-    if (!connection.isConfigured || !connection.connected) {
+    // The first sync is what establishes the connected state, so only skip
+    // when credentials are absent. Subsequent syncs use the same path.
+    if (!connection.isConfigured) {
       const skipped: ProviderSyncResponse = {
         provider: "hevy",
         status: "skipped",
         attemptedAt,
         completedAt: null,
         latestObservationAt: null,
-        errorCode: connection.isConfigured ? "not_connected" : "not_configured",
+        errorCode: "not_configured",
       };
       if (wantsJson) return NextResponse.json(skipped);
-      redirectUrl.searchParams.set("hevy", "sync-skipped");
+      redirectUrl.searchParams.set("hevy", "not-configured");
       return NextResponse.redirect(redirectUrl, { status: 303 });
     }
 
