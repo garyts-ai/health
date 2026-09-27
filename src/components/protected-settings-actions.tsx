@@ -16,6 +16,7 @@ type ProviderCard = {
   lastSyncStatus: string | null;
   reconnectHref: string | null;
   reconnectLabel: string;
+  syncLabel: string;
   syncAction: string;
   syncNotice: string | null;
   grantedScopes: string[] | null;
@@ -55,7 +56,7 @@ export function ProtectedSettingsActions({ hevy, syncStatus, whoop }: { hevy: He
     {
       name: "WHOOP", connected: whoop.connected, configured: whoop.isConfigured, stale: whoop.isStale,
       lastSyncCompletedAt: whoop.lastSyncCompletedAt, lastSyncError: whoop.lastSyncError, lastSyncStatus: whoop.lastSyncStatus,
-      reconnectHref: whoop.isConfigured && canUseWhoopOAuth ? "/api/auth/whoop" : null,
+      reconnectHref: whoop.isConfigured && canUseWhoopOAuth ? "/api/auth/whoop" : null, syncLabel: "Sync WHOOP",
       reconnectLabel: whoop.isConfigured ? "Reconnect requires HTTPS" : "Configure WHOOP", syncAction: "/api/whoop/sync",
       syncNotice: providerNotice("WHOOP", syncStatus?.whoop),
       grantedScopes: whoop.scopes,
@@ -63,7 +64,9 @@ export function ProtectedSettingsActions({ hevy, syncStatus, whoop }: { hevy: He
     {
       name: "Hevy", connected: hevy.connected, configured: hevy.isConfigured, stale: hevy.isStale,
       lastSyncCompletedAt: hevy.lastSyncCompletedAt, lastSyncError: null, lastSyncStatus: hevy.lastSyncStatus,
-      reconnectHref: null, reconnectLabel: "Configure Hevy", syncAction: "/api/hevy/sync",
+      reconnectHref: null, reconnectLabel: "Configure Hevy",
+      syncLabel: !hevy.isConfigured ? "Add HEVY_API_KEY" : hevy.connected ? "Sync Hevy" : "Connect Hevy",
+      syncAction: "/api/hevy/sync",
       syncNotice: providerNotice("Hevy", syncStatus?.hevy),
       grantedScopes: null,
     },
@@ -83,7 +86,7 @@ export function ProtectedSettingsActions({ hevy, syncStatus, whoop }: { hevy: He
               {provider.syncNotice ? <p className={styles.notice} role="status">{provider.syncNotice}</p> : null}
               <div className={styles.actions}>
                 {provider.reconnectHref ? <a href={provider.reconnectHref}>Reconnect</a> : <button type="button" disabled>{provider.reconnectLabel}</button>}
-                <form action={provider.syncAction} method="post"><button type="submit" disabled={!provider.configured}>Sync {provider.name}</button></form>
+                <form action={provider.syncAction} method="post"><button type="submit" disabled={!provider.configured}>{provider.syncLabel}</button></form>
               </div>
             </article>;
           })}
