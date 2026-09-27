@@ -13,7 +13,7 @@ export function buildWeeklyPlanFromInputs({
   decision: DailyPhysiqueDecision;
   readiness: DailyReadiness;
   trainingLoad: DailyTrainingLoad;
-  completed: Array<{ date: string; title: string | null }>;
+  completed: Array<{ date: string; title: string | null; exercises?: string[] }>;
 }): WeeklyPlan {
   const interval = calendarWeekInterval(now);
   const today = calendarDateKey(now);
@@ -69,8 +69,14 @@ export function buildWeeklyPlanFromInputs({
       } else consecutivePlanned = 0;
     } else consecutivePlanned = 0;
 
-    const anchors = workoutType === "Upper" ? trainingLoad.upperSessionAnchors.slice(0, 3)
-      : workoutType === "Lower" ? trainingLoad.lowerSessionAnchors.slice(0, 3) : [];
+    let anchors: string[];
+    if (actual) {
+      anchors = actual.exercises?.slice(0, 3) ?? [];
+      if (!anchors.length && actual.title) anchors = [actual.title];
+    } else {
+      anchors = workoutType === "Upper" ? trainingLoad.upperSessionAnchors.slice(0, 3)
+        : workoutType === "Lower" ? trainingLoad.lowerSessionAnchors.slice(0, 3) : [];
+    }
     days.push({
       date: key,
       label: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" }).format(date),
@@ -89,10 +95,33 @@ export async function buildWeeklyPlan(
   trainingLoad: DailyTrainingLoad,
 ) {
   const interval = calendarWeekInterval(now);
-  const completed = await dbAll<{ date: string; title: string | null }>(
-    "SELECT start_time AS date, title FROM hevy_workouts WHERE start_time >= ? AND start_time < ? ORDER BY start_time",
+  const completed = await dbAll<{ date: string; title: string | null; raw_json: string }>(
+    "SELECT start_time AS date, title, raw_json FROM hevy_workouts WHERE start_time >= ? AND start_time < ? ORDER BY start_time",
     interval.start.toISOString(),
     interval.end.toISOString(),
   );
-  return buildWeeklyPlanFromInputs({ now, decision, readiness, trainingLoad, completed });
+  return buildWeeklyPlanFromInputs({
+    now,
+    decision,
+    readiness,
+    trainingLoad,
+    completed: completed.map((workout) => {
+      try {
+        const rawWorkout = JSON.parse(workout.raw_json) as {
+          exercises?: Array<{ title?: string | null }>;
+        };
+        return {
+          date: workout.date,
+          title: workout.title,
+          exercises: Array.isArray(rawWorkout.exercises)
+            ? rawWorkout.exercises
+                .map((exercise) => typeof exercise?.title === "string" ? exercise.title.trim() : "")
+                .filter(Boolean)
+            : [],
+        };
+      } catch {
+        return { date: workout.date, title: workout.title, exercises: [] };
+      }
+    }),
+  });
 }
