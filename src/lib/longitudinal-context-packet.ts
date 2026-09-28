@@ -1,12 +1,14 @@
 import { assertLongitudinalCopySafe } from "@/lib/longitudinal-copy-safety";
 import type {
   CoverageDetail,
+  ExploratoryRelationship,
   HealthDomainTrend,
   LongitudinalHealthView,
   MetricTrend,
   NotableTrend,
   RecordedAssociation,
   SourceProvenance,
+  TrainingResponseAnalysis,
 } from "@/lib/longitudinal/types";
 
 export const LONGITUDINAL_QUESTION_PLACEHOLDER =
@@ -95,12 +97,16 @@ function notableLine(trend: NotableTrend) {
 function associationLine(association: RecordedAssociation) {
   return [
     `id=${association.id}`,
+    `methodVersion=${text(association.methodVersion)}`,
     `exposure=${association.exposureLabel}`,
     `outcome=${association.outcomeLabel}`,
     `window=${association.analysisWindowDays}d`,
     `lag=${association.lagHours}h`,
     `exposed=${association.exposedCount}`,
     `comparison=${association.comparisonCount}`,
+    `eligible=${text(association.eligibleCount)}`,
+    `excluded=${text(association.excludedCount)}`,
+    `sampleDates=${dateRange([...(association.exposedDates ?? []), ...(association.comparisonDates ?? [])])}`,
     `exposedMedian=${text(association.exposedMedian)}`,
     `comparisonMedian=${text(association.comparisonMedian)}`,
     `absoluteDifference=${text(association.absoluteDifference)}`,
@@ -113,6 +119,55 @@ function associationLine(association: RecordedAssociation) {
     `provenance: ${provenanceSummary(association.provenance)}`,
     `limitations=${list(association.limitations)}`,
   ].join("; ");
+}
+
+function analysisFindingLine(finding: NonNullable<LongitudinalHealthView["analysis"]>["findings"][number]) {
+  return [
+    `id=${finding.id}`,
+    `kind=${finding.kind}`,
+    `metric=${finding.metricId}`,
+    `current=${finding.currentStart} through ${finding.currentEnd} (${finding.currentCount} observations; coverage=${finding.currentCoverage})`,
+    `comparison=${finding.comparisonStart ?? "none"} through ${finding.comparisonEnd ?? "none"} (${finding.comparisonCount} observations; coverage=${text(finding.comparisonCoverage)})`,
+    `median=${finding.currentMedian}; comparisonMedian=${text(finding.comparisonMedian)}; difference=${text(finding.difference)}${finding.unit ? ` ${finding.unit}` : ""}`,
+    `standardizedDifference=${text(finding.standardizedDifference)}`,
+    `persistence=${finding.persistenceDays}d`,
+    `evidence=${finding.evidence}`,
+    `sources=${list(finding.source)}`,
+    `summary=${finding.summary}`,
+  ].join("; ");
+}
+
+function relationshipLine(relationship: ExploratoryRelationship) {
+  return [
+    `id=${relationship.id}`,
+    `methodVersion=${relationship.methodVersion}`,
+    `exposure=${relationship.exposureLabel} (${relationship.exposureUnit})`,
+    `outcome=${relationship.outcomeLabel} (${relationship.outcomeUnit})`,
+    `sampleCount=${relationship.sampleCount}`,
+    `eligible=${relationship.eligibleCount}; excluded=${relationship.excludedCount}`,
+    `dates=${dateRange([relationship.startDate ?? "", relationship.endDate ?? ""].filter(Boolean))}`,
+    `rankCorrelation=${text(relationship.rankCorrelation)}`,
+    `lowerExposureMedian=${text(relationship.lowerExposureMedian)}`,
+    `higherExposureMedian=${text(relationship.higherExposureMedian)}`,
+    `medianDifference=${text(relationship.medianDifference)}`,
+    `bootstrapInterval=${relationship.bootstrapInterval ? relationship.bootstrapInterval.join(" to ") : "unavailable"}`,
+    `evidence=${relationship.evidence}`,
+    `method=${relationship.method}`,
+    `limitations=${list(relationship.limitations)}`,
+  ].join("; ");
+}
+
+function trainingResponseLines(response: TrainingResponseAnalysis) {
+  return [
+    `- methodVersion=${response.methodVersion}; metric=${response.metric}; eligibleSessions=${response.eligibleSessionCount}; excludedSessions=${response.excludedSessionCount}; span=${response.sessionSpanDays}d; qualified=${response.qualified}; followupSessionCounts=${response.followupCounts.join(",")}`,
+    ...(["upper", "lower", "mixed"] as const).map((split) => {
+      const summary = response.splitSummary[split];
+      return `- ${split}: eligibleSessions=${summary.eligibleSessionCount}; span=${summary.sessionSpanDays}d; qualified=${summary.qualified}; followupSessionCounts=${summary.followupCounts.join(",")}`;
+    }),
+    `- Unknown sessions retained as censoring exposures=${response.unknownSessionCount}`,
+    ...response.exclusions.map((item) => `- Exclusion: ${item}`),
+    ...response.limitations.map((item) => `- Limitation: ${item}`),
+  ];
 }
 
 type OptionalSignalSummary = {
@@ -184,6 +239,17 @@ export function buildLongitudinalContextPacket(view: LongitudinalHealthView) {
     "",
     "Notable longitudinal trends",
     ...(view.notableTrends.length ? view.notableTrends.map((trend) => `- ${notableLine(trend)}`) : ["- None available"]),
+    "",
+    "WHOOP analysis findings",
+    ...(view.analysis?.findings.length ? view.analysis.findings.map((finding) => `- ${analysisFindingLine(finding)}`) : ["- None met the current evidence rules"]),
+    `- Method=${text(view.analysis?.methodVersion)}; range=${text(view.analysis?.range)}; dates=${text(view.analysis?.startDate)} through ${text(view.analysis?.endDate)}; eligibleMetrics=${text(view.analysis?.eligibleMetricCount)}; excludedMetrics=${text(view.analysis?.excludedMetricCount)}; exclusions=${list(view.analysis?.exclusions)}`,
+    "",
+    "Sleep and strain relationships (exploratory)",
+    ...(view.sleepRelationships?.length ? view.sleepRelationships.map((relationship) => `- ${relationshipLine(relationship)}`) : ["- No sleep relationships available in this view"]),
+    ...(view.strainRelationship ? [`- ${relationshipLine(view.strainRelationship)}`] : []),
+    "",
+    "Hevy response analysis",
+    ...(view.trainingResponse ? trainingResponseLines(view.trainingResponse) : ["- No Hevy response analysis available in this view"]),
     "",
     "Explicitly recorded associations",
     ...(view.recordedAssociations.length ? view.recordedAssociations.map((association) => `- ${associationLine(association)}`) : ["- No supported recorded associations"]),

@@ -8,9 +8,11 @@ import {
 } from "@/lib/longitudinal-context-packet";
 import type {
   HealthDomainTrend,
+  ExploratoryRelationship,
   LongitudinalHealthView,
   MetricTrend,
   SourceProvenance,
+  TrainingResponseAnalysis,
 } from "@/lib/longitudinal/types";
 
 const provenance: SourceProvenance = {
@@ -145,6 +147,52 @@ test("packet represents absent associations as unsupported", () => {
   const { contextPacketText } = buildLongitudinalContextPacket(fixture({ recordedAssociations: [] }));
   assert.match(contextPacketText, /No supported recorded associations/);
   assert.doesNotMatch(contextPacketText, /likely alcohol|suggests alcohol/i);
+});
+
+test("evidence packet carries findings, exploratory methods, and training sample limits without raw points", () => {
+  const relationship: ExploratoryRelationship = {
+    id: "sleep-duration-hrv", methodVersion: "whoop-associated-cycle-exploration-v1",
+    exposureKey: "sleep_duration", exposureLabel: "Sleep duration", exposureUnit: "min",
+    outcomeKey: "hrv", outcomeLabel: "Associated morning HRV", outcomeUnit: "ms",
+    startDate: "2026-06-01", endDate: "2026-07-12", sampleCount: 30, eligibleCount: 31, excludedCount: 2,
+    rankCorrelation: 0.42, lowerExposureMedian: 55, higherExposureMedian: 61,
+    medianDifference: 6, bootstrapInterval: [-1, 12], points: [
+      { date: "2026-06-01", x: 410, y: 55, observationId: "sleep:cycle" },
+    ], evidence: "exploratory", method: "Pairs use the referenced sleep and its associated physiological cycle.",
+    limitations: ["Observational personal-data relationship; association does not establish causation."],
+  };
+  const trainingResponse: TrainingResponseAnalysis = {
+    methodVersion: "hevy-recovery-response-v1", metric: "hrv", eligibleSessionCount: 8, excludedSessionCount: 4,
+    sessionSpanDays: 49, qualified: false, followupCounts: [8, 6, 3],
+    splitSummary: {
+      upper: { eligibleSessionCount: 4, sessionSpanDays: 35, qualified: false, followupCounts: [4, 3, 1] },
+      lower: { eligibleSessionCount: 4, sessionSpanDays: 42, qualified: false, followupCounts: [4, 3, 2] },
+      mixed: { eligibleSessionCount: 0, sessionSpanDays: 0, qualified: false, followupCounts: [0, 0, 0] },
+    },
+    unknownSessionCount: 2, points: [], exclusions: ["Two sessions lacked baseline coverage."],
+    limitations: ["Descriptive response does not establish causation."],
+  };
+  const base = fixture();
+  const view = fixture({
+    analysis: {
+      methodVersion: "whoop-observatory-v1", range: "30d", endDate: "2026-07-12",
+      startDate: "2026-06-13", comparisonStartDate: "2026-05-14", comparisonEndDate: "2026-06-12",
+      findings: [], eligibleMetricCount: 3, excludedMetricCount: 7, exclusions: ["Sparse coverage."],
+    },
+    sleepRelationships: [relationship], strainRelationship: { ...relationship, id: "strain-recovery" },
+    trainingResponse,
+    recordedAssociations: base.recordedAssociations,
+  });
+  const { contextPacketText } = buildLongitudinalContextPacket(view);
+  assert.match(contextPacketText, /WHOOP analysis findings/);
+  assert.match(contextPacketText, /whoop-observatory-v1/);
+  assert.match(contextPacketText, /whoop-associated-cycle-exploration-v1/);
+  assert.match(contextPacketText, /sampleCount=30/);
+  assert.match(contextPacketText, /bootstrapInterval=-1 to 12/);
+  assert.match(contextPacketText, /hevy-recovery-response-v1/);
+  assert.match(contextPacketText, /Unknown sessions retained as censoring exposures=2/);
+  assert.match(contextPacketText, /Two sessions lacked baseline coverage/);
+  assert.doesNotMatch(contextPacketText, /observationId=sleep:cycle|x=410|y=55/);
 });
 
 test("365 daily points and provenance timestamps are summarized rather than dumped", () => {
