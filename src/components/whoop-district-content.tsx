@@ -1,7 +1,7 @@
-import { LongitudinalObservatory } from "@/components/longitudinal-observatory";
-import { getLongitudinalHealthView } from "@/lib/longitudinal";
+import { WhoopAnalysisClient } from "@/components/whoop-analysis-client";
+import { getWhoopAnalysisSelection } from "@/lib/longitudinal/selection";
 
 export async function WhoopDistrictContent() {
-  const view = await getLongitudinalHealthView();
-  return <LongitudinalObservatory view={view} />;
+  const initialData = await getWhoopAnalysisSelection({ range: "30d", view: "overview" });
+  return <WhoopAnalysisClient initialData={initialData} />;
 }
