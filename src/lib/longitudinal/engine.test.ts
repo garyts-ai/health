@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { calendarDateKey, shiftCalendarDateKey } from "@/lib/calendar";
+import { buildWhoopCycleObservations, type ExportCycleRecord } from "@/lib/longitudinal/observations";
 import { buildLongitudinalHealthView, metricPointsWithPersonalRanges, type LongitudinalEngineInput } from "@/lib/longitudinal/engine";
 
 const NOW = new Date("2026-07-12T16:00:00.000Z");
@@ -63,11 +65,10 @@ test("acute deviation remains separate from stable long-term direction", () => {
   assert.doesNotMatch(JSON.stringify(view), /you should|diagnos|getting sick/i);
 });
 
-test("personal ranges use strictly prior non-null observations", () => {
+test("personal ranges use strictly prior non-null observations from the recent 28 days", () => {
   const source = [
-    ...Array.from({ length: 14 }, (_, index) => ({ date: `2026-01-${String(index + 1).padStart(2, "0")}`, value: index })),
-    { date: "2026-02-01", value: 100 },
-    { date: "2026-02-10", value: null },
+    ...Array.from({ length: 28 }, (_, index) => ({ date: new Date(Date.UTC(2026, 0, index + 1, 12)).toISOString().slice(0, 10), value: index === 14 ? 100 : index })),
+    ...Array.from({ length: 28 }, (_, index) => ({ date: new Date(Date.UTC(2026, 1, index + 1, 12)).toISOString().slice(0, 10), value: index === 9 ? null : index + 100 })),
     { date: "2026-03-01", value: 7 },
   ];
   const points = metricPointsWithPersonalRanges(source, 4);
@@ -75,9 +76,10 @@ test("personal ranges use strictly prior non-null observations", () => {
   assert.equal(points[14].personalRange?.sampleCount, 14);
   assert.equal(points[14].personalRange?.center, 6.5);
   assert.equal(points[14].personalRange?.status, "above");
-  assert.equal(points[15].personalRange, undefined);
-  assert.equal(points[16].personalRange?.sampleCount, 15);
-  assert.notEqual(points[16].personalRange?.center, points[14].personalRange?.center);
+  const feb10 = points.find((point) => point.date === "2026-02-10");
+  assert.equal(feb10?.personalRange, undefined);
+  assert.equal(points.at(-1)?.personalRange?.sampleCount, 27);
+  assert.notEqual(points.at(-1)?.personalRange?.center, points[14].personalRange?.center);
 });
 
 test("personal range is unavailable for insufficient history or zero MAD", () => {
@@ -93,7 +95,7 @@ test("the robust-z threshold boundary is classified as outside the range", () =>
   const center = 6.5;
   const dispersion = 3.5;
   const boundary = center + 2.5 * dispersion / 0.6745;
-  const points = metricPointsWithPersonalRanges([...history, { date: "2026-02-01", value: boundary }], 8);
+  const points = metricPointsWithPersonalRanges([...history, { date: "2026-01-15", value: boundary }], 8);
   assert.equal(points.at(-1)?.personalRange?.robustZScore, 2.5);
   assert.equal(points.at(-1)?.personalRange?.status, "above");
 });
@@ -158,20 +160,38 @@ function alcoholRows(count: number): LongitudinalEngineInput["journalRows"] {
 }
 
 function alcoholNoRows(count: number): LongitudinalEngineInput["journalRows"] {
-  const exposed = new Set(alcoholRows(20).map((row) => row.cycle_start));
-  return Array.from({ length: 170 }, (_, index) => `${date(-(index + 1))}T05:00:00.000Z`)
-    .filter((cycleStart) => !exposed.has(cycleStart))
-    .slice(0, count)
-    .map((cycleStart, index) => ({ id: `journal-no-${index}`, cycle_start: cycleStart, question_text: "Did you consume alcohol?", answered_yes: 0 }));
+  const controlDates = [...new Set(alcoholRows(Math.ceil(count / 2)).flatMap((row) => {
+    const exposureDate = calendarDateKey(row.cycle_start!);
+    return [shiftCalendarDateKey(exposureDate, -7), shiftCalendarDateKey(exposureDate, 7)];
+  }))].slice(0, count).sort();
+  return controlDates.map((controlDate, index) => ({
+    id: `journal-no-${index}`,
+    cycle_start: `${controlDate}T05:00:00.000Z`,
+    question_text: "Did you consume alcohol?",
+    answered_yes: 0,
+  }));
 }
 
-test("explicit alcohol records can produce a cautious next-day association", () => {
-  const exposedTargets = new Set(alcoholRows(12).map((row) => date(Math.round((Date.parse(row.cycle_start!) - NOW.getTime()) / 86_400_000) + 1)));
+function exportCyclesFromDays(days: LongitudinalEngineInput["liveDays"]): ExportCycleRecord[] {
+  return days.map((row) => ({
+    cycle_start: row.cycle_start, cycle_end: row.sleep_end, timezone_offset: row.timezone_offset,
+    recovery_score: row.recovery_score, resting_heart_rate: row.resting_heart_rate,
+    hrv_rmssd_milli: row.hrv_rmssd_milli, skin_temp_celsius: row.skin_temp_celsius,
+    spo2_percentage: row.spo2_percentage, day_strain: row.day_strain,
+    sleep_onset: null, wake_onset: row.sleep_end, sleep_performance: null,
+    respiratory_rate: row.respiratory_rate, asleep_minutes: row.asleep_minutes,
+    sleep_need_minutes: null, sleep_efficiency: row.sleep_efficiency,
+    sleep_consistency: row.sleep_consistency,
+  }));
+}
+
+test("explicit alcohol records compare answers with recovery from the referenced cycle", () => {
+  const exposedTargets = new Set(alcoholRows(12).map((row) => calendarDateKey(row.cycle_start!)));
   const liveDays = Array.from({ length: 180 }, (_, index) => {
     const offset = index - 179;
     return liveDay(offset, { recovery_score: exposedTargets.has(date(offset)) ? 48 : 68 + (index % 2) });
   });
-  const view = buildLongitudinalHealthView(input({ liveDays, journalRows: [...alcoholRows(12), ...alcoholNoRows(40)] }));
+  const view = buildLongitudinalHealthView(input({ liveDays, journalRows: [...alcoholRows(12), ...alcoholNoRows(170)] }));
   const association = view.recordedAssociations.find((item) => item.outcomeKey === "recovery");
   assert.equal(association?.claim, "association_detected");
   assert.match(association?.observation ?? "", /associated with/i);
@@ -179,6 +199,60 @@ test("explicit alcohol records can produce a cautious next-day association", () 
   assert.ok(association?.sensitivityChecksPassed.includes("robust standardized effect ≥0.35"));
   assert.ok(association?.sensitivityChecksPassed.includes("deterministic 95% bootstrap interval excludes zero"));
   assert.ok(association?.sensitivityChecksPassed.includes("trimmed-outlier sign retained"));
+  assert.equal(association?.lagHours, 0);
+  assert.match(association?.matchingMethod ?? "", /legacy daily-summary date fallback/i);
+});
+
+test("recorded answers use the exact referenced cycle and same-cycle recovery", () => {
+  const exposedTargets = new Set(alcoholRows(12).map((row) => calendarDateKey(row.cycle_start!)));
+  const liveDays = Array.from({ length: 180 }, (_, index) => {
+    const offset = index - 179;
+    return liveDay(offset, { recovery_score: exposedTargets.has(date(offset)) ? 48 : 68 + (index % 2) });
+  });
+  const cycleObservations = buildWhoopCycleObservations([], exportCyclesFromDays(liveDays), [], NOW);
+  const view = buildLongitudinalHealthView(input({
+    liveDays,
+    cycleObservations,
+    journalRows: [...alcoholRows(12), ...alcoholNoRows(40)],
+  }));
+  const association = view.recordedAssociations.find((item) => item.outcomeKey === "recovery");
+  assert.equal(association?.claim, "association_detected");
+  assert.equal(association?.lagHours, 0);
+  assert.match(association?.matchingMethod ?? "", /exact referenced physiological cycle start/i);
+  assert.equal(new Set(association?.comparisonDates).size, association?.comparisonDates?.length);
+  for (const exposedDate of association?.exposedDates ?? []) {
+    const exposedDay = new Date(`${exposedDate}T12:00:00.000Z`).getUTCDay();
+    const nearbyControls = (association?.comparisonDates ?? []).filter((controlDate) =>
+      new Date(`${controlDate}T12:00:00.000Z`).getUTCDay() === exposedDay
+      && Math.abs(Date.parse(`${controlDate}T12:00:00.000Z`) - Date.parse(`${exposedDate}T12:00:00.000Z`)) <= 28 * 86_400_000);
+    assert.ok(nearbyControls.length >= 2, `${exposedDate} should have two matched controls`);
+  }
+});
+
+test("contradictory journal answers for the same question and cycle are excluded", () => {
+  const cycleStart = `${date(-2)}T05:00:00.000Z`;
+  const view = buildLongitudinalHealthView(input({ journalRows: [
+    { id: "contradictory-yes", cycle_start: cycleStart, question_text: "Did you consume alcohol?", answered_yes: 1 },
+    { id: "contradictory-no", cycle_start: cycleStart, question_text: "Did you consume alcohol?", answered_yes: 0 },
+  ] }));
+  const recovery = view.recordedAssociations.find((item) => item.outcomeKey === "recovery");
+  assert.equal(recovery?.claim, "insufficient_data");
+  assert.equal(recovery?.exposedCount, 0);
+  assert.equal(recovery?.comparisonCount, 0);
+  assert.ok(recovery?.limitations.some((item) => /contradictory cycle answers were excluded/i.test(item)));
+});
+
+test("different physiological cycles on the same display date keep their distinct answers", () => {
+  const sameDate = date(-2);
+  const view = buildLongitudinalHealthView(input({ journalRows: [
+    { id: "cycle-a-yes", cycle_start: `${sameDate}T05:00:00.000Z`, question_text: "Did you consume alcohol?", answered_yes: 1 },
+    { id: "cycle-b-no", cycle_start: `${sameDate}T06:00:00.000Z`, question_text: "Did you consume alcohol?", answered_yes: 0 },
+  ] }));
+  const recovery = view.recordedAssociations.find((item) => item.outcomeKey === "recovery");
+  assert.equal(recovery?.claim, "insufficient_data");
+  assert.equal(recovery?.eligibleCount, 2);
+  assert.equal(recovery?.excludedCount, 2);
+  assert.equal(recovery?.limitations.some((item) => /contradictory/i.test(item)), false);
 });
 
 test("unrecorded alcohol is never inferred and small samples are insufficient", () => {

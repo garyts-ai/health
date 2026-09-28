@@ -33,6 +33,8 @@ export type SourceProvenance = {
 export type MetricPoint = {
   date: string;
   value: number | null;
+  sources?: LongitudinalSource[];
+  observationIds?: string[];
   personalRange?: {
     center: number;
     lower: number;
@@ -41,6 +43,199 @@ export type MetricPoint = {
     robustZScore: number;
     status: "within" | "above" | "below";
   };
+};
+
+export type WhoopCycleObservation = {
+  id: string;
+  date: string;
+  source: "WHOOP live API" | "WHOOP export";
+  cycleId: string | null;
+  sleepId: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  sleepStartedAt: string | null;
+  sleepEndedAt: string | null;
+  completed: boolean;
+  scoreState: string | null;
+  recoveryValid: boolean;
+  sleepValid: boolean;
+  strainValid: boolean;
+  recoveryScore: number | null;
+  restingHeartRate: number | null;
+  hrv: number | null;
+  spo2: number | null;
+  skinTemperature: number | null;
+  strain: number | null;
+  respiratoryRate: number | null;
+  sleepMinutes: number | null;
+  sleepNeedMinutes: number | null;
+  sleepEfficiency: number | null;
+  sleepConsistency: number | null;
+  calibrating: boolean;
+  validity: string[];
+  provenance: SourceProvenance;
+};
+
+export type WhoopSleepObservation = {
+  id: string;
+  cycleId: string | null;
+  date: string;
+  source: "WHOOP live API" | "WHOOP export";
+  startedAt: string;
+  endedAt: string;
+  nap: boolean;
+  scoreState: string | null;
+  sleepMinutes: number | null;
+  sleepNeedMinutes: number | null;
+  sleepEfficiency: number | null;
+  sleepConsistency: number | null;
+  validity: string[];
+  provenance: SourceProvenance;
+};
+
+export type WhoopActivityObservation = {
+  id: string;
+  date: string;
+  startedAt: string;
+  endedAt: string;
+  title: string;
+  strain: number | null;
+  source: "WHOOP live API" | "WHOOP export";
+  completed: boolean;
+};
+
+export type HevySessionObservation = {
+  id: string;
+  date: string;
+  startedAt: string;
+  endedAt: string;
+  title: string | null;
+  split: "upper" | "lower" | "mixed" | "unknown";
+  exercises: string[];
+  setCount: number;
+  source: "Hevy";
+};
+
+export type AnalysisRange = "7d" | "30d" | "90d" | "365d" | "all";
+export type AnalysisView = "overview" | "sleep" | "training" | "recorded";
+
+export type AnalysisFinding = {
+  id: string;
+  kind: "period_difference" | "sustained_trend" | "current_deviation";
+  metricId: string;
+  label: string;
+  unit: string;
+  currentStart: string;
+  currentEnd: string;
+  comparisonStart: string | null;
+  comparisonEnd: string | null;
+  currentMedian: number;
+  comparisonMedian: number | null;
+  difference: number | null;
+  relativeDifference: number | null;
+  standardizedDifference: number | null;
+  slopePerWeek: number | null;
+  currentCount: number;
+  comparisonCount: number;
+  currentCoverage: number;
+  comparisonCoverage: number | null;
+  persistenceDays: number;
+  evidence: "supported" | "exploratory" | "insufficient";
+  source: LongitudinalSource[];
+  summary: string;
+};
+
+export type LongitudinalAnalysis = {
+  methodVersion: string;
+  range: AnalysisRange;
+  endDate: string;
+  startDate: string;
+  comparisonStartDate: string | null;
+  comparisonEndDate: string | null;
+  findings: AnalysisFinding[];
+  eligibleMetricCount: number;
+  excludedMetricCount: number;
+  exclusions: string[];
+};
+
+export type RelationshipPoint = { date: string; x: number; y: number; observationId: string };
+
+export type ExploratoryRelationship = {
+  id: string;
+  methodVersion: string;
+  exposureKey: string;
+  exposureLabel: string;
+  outcomeKey: string;
+  outcomeLabel: string;
+  exposureUnit: string;
+  outcomeUnit: string;
+  startDate: string | null;
+  endDate: string | null;
+  sampleCount: number;
+  eligibleCount: number;
+  excludedCount: number;
+  rankCorrelation: number | null;
+  lowerExposureMedian: number | null;
+  higherExposureMedian: number | null;
+  medianDifference: number | null;
+  bootstrapInterval: [number, number] | null;
+  points: RelationshipPoint[];
+  evidence: "exploratory" | "insufficient";
+  method: string;
+  limitations: string[];
+};
+
+export type TrainingResponsePoint = {
+  sessionId: string;
+  sessionDate: string;
+  split: "upper" | "lower" | "mixed";
+  followupIndex: number;
+  recoveryDate: string;
+  elapsedHours: number;
+  baselineHrv: number | null;
+  recoveryHrv: number | null;
+  difference: number | null;
+};
+
+export type TrainingResponseAnalysis = {
+  methodVersion: string;
+  metric: "hrv";
+  eligibleSessionCount: number;
+  excludedSessionCount: number;
+  sessionSpanDays: number;
+  qualified: boolean;
+  followupCounts: [number, number, number];
+  splitSummary: Record<"upper" | "lower" | "mixed", {
+    eligibleSessionCount: number;
+    sessionSpanDays: number;
+    qualified: boolean;
+    followupCounts: [number, number, number];
+  }>;
+  unknownSessionCount: number;
+  points: TrainingResponsePoint[];
+  exclusions: string[];
+  limitations: string[];
+};
+
+export type AnalysisMetricSeries = Pick<MetricTrend, "id" | "domainId" | "label" | "unit" | "points" | "baselineValue" | "confidence" | "coveredDays" | "expectedDays"> & { granularity: "daily" | "weekly" };
+
+export type WhoopAnalysisSelectionView = {
+  generatedAt: string;
+  timezone: string;
+  selectedView: AnalysisView;
+  selectedMetric: string | null;
+  analysis: LongitudinalAnalysis;
+  metrics: AnalysisMetricSeries[];
+  cycles: WhoopCycleObservation[];
+  latestCycles: WhoopCycleObservation[];
+  sleeps: WhoopSleepObservation[];
+  activities: WhoopActivityObservation[];
+  sessions: HevySessionObservation[];
+  relationships: ExploratoryRelationship[];
+  trainingResponse: TrainingResponseAnalysis;
+  recordedAssociations: RecordedAssociation[];
+  journalEvents: JournalEventViewModel[];
+  freshness: { lastSyncCompletedAt: string | null; lastSyncStatus: string | null; isStale: boolean };
 };
 
 export type MetricTrend = {
@@ -120,6 +315,7 @@ export type CurrentDeviation = {
 
 export type RecordedAssociation = {
   id: string;
+  methodVersion?: string;
   exposureKey: string;
   exposureLabel: string;
   outcomeKey: string;
@@ -128,6 +324,8 @@ export type RecordedAssociation = {
   lagHours: number;
   exposedCount: number;
   comparisonCount: number;
+  eligibleCount?: number;
+  excludedCount?: number;
   exposedMedian: number | null;
   comparisonMedian: number | null;
   absoluteDifference: number | null;
@@ -142,6 +340,7 @@ export type RecordedAssociation = {
   limitations: string[];
   exposedDates?: string[];
   comparisonDates?: string[];
+  sampleValues?: Array<{ date: string; answer: "yes" | "no"; value: number; observationId: string }>;
   exposedDispersion?: number | null;
   comparisonDispersion?: number | null;
   robustEffectSize?: number | null;
@@ -296,5 +495,13 @@ export type LongitudinalHealthView = {
   journalEvents?: JournalEventViewModel[];
   alcoholLog?: AlcoholLogViewModel;
   domainCards?: DomainCardViewModel[];
+  cycleObservations?: WhoopCycleObservation[];
+  sleepObservations?: WhoopSleepObservation[];
+  activityObservations?: WhoopActivityObservation[];
+  hevySessions?: HevySessionObservation[];
+  analysis?: LongitudinalAnalysis;
+  sleepRelationships?: ExploratoryRelationship[];
+  strainRelationship?: ExploratoryRelationship;
+  trainingResponse?: TrainingResponseAnalysis;
   dataCoverage: DataCoverage;
 };
