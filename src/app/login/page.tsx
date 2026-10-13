@@ -1,7 +1,8 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
-import { authOptions, isAppAuthEnabled } from "@/lib/auth";
+import { authOptions, isAllowedGitHubSession, isAppAuthEnabled } from "@/lib/auth";
+import { getSafeCallbackUrl } from "@/lib/auth-navigation";
 import { SignInButton } from "@/app/login/sign-in-button";
 
 export const dynamic = "force-dynamic";
@@ -11,28 +12,21 @@ type LoginPageProps = {
   searchParams?: Promise<{
     callbackUrl?: string;
     error?: string;
+    switchAccount?: string;
   }>;
 };
-
-function getSafeCallbackUrl(callbackUrl?: string) {
-  if (!callbackUrl || !callbackUrl.startsWith("/") || callbackUrl.startsWith("//")) {
-    return "/";
-  }
-
-  return callbackUrl;
-}
 
 function getLoginErrorMessage(error?: string) {
   switch (error) {
     case "AccessDenied":
-      return "GitHub signed in, but that account is not on the Health OS allowlist. Use the allowed GitHub account, then retry.";
+      return "This GitHub account does not have access to HealthMaxer. Choose a different account to try again.";
     case "github":
-      return "GitHub did not complete a clean sign-in. Clear this app session, then retry GitHub from a fresh flow.";
+      return "GitHub sign-in did not complete. Try again or choose a different account.";
     case "Configuration":
       return "Health OS auth is misconfigured. Check the GitHub OAuth env values in Vercel, then redeploy.";
     default:
       return error
-        ? "Sign-in did not complete. Clear this app session, then retry GitHub."
+        ? "Sign-in did not complete. Try again or choose a different GitHub account."
         : null;
   }
 }
@@ -45,7 +39,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await getServerSession(authOptions);
   const resolvedSearchParams = (await searchParams) ?? {};
 
-  if (session?.user?.email) {
+  if (isAllowedGitHubSession(session) && !resolvedSearchParams.error && resolvedSearchParams.switchAccount !== "1") {
     redirect(getSafeCallbackUrl(resolvedSearchParams.callbackUrl));
   }
 
@@ -66,12 +60,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </p>
 
           {errorMessage ? (
-            <p className="mt-5 rounded-[10px] border border-[#ff8d75]/30 bg-[#ff8d75]/12 px-4 py-3 text-sm text-[#ffe2dc]">
+            <p role="alert" className="mt-5 rounded-[10px] border border-[#ff8d75]/30 bg-[#ff8d75]/12 px-4 py-3 text-sm text-[#ffe2dc]">
               {errorMessage}
             </p>
           ) : null}
 
-          <SignInButton callbackUrl={callbackUrl} hasError={Boolean(errorMessage)} />
+          {session?.user?.name ? <p className="mt-5 text-sm text-[#d8d0ec]">HealthMaxer session: {session.user.name}</p> : null}
+          <SignInButton callbackUrl={callbackUrl} hasSession={Boolean(session)} />
         </div>
       </section>
     </main>
