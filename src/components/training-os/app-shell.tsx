@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { MobilePullSync } from "@/components/mobile-pull-sync";
 import { NeonAtmosphere } from "@/components/neon-atmosphere";
+import { SignOutButton } from "@/components/sign-out-button";
+import { isAppAuthEnabled } from "@/lib/auth";
 import { GlobalNavigation } from "./global-navigation";
 import styles from "./app-shell.module.css";
 
@@ -18,7 +20,7 @@ export function AppShell({ date, children }: { date: string; children: ReactNode
         </div>
       </header>
       {children}
-      <footer className="district-footer"><span>Health OS</span><a href="#today">Back to today ↑</a></footer>
+      <footer className="district-footer"><span>Health OS</span>{isAppAuthEnabled() ? <SignOutButton /> : null}<a href="#today">Back to today ↑</a></footer>
     </main>
   );
 }

@@ -1,4 +1,4 @@
-import type { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions, Session } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
 
 type GitHubProfileLike = {
@@ -43,11 +43,21 @@ export function isAppAuthEnabled() {
   );
 }
 
+export function isAllowedGitHubSession(session: Session | null) {
+  const login = session && "githubUsername" in session
+    ? normalizePrincipal(session.githubUsername)
+    : null;
+  return Boolean(login && getAllowedGitHubUsers().has(login));
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GitHubProvider({
       clientId: process.env.AUTH_GITHUB_ID ?? "",
       clientSecret: process.env.AUTH_GITHUB_SECRET ?? "",
+      authorization: {
+        params: { scope: "read:user user:email", prompt: "select_account" },
+      },
       profile(profile: GitHubProfileLike) {
         return {
           id: String(profile.id ?? profile.login ?? ""),
@@ -64,6 +74,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   callbacks: {
     async signIn({ profile, user }) {
@@ -90,7 +101,10 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email;
       }
 
-      return session;
+      return {
+        ...session,
+        githubUsername: normalizePrincipal(token.githubUsername),
+      };
     },
   },
 };

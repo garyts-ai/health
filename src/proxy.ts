@@ -13,6 +13,7 @@ function isStaticAsset(pathname: string) {
 function isNextAuthPath(pathname: string) {
   return (
     pathname.startsWith("/api/auth/signin") ||
+    pathname === "/api/auth/signout" ||
     pathname.startsWith("/api/auth/callback") ||
     pathname.startsWith("/api/auth/error") ||
     pathname.startsWith("/api/auth/session") ||
